@@ -2,7 +2,7 @@
 
 > Buchungsportal für den Jugendraum des SV Heepen. Mitglieder und Externe können den Raum online anfragen, das Orga-Team verwaltet alles über einen Admin-Bereich.
 >
-> Stand: November 2026 · Klickbarer Prototyp: [`prototype/index.html`](prototype/index.html)
+> Stand: November 2026 · Klickbarer Prototyp: [`prototype/index.html`](prototype/index.html) · **Phase 1 (MVP) ist umgesetzt**, siehe [README](README.md)
 
 ---
 
@@ -118,7 +118,7 @@ Puffer addieren sich also nicht doppelt, und der Raum bleibt trotzdem nie ohne A
 - **Party-Wochenende** = Freitag 12:00 bis Montag 06:00 (einstellbar).
 - Liegt eine Party (Status *angefragt* oder *bestätigt*) in diesem Fenster, kann für dasselbe Wochenende **keine weitere Party** angefragt werden. Das Formular zeigt dann: *„Für das Wochenende 14.–16. Nov. ist bereits eine Feier eingetragen. Wähle bitte ein anderes Wochenende."*
 - Andere Kategorien (z. B. Mannschaftssitzung am Sonntagvormittag) bleiben möglich, solange Zeit und Puffer passen. **Schalter im Admin:** *„Party sperrt das ganze Wochenende"*, falls ihr am Party-Wochenende gar keine anderen Buchungen wollt.
-- Unbestätigte Anfragen verfallen nach 48 h ohne E-Mail-Bestätigung bzw. nach Ablehnung, damit das Wochenende wieder frei wird.
+- Unbestätigte Anfragen verfallen nach 24 h ohne E-Mail-Bestätigung bzw. nach Ablehnung, damit das Wochenende wieder frei wird.
 - Im öffentlichen Kalender bekommt ein vergebenes Party-Wochenende ein kleines Party-Badge.
 
 ### Weitere Regeln (Vorschlag, alle einstellbar)
@@ -193,13 +193,14 @@ Ziel: günstig (0–5 €/Monat), wartungsarm und von Ehrenamtlichen bedienbar.
 | Baustein | Empfehlung | Warum |
 |---|---|---|
 | Frontend + API | **Next.js** (App Router), TypeScript | ein Projekt für Buchungsseite und Admin |
-| UI | Tailwind CSS + eigene Komponenten | setzt die Art Direction exakt um |
-| Datenbank + Auth | **Supabase** (Postgres, Region Frankfurt) | Magic-Link-Login, Row-Level-Security, kostenloser Tarif reicht |
-| Doppelbuchungsschutz | Postgres `EXCLUDE`-Constraint auf `tstzrange` inkl. Puffer + Party-Wochenend-Check in einer Transaktion | Schutz auch bei gleichzeitigen Anfragen |
+| Admin-Login | eigener Magic Link (E-Mail), signiertes Cookie | funktioniert mit jeder Postgres-Datenbank |
+| UI | eigenes CSS mit Design-Tokens (aus dem Prototyp) | setzt die Art Direction exakt um |
+| Datenbank | **Supabase** (Postgres, Region Frankfurt) oder jede andere Postgres-Datenbank | kostenloser Tarif reicht |
+| Doppelbuchungsschutz | Postgres `EXCLUDE`-Constraint gegen überlappende Kernzeiten, Unique-Index für die Party-Regel, Puffer-Prüfung in einer gesperrten Transaktion | Schutz auch bei gleichzeitigen Anfragen |
 | E-Mail | Resend oder Brevo (EU) + React-Email-Vorlagen | gute Zustellbarkeit, Vorlagen im Vereinsdesign |
-| Reminder | Supabase Cron (pg_cron) oder Vercel Cron, stündlich | verschickt fällige Erinnerungen |
+| Reminder | Vercel Cron, täglich 07:00 | verschickt fällige Erinnerungen, idempotent |
 | Hosting | Vercel oder Netlify (EU-Region) | Deployment per Git-Push |
-| Kalender-UI | FullCalendar (Admin), eigener schlanker Kalender (öffentlich) | Drag & Drop im Admin |
+| Kalender-UI | eigener schlanker Monatskalender (öffentlich und Admin) | ohne zusätzliche Bibliothek |
 | Domain | `jugendraum.sv-heepen.de` | Vertrauen und einfacher Link |
 
 ### Datenmodell (vereinfacht)
@@ -310,8 +311,8 @@ Alle über Google Fonts, oder selbst gehostet (DSGVO-sicherer, empfohlen).
 | Phase | Umfang | Aufwand (grob) |
 |---|---|---|
 | **0 – Abstimmung** | Konzept mit Michael & Sigrid durchgehen, offene Fragen klären, Raumfotos machen | 1 Woche |
-| **1 – MVP** | Buchungsformular, Regeln (Puffer, Party), Double-Opt-in, Admin: Anfragen + Kalender, Bestätigungs-/Reminder-Mails | 3–4 Wochenenden |
-| **2 – Komfort** | iCal-Feed, Drag & Drop, Sperrzeiten, Serientermine, Ausstattung, Wochen-Digest, PWA/Push | 2–3 Wochenenden |
+| **1 – MVP** ✅ | Buchungsformular, Regeln (Puffer, Party), Double-Opt-in, Admin: Anfragen + Kalender, Bestätigungs-/Reminder-Mails. Zusätzlich schon dabei: Sperrzeiten, iCal-Abo, Wochenübersicht, Rollen, Protokoll | erledigt |
+| **2 – Komfort** | Drag & Drop im Kalender, Admin bucht für andere, Serientermine, Ausstattung, Mail-Vorlagen im Admin editierbar, PWA/Push | 2–3 Wochenenden |
 | **3 – Extras** | Kaution/Miete-Tracking, Schlüsselübergabe-Checkliste, Statistik, Feedback-Auswertung | nach Bedarf |
 
 ---

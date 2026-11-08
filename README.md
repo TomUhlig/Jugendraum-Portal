@@ -1,7 +1,84 @@
 # Jugendraum-Portal SV Heepen
 
-Buchungsportal für den Jugendraum des SV Heepen.
+Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen den Raum an, das Orga-Team verwaltet alles im Admin-Bereich.
 
-- **[KONZEPT.md](KONZEPT.md)**: vollständiges Konzept (Funktionen, Regeln, Benachrichtigungen, Admin, Technik, Art Direction, Roadmap, offene Fragen)
-- **[prototype/index.html](prototype/index.html)**: klickbarer Prototyp (Buchungsseite + Verwaltung, Beispieldaten, kein Backend). Datei im Browser öffnen; `#admin` zeigt die Verwaltung.
-- **assets/**: Vereinslogo
+- **[KONZEPT.md](KONZEPT.md)**: Konzept, Regeln, Art Direction, Roadmap
+- **[prototype/](prototype/index.html)**: der erste klickbare Entwurf (ohne Backend)
+- **App** (dieses Repo): Next.js 15 + PostgreSQL, Mails über Resend
+
+## Was die App kann
+
+**Für Bucher**
+- Belegungskalender (anonym) mit Tagesansicht inkl. Pufferzeiten
+- Formular in 4 Schritten mit Live-Prüfung: frei / Hinweis / belegt, inkl. Vorschlag für die nächste freie Zeit bzw. das nächste freie Party-Wochenende
+- Pflicht-Haken „mit Michael Grieswelle oder Sigrid Brodig abgesprochen“ plus Auswahl der Person
+- E-Mail-Bestätigung (Double-Opt-in). Unbestätigte Anfragen verfallen nach 24 h
+- Persönliche Buchungsseite mit Status und Storno
+- Mails: Bestätigungslink, Eingang, Bestätigung mit Kalenderdatei (.ics), Ablehnung mit Begründung, Erinnerung 3 Tage und 1 Tag vorher, Nachfrage danach
+
+**Für das Orga-Team** (`/admin`, Login per Magic Link)
+- Übersicht: offene Anfragen mit automatischer Konfliktprüfung, nächste Termine, Auslastung
+- Bestätigen / Ablehnen (mit Begründung) / Stornieren, jeweils mit Mail an den Bucher
+- Interne Notiz, Schlüssel ausgegeben, Kaution erhalten
+- Monatskalender, Sperrzeiten (Ferien, Renovierung)
+- Regeln einstellen: Puffer pro Kategorie, Freigabepflicht, „Party sperrt das ganze Wochenende“, Vorlauf, Kapazität
+- Team & Rollen (Admin / Verwalter / Lesezugriff), Mail-Benachrichtigung pro Person
+- Persönliches Kalender-Abo (iCal) für Handy oder Outlook
+- Protokoll aller Änderungen und verschickten Mails
+- Montags eine Wochenübersicht per Mail
+
+**Regeln** (in `lib/rules.ts`, identisch im Browser und auf dem Server)
+- Puffer vor/nach jedem Termin; zwischen zwei Terminen gilt der **größere** Puffer
+- **Eine Party pro Wochenende** (Fr 12:00 bis Mo 06:00), zusätzlich in der Datenbank per Unique-Index abgesichert
+- Keine überlappenden Termine, zusätzlich per Exclusion-Constraint in der Datenbank abgesichert
+- Sperrzeiten, maximale Dauer, Buchungshorizont; Hinweise bei kurzem Vorlauf, zu vielen Gästen, spätem Party-Ende
+- Besprechungen und Mannschaftssitzungen von Mitgliedern werden automatisch bestätigt (einstellbar)
+
+## Lokal starten
+
+Voraussetzungen: Node.js 20+, PostgreSQL 15+ (lokal oder Supabase).
+
+```bash
+npm install
+cp .env.example .env.local        # Werte eintragen
+npm run db:migrate                # Tabellen anlegen (mehrfach ausführbar)
+npm run admin:add -- du@example.de "Dein Name" admin
+npm run db:seed                   # optional: Beispielbuchungen für eine Test-Datenbank
+npm run dev                       # http://localhost:3000
+```
+
+Ohne `RESEND_API_KEY` werden Mails nicht verschickt, sondern mit allen Links in der Konsole ausgegeben. Im Dev-Modus zeigt die Login-Seite den Login-Link dann auch direkt an.
+
+Tests: `npm test` (Regel-Engine, Zeitzonen, iCal). Typprüfung: `npm run lint`.
+
+## Live schalten (ca. 30 Minuten, 0 €)
+
+1. **Datenbank:** Projekt bei [Supabase](https://supabase.com) anlegen, Region *Frankfurt (eu-central-1)*. Unter *Connect → Session pooler* die Verbindungs-URL kopieren. Lokal `DATABASE_URL=… npm run db:migrate` und `npm run admin:add` ausführen.
+2. **Mails:** Konto bei [Resend](https://resend.com) (EU-Region), Domain `sv-heepen.de` verifizieren (DNS-Einträge SPF/DKIM beim Domain-Anbieter setzen), API-Key erzeugen.
+3. **Hosting:** Repo bei [Vercel](https://vercel.com) importieren. Umgebungsvariablen aus `.env.example` setzen (`APP_URL` = endgültige Adresse, `SESSION_SECRET` und `CRON_SECRET` mit `openssl rand -hex 32` erzeugen). Die Region `fra1` und der tägliche Cron-Lauf (06:00 UTC) sind in `vercel.json` hinterlegt.
+4. **Domain:** In Vercel `jugendraum.sv-heepen.de` hinzufügen und den CNAME beim Domain-Anbieter eintragen.
+5. **Team einladen:** In der Verwaltung unter *Team* Michael Grieswelle, Sigrid Brodig und weitere Personen anlegen.
+
+Datenschutz: Auftragsverarbeitungsverträge (AVV) mit Supabase, Vercel und Resend abschließen (bei allen im Dashboard verfügbar). Personenbezogene Daten werden 12 Monate nach dem Termin automatisch entfernt.
+
+## Aufbau
+
+```
+app/
+  page.tsx                  Buchungsseite (Kalender + Formular)
+  api/belegung              anonyme Belegung für den Kalender
+  api/buchungen             Anfrage anlegen (Prüfung, Sperre, Mail)
+  bestaetigen/[token]       E-Mail-Bestätigung
+  buchung/[token]           Buchung ansehen / stornieren
+  regeln                    Hausordnung, Party-Regel, Datenschutz
+  admin/(app)/…             Übersicht, Buchung, Kalender, Einstellungen, Team, Protokoll
+  admin/anmelden            Magic-Link-Login
+  api/ical/[token]          Kalender-Abo fürs Team
+  api/cron/taeglich         Verfall, Erinnerungen, Nachfrage, Wochenübersicht, Löschung
+components/BookingApp.tsx   Kalender, Tagesleiste, Formular, Ticket
+lib/rules.ts                Buchungsregeln (+ rules.test.ts)
+lib/time.ts                 Rechnen in Europe/Berlin
+lib/data.ts                 Datenbankzugriffe
+lib/mail.ts                 Mail-Vorlagen im Vereinsdesign
+db/schema.sql               Tabellen, Constraints, Startwerte
+```
