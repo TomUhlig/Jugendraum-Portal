@@ -1,6 +1,7 @@
 import { CalendarClock, Clock, KeyRound, PartyPopper, ShieldCheck, Users } from 'lucide-react';
 import Link from 'next/link';
-import { getCategories, getExtras, getSettings } from '@/lib/data';
+import { getCategories, getExtras, getRecurring, getSettings } from '@/lib/data';
+import { describeRecurring } from '@/lib/rules';
 import { eur } from '@/lib/labels';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +11,9 @@ const SECTIONS = [['raum', 'Der Raum'], ['ablauf', 'So läuft eine Buchung'], ['
   ['uebergabe', 'Schlüssel, Übergabe, Rückgabe'], ['hausordnung', 'Hausordnung'], ['storno', 'Absagen und Änderungen'], ['datenschutz', 'Datenschutz']];
 
 export default async function Raum() {
-  const [cats, s, x] = await Promise.all([getCategories(), getSettings(), getExtras()]);
+  const [cats, s, x, rec] = await Promise.all([getCategories(), getSettings(), getExtras(), getRecurring()]);
+  const today = new Date().toISOString().slice(0, 10);
+  const fixed = rec.filter((r) => !r.validUntil || r.validUntil >= today);
   const hasFees = x.feesExternal.rent + x.feesExternal.deposit + x.feesMemberParty.rent + x.feesMemberParty.deposit > 0;
   return (
     <main className="wrap">
@@ -27,6 +30,10 @@ export default async function Raum() {
             <div className="card fact"><Clock className="icon" /><b>Feiern bis {s.partyLatestEnd} Uhr</b><span>danach Aufräumen</span></div>
             <div className="card fact"><CalendarClock className="icon" /><b>{s.partyMinLeadDays} Tage Vorlauf</b><span>für Feiern</span></div>
           </div>
+          {fixed.length > 0 && (
+            <div className="card card-body stack-sm"><b>Feste Zeiten, in denen nicht gebucht werden kann</b>
+              <ul style={{ margin: 0 }}>{fixed.map((r) => <li key={r.id}>{describeRecurring(r)}{r.scope === 'party' ? ' (nur Feiern)' : ''}: {r.reason}</li>)}</ul></div>
+          )}
           {x.equipment.length > 0 && <p><b>Ausstattung:</b> {x.equipment.join(', ')}. Was du brauchst, kannst du bei der Anfrage angeben.</p>}
 
           <h2 id="ablauf">So läuft eine Buchung</h2>

@@ -1,5 +1,5 @@
 // Buchungsregeln. Läuft identisch im Browser (Live-Prüfung) und auf dem Server (verbindliche Prüfung).
-import { DAY, HOUR, MIN, addDays, berlinHm, berlinParts, fmtDay, weekendKey, weekendLabel } from './time';
+import { DAY, HOUR, MIN, addDays, berlinHm, berlinParts, berlinToUtc, berlinYmd, fmtDay, weekdayOf, weekendKey, weekendLabel } from './time';
 
 export type Category = {
   id: string;
@@ -87,7 +87,8 @@ export function checkBooking(d: Draft, ctx: Context): CheckResult {
   // Sperrzeiten
   for (const b of ctx.blackouts) {
     if (b.scope === 'party' && !c.isParty) continue;
-    if (d.start - c.bufferBefore * MIN < b.end && b.start < d.end + c.bufferAfter * MIN) {
+    // Sperrzeiten gelten für die gebuchte Zeit selbst ("ab 17 Uhr" heißt: Beginn 17:00 ist möglich)
+    if (d.start < b.end && b.start < d.end) {
       add('block', 'blackout', blackoutText(b));
     }
   }
@@ -143,6 +144,44 @@ export function checkBooking(d: Draft, ctx: Context): CheckResult {
 
   const level: Level = messages.some((m) => m.level === 'block') ? 'block' : messages.length ? 'warn' : 'ok';
   return { level, messages, suggestion };
+}
+
+/**
+ * Regelmäßige Sperre, z. B. „montags geschlossen“ oder „Mo–Fr bis 17 Uhr“.
+ * weekdays: 0 = Sonntag … 6 = Samstag. Ohne Uhrzeiten ganztägig; endet die Zeit vor dem Beginn, gilt sie bis zum Folgetag.
+ */
+export type RecurringBlock = {
+  id: string; weekdays: number[]; fromTime: string | null; toTime: string | null;
+  scope: 'all' | 'party'; reason: string; validFrom: string | null; validUntil: string | null;
+};
+export const WEEKDAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+/** Rechnet regelmäßige Sperren für einen Zeitraum in einzelne Sperrzeiten um. */
+export function expandRecurring(rules: RecurringBlock[], from: number, to: number): Blackout[] {
+  const out: Blackout[] = [];
+  const first = addDays(berlinYmd(from), -1), last = berlinYmd(to);
+  for (let d = first; d <= last; d = addDays(d, 1)) {
+    const wd = weekdayOf(d);
+    for (const r of rules) {
+      if (!r.weekdays.includes(wd) || (r.validFrom && d < r.validFrom) || (r.validUntil && d > r.validUntil)) continue;
+      let start: number, end: number;
+      if (r.fromTime && r.toTime) {
+        start = berlinToUtc(d, r.fromTime);
+        end = r.toTime > r.fromTime ? berlinToUtc(d, r.toTime) : berlinToUtc(addDays(d, 1), r.toTime);
+      } else { start = berlinToUtc(d, '00:00'); end = berlinToUtc(addDays(d, 1), '00:00'); }
+      if (end > from && start < to) out.push({ id: `${r.id}:${d}`, start, end, reason: r.reason, scope: r.scope });
+    }
+  }
+  return out;
+}
+
+/** Kurzbeschreibung einer regelmäßigen Sperre, z. B. „Mo, Di · 00:00–17:00 Uhr“. */
+export function describeRecurring(r: RecurringBlock): string {
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const days = order.filter((d) => r.weekdays.includes(d));
+  const dayText = days.length === 7 ? 'täglich' : days.join(',') === '1,2,3,4,5' ? 'Mo–Fr' : days.join(',') === '6,0' ? 'Sa und So' : days.map((d) => WEEKDAY_SHORT[d]).join(', ');
+  const time = r.fromTime && r.toTime ? `${r.fromTime}–${r.toTime} Uhr` : 'ganztägig';
+  return `${dayText} · ${time}`;
 }
 
 /** Zeitraum einer Sperrzeit, z. B. „Mo., 21. Dez.–So., 3. Jan.“ oder „Sa., 5. Dez. 14:00–18:00 Uhr“. */

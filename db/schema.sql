@@ -199,6 +199,20 @@ do $$ begin
   alter table blackouts add constraint blackouts_scope check (scope in ('all', 'party'));
 exception when duplicate_object then null; end $$;
 
+-- ---------- Version 4: regelmäßige Sperren ----------
+create table if not exists recurring_blocks (
+  id          uuid primary key default gen_random_uuid(),
+  weekdays    int[] not null,                -- 0 = Sonntag … 6 = Samstag
+  from_time   text,                          -- "HH:MM", leer = ganztägig
+  to_time     text,
+  scope       text not null default 'all' check (scope in ('all', 'party')),
+  reason      text not null,
+  valid_from  date,
+  valid_until date,
+  created_by  text,
+  created_at  timestamptz not null default now()
+);
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -212,5 +226,6 @@ do $$ begin
     execute 'alter table settings enable row level security';
     execute 'alter table series enable row level security';
     execute 'alter table feedback enable row level security';
+    execute 'alter table recurring_blocks enable row level security';
   end if;
 end $$;

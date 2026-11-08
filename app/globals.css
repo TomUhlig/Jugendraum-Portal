@@ -140,7 +140,7 @@ textarea { min-height: 96px; resize: vertical }
 .check-inline { display: inline-flex; gap: 8px; align-items: center; cursor: pointer }
 .check-inline input { width: 18px; height: 18px; accent-color: var(--brand) }
 .chips { display: flex; flex-wrap: wrap; gap: 8px }
-.chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font-size: .9rem; font-weight: 500 }
+.chip { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font-size: .9rem; font-weight: 500 }
 .chip:hover { border-color: var(--muted) }
 .chip[aria-pressed="true"], .chip:has(input:checked) { border-color: var(--brand-ink); background: var(--brand-tint); color: var(--brand-ink); font-weight: 600 }
 .chip input { position: absolute; opacity: 0; pointer-events: none }

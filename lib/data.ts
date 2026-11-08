@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import type postgres from 'postgres';
 import { db } from './db';
 import {
-  ACTIVE_STATUSES, Blackout, Category, CheckResult, DEFAULT_SETTINGS, Message, Settings, Slot, checkBooking, partyWeekendOf,
+  ACTIVE_STATUSES, Blackout, Category, CheckResult, DEFAULT_SETTINGS, Message, RecurringBlock, Settings, Slot, checkBooking, expandRecurring, partyWeekendOf,
 } from './rules';
 import { DAY } from './time';
 
@@ -93,11 +93,32 @@ export async function getBlackouts(q: Q = db(), from = 0, to = Date.UTC(2100, 0,
   return rows.map((r) => ({ id: r.id, start: +r.starts_at, end: +r.ends_at, reason: r.reason, scope: r.scope }));
 }
 
+// ---------- Regelmäßige Sperren ----------
+const ymdOrNull = (d: unknown) => (d ? (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10)) : null);
+export async function getRecurring(q: Q = db()): Promise<RecurringBlock[]> {
+  const rows = await q`select id, weekdays, from_time, to_time, scope, reason, valid_from::text as valid_from, valid_until::text as valid_until from recurring_blocks order by created_at`;
+  return rows.map((r) => ({ id: r.id, weekdays: r.weekdays, fromTime: r.from_time, toTime: r.to_time, scope: r.scope, reason: r.reason, validFrom: ymdOrNull(r.valid_from), validUntil: ymdOrNull(r.valid_until) }));
+}
+export async function addRecurring(actor: string, r: Omit<RecurringBlock, 'id'>) {
+  await db()`insert into recurring_blocks (weekdays, from_time, to_time, scope, reason, valid_from, valid_until, created_by)
+    values (${r.weekdays}, ${r.fromTime}, ${r.toTime}, ${r.scope}, ${r.reason}, ${r.validFrom}, ${r.validUntil}, ${actor})`;
+  await audit(db(), actor, null, 'recurring-added', r);
+}
+export async function deleteRecurring(actor: string, id: string) {
+  await db()`delete from recurring_blocks where id = ${id}`;
+  await audit(db(), actor, null, 'recurring-removed', { id });
+}
+/** Alle Sperren im Zeitraum: einzelne Sperrzeiten plus aufgelöste regelmäßige Sperren. */
+export async function getAllBlocks(q: Q = db(), from: number, to: number): Promise<Blackout[]> {
+  const [single, rec] = await Promise.all([getBlackouts(q, from, to), getRecurring(q)]);
+  return [...single, ...expandRecurring(rec, from, to)].sort((a, b) => a.start - b.start);
+}
+
 /** Öffentliche, anonyme Belegung für den Kalender (ohne Namen, Notizen, Kontaktdaten). */
 export async function getPublicOccupancy(from: number, to: number) {
   const q = db();
   const [categories, settings, slots, blackouts, extras] = await Promise.all([
-    getCategories(q), getSettings(q), getSlots(q, from - 7 * DAY, to + 7 * DAY), getBlackouts(q, from, to), getExtras(q),
+    getCategories(q), getSettings(q), getSlots(q, from - 7 * DAY, to + 7 * DAY), getAllBlocks(q, from, to), getExtras(q),
   ]);
   return {
     categories, settings, blackouts, slots: slots.map((s) => ({ ...s, id: s.id.slice(0, 8) })),
@@ -116,7 +137,7 @@ async function lockedContext(q: postgres.TransactionSql, start: number, end: num
   await q`select pg_advisory_xact_lock(4242)`; // Buchungen nacheinander prüfen: keine Doppelbuchung bei gleichzeitigen Klicks
   const [categories, settings, extras] = await Promise.all([getCategories(q), getSettings(q), getExtras(q)]);
   const slots = await getSlots(q, start - 10 * DAY, end + 10 * DAY);
-  const blackouts = await getBlackouts(q, start - DAY, end + DAY);
+  const blackouts = await getAllBlocks(q, start - DAY, end + DAY);
   return { categories, settings, extras, slots, blackouts };
 }
 
@@ -313,7 +334,7 @@ export async function listSeries(seriesId: string): Promise<Booking[]> {
 export async function checkExisting(b: Booking): Promise<CheckResult> {
   const q = db();
   const [categories, settings, slots, blackouts] = await Promise.all([
-    getCategories(q), getSettings(q), getSlots(q, b.start - 10 * DAY, b.end + 10 * DAY), getBlackouts(q, b.start - DAY, b.end + DAY),
+    getCategories(q), getSettings(q), getSlots(q, b.start - 10 * DAY, b.end + 10 * DAY), getAllBlocks(q, b.start - DAY, b.end + DAY),
   ]);
   return checkBooking(b, { categories, settings, slots, blackouts, now: Date.now(), ignoreId: b.id, asAdmin: true });
 }

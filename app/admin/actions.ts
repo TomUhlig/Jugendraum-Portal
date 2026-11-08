@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
-  Admin, MailTextKey, addBlackout, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
+  Admin, MailTextKey, addBlackout, addRecurring, deleteRecurring, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
   removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin,
 } from '@/lib/data';
 import { mails } from '@/lib/mail';
@@ -212,6 +212,31 @@ export async function deleteBlackoutAction(fd: FormData) {
   await deleteBlackout(admin.name, str(fd, 'id', 40));
   revalidatePath('/', 'layout');
   go('/admin/sperrzeiten', 'ok', 'Sperrzeit gelöscht.');
+}
+
+export async function addRecurringAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  const weekdays = [...new Set(fd.getAll('weekday').map(Number).filter((n) => n >= 0 && n <= 6))];
+  const reason = str(fd, 'reason', 120);
+  if (!weekdays.length) go('/admin/sperrzeiten#regelmaessig', 'fehler', 'Bitte mindestens einen Wochentag auswählen.');
+  if (!reason) go('/admin/sperrzeiten#regelmaessig', 'fehler', 'Bitte einen Grund angeben, z. B. „Ruhetag“.');
+  const hours = fd.get('hours') === 'on';
+  const fromTime = str(fd, 'fromTime', 5), toTime = str(fd, 'toTime', 5);
+  if (hours && (!isTime(fromTime) || !isTime(toTime) || fromTime === toTime)) go('/admin/sperrzeiten#regelmaessig', 'fehler', 'Bitte gültige Uhrzeiten angeben.');
+  const validFrom = str(fd, 'validFrom', 10), validUntil = str(fd, 'validUntil', 10);
+  if (validFrom && validUntil && validUntil < validFrom) go('/admin/sperrzeiten#regelmaessig', 'fehler', '„Gültig bis“ liegt vor „gültig ab“.');
+  await addRecurring(admin.name, {
+    weekdays, fromTime: hours ? fromTime : null, toTime: hours ? toTime : null, scope: fd.get('scope') === 'party' ? 'party' : 'all', reason,
+    validFrom: isDate(validFrom) ? validFrom : null, validUntil: isDate(validUntil) ? validUntil : null,
+  });
+  revalidatePath('/', 'layout');
+  go('/admin/sperrzeiten#regelmaessig', 'ok', 'Regelmäßige Sperre gespeichert. Sie gilt ab sofort auf der Buchungsseite.');
+}
+export async function deleteRecurringAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  await deleteRecurring(admin.name, str(fd, 'id', 40));
+  revalidatePath('/', 'layout');
+  go('/admin/sperrzeiten#regelmaessig', 'ok', 'Regelmäßige Sperre aufgehoben.');
 }
 
 // ---------- Team ----------

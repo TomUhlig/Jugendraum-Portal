@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, Lock, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { PageHead } from '@/components/Flash';
 import { requireAdmin } from '@/lib/auth';
-import { getBlackouts, getCategories, listBookings } from '@/lib/data';
+import { getAllBlocks, getCategories, listBookings } from '@/lib/data';
 import { blackoutWhen } from '@/lib/rules';
 import { MIN, addDays, berlinHm, berlinToUtc, berlinYmd, weekdayOf } from '@/lib/time';
 
@@ -24,7 +24,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
     const w = monday(/^\d{4}-\d\d-\d\d$/.test(sp.w ?? '') ? sp.w : today);
     const days = Array.from({ length: 7 }, (_, i) => addDays(w, i));
     const from = berlinToUtc(w, '00:00'), to = berlinToUtc(addDays(w, 8), '06:00');
-    const [list, blackouts] = await Promise.all([listBookings({ from, to, status: all ? undefined : [...ACTIVE] }), getBlackouts(undefined, from, to)]);
+    const [list, blackouts] = await Promise.all([listBookings({ from, to, status: all ? undefined : [...ACTIVE] }), getAllBlocks(undefined, from, to)]);
     const H0 = 8, SPAN = 18; // 08:00 bis 02:00
     const pos = (d: string, a: number, b: number) => {
       const w0 = berlinToUtc(d, '08:00'), w1 = w0 + SPAN * 3600e3;
@@ -83,7 +83,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
   const cells: string[] = [];
   for (let i = 0; i < 42; i++) { const k = addDays(first, i); if (i >= 35 && k.slice(0, 7) !== m.slice(0, 7)) break; cells.push(k); }
   const from = berlinToUtc(cells[0], '00:00'), to = berlinToUtc(addDays(cells[cells.length - 1], 1), '00:00');
-  const [list, blackouts] = await Promise.all([listBookings({ from, to, status: all ? undefined : [...ACTIVE] }), getBlackouts(undefined, from, to)]);
+  const [list, blackouts] = await Promise.all([listBookings({ from, to, status: all ? undefined : [...ACTIVE] }), getAllBlocks(undefined, from, to)]);
   return (
     <>
       <PageHead title="Kalender">

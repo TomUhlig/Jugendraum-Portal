@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Category, Context, DEFAULT_SETTINGS, Slot, checkBooking, requiredGap } from './rules';
+import { Category, Context, DEFAULT_SETTINGS, RecurringBlock, Slot, checkBooking, describeRecurring, expandRecurring, requiredGap } from './rules';
 import { berlinHm, berlinToUtc, weekendKey } from './time';
 
 const cat = (id: string, before: number, after: number, isParty = false): Category => ({
@@ -99,5 +99,30 @@ describe('Hinweise', () => {
     expect(checkBooking({ categoryId: 'meet', start: t('2026-12-09', '19:00'), end: t('2026-12-09', '20:00'), guests: 5 }, ctx([], { blackouts: hours })).level).toBe('ok');
     const r = checkBooking({ categoryId: 'meet', start: t('2026-12-09', '17:00'), end: t('2026-12-09', '18:30'), guests: 5 }, ctx([], { blackouts: hours }));
     expect(r.messages[0].text).toBe('Der Raum ist Mi., 9. Dez. 14:00–18:00 Uhr gesperrt: Reinigung.');
+  });
+});
+
+describe('Regelmäßige Sperren', () => {
+  const mondays: RecurringBlock = { id: 'r1', weekdays: [1], fromTime: null, toTime: null, scope: 'all', reason: 'Ruhetag', validFrom: null, validUntil: null };
+  const weekdayMornings: RecurringBlock = { id: 'r2', weekdays: [1, 2, 3, 4, 5], fromTime: '00:00', toTime: '17:00', scope: 'all', reason: 'Schulbetrieb', validFrom: '2026-11-01', validUntil: '2026-11-30' };
+  it('sperrt jeden Montag ganztägig', () => {
+    const bo = expandRecurring([mondays], t('2026-11-01', '00:00'), t('2026-11-30', '00:00'));
+    expect(bo.map((b) => b.id)).toEqual(['r1:2026-11-02', 'r1:2026-11-09', 'r1:2026-11-16', 'r1:2026-11-23']);
+    const r = checkBooking({ categoryId: 'meet', start: t('2026-11-16', '19:00'), end: t('2026-11-16', '20:00'), guests: 5 }, ctx([], { blackouts: bo }));
+    expect(r.messages[0].text).toBe('Der Raum ist Mo., 16. Nov. gesperrt: Ruhetag.');
+  });
+  it('werktags bis 17 Uhr, nur im Gültigkeitszeitraum', () => {
+    const bo = expandRecurring([weekdayMornings], t('2026-11-25', '00:00'), t('2026-12-05', '00:00'));
+    expect(bo.map((b) => b.id)).toEqual(['r2:2026-11-25', 'r2:2026-11-26', 'r2:2026-11-27', 'r2:2026-11-30']);
+    expect(checkBooking({ categoryId: 'meet', start: t('2026-11-26', '18:00'), end: t('2026-11-26', '19:00'), guests: 5 }, ctx([], { blackouts: bo })).level).toBe('ok');
+    expect(checkBooking({ categoryId: 'meet', start: t('2026-11-26', '15:00'), end: t('2026-11-26', '16:00'), guests: 5 }, ctx([], { blackouts: bo })).level).toBe('block');
+    expect(checkBooking({ categoryId: 'meet', start: t('2026-11-26', '17:00'), end: t('2026-11-26', '18:00'), guests: 5 }, ctx([], { blackouts: bo })).level).toBe('ok');
+  });
+  it('Zeit über Mitternacht und Beschreibung', () => {
+    const late: RecurringBlock = { ...mondays, id: 'r3', weekdays: [6, 0], fromTime: '23:00', toTime: '06:00' };
+    const [b] = expandRecurring([late], t('2026-11-14', '12:00'), t('2026-11-15', '00:00'));
+    expect(new Date(b.end).toISOString()).toBe('2026-11-15T05:00:00.000Z');
+    expect(describeRecurring(late)).toBe('Sa und So · 23:00–06:00 Uhr');
+    expect(describeRecurring(weekdayMornings)).toBe('Mo–Fr · 00:00–17:00 Uhr');
   });
 });
