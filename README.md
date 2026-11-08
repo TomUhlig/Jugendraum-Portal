@@ -35,6 +35,8 @@ Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen 
 - Statistik (Buchungen pro Monat, nach Art, Mitglieder/Externe, Mannschaften, Ablehnungsquote) und Rückmeldungen
 - E-Mail-Texte, Ausstattung und Kosten in den Einstellungen änderbar
 - Als App aufs Handy installierbar (PWA)
+
+**Darstellung:** Hell, Dunkel oder automatisch nach Systemeinstellung, umschaltbar oben rechts (wird gespeichert).
 - Regeln einstellen: Puffer pro Kategorie, Freigabepflicht, „Party sperrt das ganze Wochenende“, Vorlauf, Kapazität
 - Team & Rollen (Admin / Verwalter / Lesezugriff), Mail-Benachrichtigung pro Person
 - Persönliches Kalender-Abo (iCal) für Handy oder Outlook

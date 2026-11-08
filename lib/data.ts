@@ -336,7 +336,10 @@ export async function checkExisting(b: Booking): Promise<CheckResult> {
   const [categories, settings, slots, blackouts] = await Promise.all([
     getCategories(q), getSettings(q), getSlots(q, b.start - 10 * DAY, b.end + 10 * DAY), getAllBlocks(q, b.start - DAY, b.end + DAY),
   ]);
-  return checkBooking(b, { categories, settings, slots, blackouts, now: Date.now(), ignoreId: b.id, asAdmin: true });
+  const r = checkBooking(b, { categories, settings, slots, blackouts, now: Date.now(), ignoreId: b.id, asAdmin: true });
+  // Für bestehende Buchungen ist „liegt in der Vergangenheit“ kein Konflikt.
+  const messages = r.messages.filter((m) => m.code !== 'past');
+  return { ...r, messages, level: messages.some((m) => m.level === 'block') ? 'block' : messages.length ? 'warn' : 'ok' };
 }
 
 export async function getAudit(bookingId?: string, limit = 50) {

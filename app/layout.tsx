@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Archivo, Source_Sans_3 } from 'next/font/google';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
+import { Theme, ThemeSwitch } from '@/components/ThemeSwitch';
 import { NavLink } from '@/components/NavLinks';
 import './globals.css';
 
@@ -13,11 +15,15 @@ export const metadata: Metadata = {
   icons: { icon: '/logo.png', apple: '/icon-192.png' },
   manifest: '/manifest.webmanifest',
 };
-export const viewport: Viewport = { themeColor: '#2E367A' };
+export const viewport: Viewport = {
+  themeColor: [{ media: '(prefers-color-scheme: light)', color: '#FFFFFF' }, { media: '(prefers-color-scheme: dark)', color: '#151931' }],
+};
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const c = (await cookies()).get('theme')?.value;
+  const theme: Theme = c === 'light' || c === 'dark' ? c : 'system';
   return (
-    <html lang="de" className={`${archivo.variable} ${source.variable}`}>
+    <html lang="de" className={`${archivo.variable} ${source.variable}`} data-theme={theme === 'system' ? undefined : theme}>
       <body>
         <a href="#inhalt" className="hp">Zum Inhalt springen</a>
         <header className="site-header">
@@ -30,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <NavLink href="/" exact>Anfragen</NavLink>
               <NavLink href="/raum">Raum &amp; Regeln</NavLink>
               <NavLink href="/admin" className="nav-login">Verwaltung</NavLink>
+              <ThemeSwitch initial={theme} />
             </nav>
           </div>
         </header>

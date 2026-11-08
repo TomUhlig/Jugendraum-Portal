@@ -22,6 +22,8 @@
   --warn: #9A5B00; --warn-bg: #FFF4DB;
   --bad: #B42F36; --bad-bg: #FBE9EA;
   --info: #2E367A; --info-bg: #ECEEF8;
+  --intro: #2E367A;
+  --on-ok: #FFFFFF;
   --shadow: 0 1px 2px rgba(22, 26, 51, .06), 0 1px 1px rgba(22, 26, 51, .04);
   --shadow-lg: 0 10px 30px rgba(22, 26, 51, .12);
   --r: 10px; --r-sm: 6px;
@@ -29,13 +31,22 @@
   --f-body: var(--font-source), "Segoe UI", system-ui, sans-serif;
   color-scheme: light;
 }
+/* Dunkles Design: folgt der Systemeinstellung, außer es wurde im Kopf ausdrücklich Hell oder Dunkel gewählt. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0E1124; --surface: #161A33; --surface-2: #1B2040; --ink: #ECEEF6; --ink-2: #C6CAE0; --muted: #9A9FBC;
-    --line: #272D52; --line-strong: #353C68; --brand-ink: #AEB6F5; --brand-tint: #20264F;
-    --ok: #4CC994; --ok-bg: #12352A; --warn: #F2B24A; --warn-bg: #3A2C10; --bad: #F2848A; --bad-bg: #3D1A1F;
-    --info: #AEB6F5; --info-bg: #20264F; --shadow: none; color-scheme: dark;
+  :root:not([data-theme="light"]) {
+    --bg: #0D1022; --surface: #151931; --surface-2: #1A1F3C; --ink: #ECEEF6; --ink-2: #C9CDE2; --muted: #9AA0BE;
+    --line: #262C50; --line-strong: #363E6C; --brand: #3B46A6; --brand-hover: #4652BA; --brand-ink: #B3BAF7; --brand-tint: #222A58;
+    --ok: #4CC994; --ok-bg: #11342A; --warn: #F2B24A; --warn-bg: #382A0F; --bad: #F2848A; --bad-bg: #3B1A20;
+    --info: #B3BAF7; --info-bg: #222A58; --intro: #1C2256; --on-ok: #06231A;
+    --shadow: 0 1px 0 rgba(0, 0, 0, .25); --shadow-lg: 0 10px 30px rgba(0, 0, 0, .45); color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+    --bg: #0D1022; --surface: #151931; --surface-2: #1A1F3C; --ink: #ECEEF6; --ink-2: #C9CDE2; --muted: #9AA0BE;
+    --line: #262C50; --line-strong: #363E6C; --brand: #3B46A6; --brand-hover: #4652BA; --brand-ink: #B3BAF7; --brand-tint: #222A58;
+    --ok: #4CC994; --ok-bg: #11342A; --warn: #F2B24A; --warn-bg: #382A0F; --bad: #F2848A; --bad-bg: #3B1A20;
+    --info: #B3BAF7; --info-bg: #222A58; --intro: #1C2256; --on-ok: #06231A;
+    --shadow: 0 1px 0 rgba(0, 0, 0, .25); --shadow-lg: 0 10px 30px rgba(0, 0, 0, .45); color-scheme: dark;
 }
 
 * { box-sizing: border-box }
@@ -75,6 +86,10 @@ button, input, select, textarea { font: inherit; color: inherit }
 .nav a[aria-current="page"] { color: var(--brand-ink) }
 .nav a[aria-current="page"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: -13px; height: 3px; background: var(--gelb); border-radius: 2px }
 .nav .nav-login { color: var(--muted); font-weight: 500 }
+.theme-switch { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); gap: 2px; margin-left: 8px }
+.theme-switch button { width: 30px; height: 28px; display: grid; place-items: center; border: 0; background: transparent; border-radius: 6px; color: var(--muted); cursor: pointer }
+.theme-switch button:hover { color: var(--ink) }
+.theme-switch button[aria-pressed="true"] { background: var(--surface); color: var(--brand-ink); box-shadow: var(--shadow) }
 .site-footer { border-top: 1px solid var(--line); background: var(--surface); margin-top: 48px }
 .site-footer .wrap { display: flex; gap: 8px 24px; flex-wrap: wrap; padding-block: 20px; font-size: .875rem; color: var(--muted); align-items: center }
 .site-footer a { color: var(--muted) }
@@ -82,7 +97,7 @@ button, input, select, textarea { font: inherit; color: inherit }
 .site-footer img { width: 24px; height: 24px }
 
 /* ---------- Seitenkopf ---------- */
-.intro { background: var(--brand); color: #fff }
+.intro { background: var(--intro); color: #fff }
 .intro .wrap { padding-block: 36px 40px; display: grid; gap: 14px }
 .intro h1 { font-size: clamp(1.8rem, 3.6vw, 2.5rem); color: #fff }
 .intro p { color: rgba(255,255,255,.82); max-width: 62ch; font-size: 1.05rem }
@@ -109,7 +124,7 @@ button, input, select, textarea { font: inherit; color: inherit }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed }
 .btn-primary { background: var(--brand); border-color: var(--brand); color: var(--on-brand) }
 .btn-primary:hover { background: var(--brand-hover); border-color: var(--brand-hover) }
-.btn-ok { background: var(--ok); border-color: var(--ok); color: #fff }
+.btn-ok { background: var(--ok); border-color: var(--ok); color: var(--on-ok) }
 .btn-ok:hover { filter: brightness(.95); background: var(--ok) }
 .btn-danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent) }
 .btn-danger:hover { background: var(--bad-bg); border-color: var(--bad) }
@@ -209,7 +224,7 @@ textarea { min-height: 96px; resize: vertical }
 .dcell:disabled { color: var(--line-strong); cursor: default }
 .dcell.out { color: var(--muted); opacity: .55 }
 .dcell.today .d { box-shadow: inset 0 -2px 0 var(--gelb) }
-.dcell.sel { background: var(--brand); color: #fff }
+.dcell.sel, .dcell.sel:hover:not(:disabled) { background: var(--brand); color: #fff }
 .dcell.sel .dots i { box-shadow: 0 0 0 1.5px var(--brand) }
 .dcell.blocked:not(.sel) { background: repeating-linear-gradient(135deg, transparent 0 5px, var(--bad-bg) 5px 8px) }
 .dots { display: flex; gap: 3px; height: 6px }
@@ -330,7 +345,10 @@ a.kpi:hover { border-color: var(--line-strong) }
 .ev:hover { background: color-mix(in srgb, var(--c) 24%, var(--surface)) }
 .ev.requested, .ev.pending_email { background: var(--surface); border: 1px dashed var(--c); border-left: 3px dashed var(--c) }
 .ev.rejected, .ev.cancelled, .ev.expired { text-decoration: line-through; opacity: .55 }
-.ev.sys { --c: var(--bad); background: var(--bad-bg) }
+.ev.sys { --c: var(--bad); background: var(--bad-bg); display: flex; gap: 5px; align-items: center }
+.ev-note { display: flex; gap: 5px; align-items: center; font-size: .72rem; color: var(--muted); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px }
+.ev-note:hover { color: var(--bad) }
+.ev-note svg { width: 12px; height: 12px; flex: none }
 .wgrid { display: grid; grid-template-columns: 52px repeat(7, minmax(0, 1fr)); min-width: 760px }
 .wgrid .wh { padding: 8px; font-size: .8rem; font-weight: 600; border-bottom: 1px solid var(--line); text-align: center; color: var(--ink-2) }
 .wgrid .wh.today { color: var(--brand-ink); box-shadow: inset 0 -3px 0 var(--gelb) }

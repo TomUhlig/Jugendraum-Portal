@@ -104,13 +104,17 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
               const ds = berlinToUtc(k, '00:00'), de = berlinToUtc(addDays(k, 1), '00:00');
               const items = list.filter((b) => b.start >= ds && b.start < de);
               const bo = blackouts.filter((b) => b.start < de && b.end > ds);
-              const fullBlock = bo.some((b) => b.scope !== 'party' && b.start <= ds && b.end >= de);
+              const fullBlock = k >= today && bo.some((b) => b.scope !== 'party' && b.start <= ds && b.end >= de);
               return (
                 <div key={k} className={['mday', k.slice(0, 7) !== m.slice(0, 7) && 'out', k === today && 'today', fullBlock && 'blocked'].filter(Boolean).join(' ')}>
                   <span className="d"><span>{+k.slice(8)}</span>{k >= today && <span className="day-tools">
                     <Link href={`/admin/neu?datum=${k}`} aria-label={`Termin am ${k} eintragen`} title="Termin eintragen"><Plus className="icon-sm" /></Link>
                     <Link href={`/admin/sperrzeiten?von=${k}&bis=${k}#neu`} aria-label={`${k} sperren`} title="Tag sperren"><Lock className="icon-sm" /></Link></span>}</span>
-                  {bo.map((x) => <Link key={x.id} href="/admin/sperrzeiten" className="ev sys" title={blackoutWhen(x)}>{x.scope === 'party' ? 'Keine Feiern' : 'Gesperrt'}: {x.reason}</Link>)}
+                  {k >= today && bo.filter((x) => !fullBlock || (x.start <= ds && x.end >= de)).map((x) => {
+                    const whole = x.start <= ds && x.end >= de;
+                    const label = x.scope === 'party' ? 'keine Feiern' : whole ? 'gesperrt' : `gesperrt ${x.start > ds ? 'ab ' + berlinHm(x.start) : 'bis ' + berlinHm(x.end)}${x.start > ds && x.end < de ? '–' + berlinHm(x.end) : ''}`;
+                    return <Link key={x.id} href="/admin/sperrzeiten" className={whole && x.scope !== 'party' ? 'ev sys' : 'ev-note'} title={`${blackoutWhen(x)}: ${x.reason}`}><Lock className="icon-sm" />{label}{whole ? `: ${x.reason}` : ''}</Link>;
+                  })}
                   {items.map((b) => (
                     <Link key={b.id} href={`/admin/buchung/${b.id}`} className={`ev ${b.status}`} title={`${b.title} · ${b.name}`} style={{ '--c': cat.get(b.categoryId)?.color } as React.CSSProperties}>
                       <span className="num">{berlinHm(b.start)}</span> {b.title}

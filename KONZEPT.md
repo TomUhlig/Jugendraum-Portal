@@ -250,7 +250,7 @@ Die erste Fassung (Plakat-Optik mit schrägen Bändern, Versalien und gekippten 
 | `--ink` / `--muted` | `#161A33` / `#646A85` | Text / Nebentext |
 | `--ok` / `--warn` / `--bad` | `#157A52` / `#9A5B00` / `#B42F36` | Status: frei, Hinweis, belegt. Immer mit Text und Icon, nie nur Farbe |
 
-Dunkelmodus folgt automatisch der Systemeinstellung.
+Dunkelmodus: folgt standardmäßig der Systemeinstellung, oben rechts umschaltbar (System / Hell / Dunkel). Im Dunkelmodus wird das Vereinsblau für Flächen etwas aufgehellt (`#3B46A6`), Texte in Blau werden zu `#B3BAF7`; Gelb bleibt unverändert.
 
 **Kategoriefarben** (Kalender, Diagramme): Besprechung `#2A78D6`, Mannschaftssitzung `#1BAF7A`, Vereinsveranstaltung `#EB6834`, Workshop `#6250D6`, Feier `#EDA100`, Sonstiges `#E87BA4`. Die Palette ist mit einem Validator auf Unterscheidbarkeit bei Farbsehschwäche geprüft. Kategorien stehen trotzdem immer mit Namen daneben.
 
