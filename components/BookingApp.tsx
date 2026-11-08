@@ -4,7 +4,7 @@ import {
   AlertTriangle, ArrowLeft, ArrowRight, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, Ellipsis,
   GraduationCap, Megaphone, PartyPopper, Shirt, Users, XCircle,
 } from 'lucide-react';
-import { Blackout, Category, CheckResult, Settings, Slot, checkBooking, partyWeekendOf } from '@/lib/rules';
+import { Blackout, Category, CheckResult, Settings, Slot, blackoutWhen, checkBooking, partyWeekendOf } from '@/lib/rules';
 import { MIN, addDays, berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong, weekdayOf } from '@/lib/time';
 
 type Fees = { rent: number; deposit: number };
@@ -136,6 +136,10 @@ export default function BookingApp({ initial, initialMonth, contactNote }: { ini
     const ds = berlinToUtc(k, '00:00'), de = berlinToUtc(addDays(k, 1), '00:00');
     return data.slots.filter((s) => s.start < de && s.end > ds).sort((a, b) => a.start - b.start);
   };
+  const dayBlocks = (k: string) => {
+    const ds = berlinToUtc(k, '00:00'), de = berlinToUtc(addDays(k, 1), '00:00');
+    return data.blackouts.filter((b) => b.start < de && b.end > ds);
+  };
   const lineDate = f.date || todayKey;
   const w0 = berlinToUtc(lineDate, '08:00'), span = berlinToUtc(addDays(lineDate, 1), '02:00') - w0;
   const x = (t: number) => Math.max(0, Math.min(100, ((t - w0) / span) * 100));
@@ -257,11 +261,12 @@ export default function BookingApp({ initial, initialMonth, contactNote }: { ini
                   {cells.map((k) => {
                     const list = daySlots(k);
                     const ds = berlinToUtc(k, '00:00'), de = berlinToUtc(addDays(k, 1), '00:00');
-                    const blocked = data.blackouts.some((b) => b.start < de && b.end > ds);
+                    // ganztägig gesperrt (für alle, oder für Feiern, wenn eine Feier gewählt ist)
+                    const blocked = data.blackouts.some((b) => b.start <= ds && b.end >= de && (b.scope !== 'party' || cat?.isParty));
                     const wd = weekdayOf(k), fri = wd === 5 ? k : wd === 6 ? addDays(k, -1) : wd === 0 ? addDays(k, -2) : null;
                     const cls = ['dcell', k.slice(0, 7) !== month.slice(0, 7) && 'out', k === todayKey && 'today', k === f.date && 'sel', blocked && 'blocked'].filter(Boolean).join(' ');
                     return (
-                      <button type="button" key={k} className={cls} disabled={k < todayKey} onClick={() => { setF((s) => ({ ...s, date: k })); if (monthStart(k) !== month) setMonth(monthStart(k)); }}
+                      <button type="button" key={k} className={cls} disabled={k < todayKey || blocked} onClick={() => { setF((s) => ({ ...s, date: k })); if (monthStart(k) !== month) setMonth(monthStart(k)); }}
                         aria-label={`${dayLabel(k)}: ${blocked ? 'gesperrt' : list.length ? `${list.length} Termin(e)` : 'frei'}`} aria-pressed={k === f.date}>
                         {fri && partyWeekends.has(fri) && <span className="pw-flag" title="Feier am Wochenende eingetragen" />}
                         <span className="d">{+k.slice(8)}</span>
@@ -274,6 +279,7 @@ export default function BookingApp({ initial, initialMonth, contactNote }: { ini
                   <span><i style={{ '--c': 'var(--muted)' } as React.CSSProperties} />Termin eingetragen</span>
                   <span><i style={{ background: 'transparent', boxShadow: 'inset 0 0 0 1.5px var(--muted)' }} />angefragt</span>
                   <span><i style={{ background: 'var(--gelb)' }} />Feier am Wochenende</span>
+                  {data.blackouts.length > 0 && <span><i style={{ background: 'repeating-linear-gradient(135deg, transparent 0 2px, var(--bad) 2px 3px)' }} />gesperrt</span>}
                 </div>
               </div>
 
@@ -281,6 +287,9 @@ export default function BookingApp({ initial, initialMonth, contactNote }: { ini
                 {!f.date ? <p className="muted small" style={{ paddingTop: 6 }}>Wähle links einen Tag aus.</p> : (
                   <>
                     <h3>{dayLabel(f.date)}</h3>
+                    {dayBlocks(f.date).map((b) => (
+                      <div key={b.id} className="alert alert-bad" style={{ padding: '8px 10px' }}><div className="small"><strong>{b.scope === 'party' ? 'Keine Feiern' : 'Gesperrt'}</strong> {blackoutWhen(b)}: {b.reason}</div></div>
+                    ))}
                     {daySlots(f.date).length ? (
                       <ul className="busy">{daySlots(f.date).map((s) => (
                         <li key={s.id} style={{ '--c': cats.get(s.categoryId)?.color } as React.CSSProperties}><span className="t">{berlinHm(s.start)}–{berlinHm(s.end)}</span><span>{s.status === 'confirmed' ? 'belegt' : 'angefragt'}</span></li>

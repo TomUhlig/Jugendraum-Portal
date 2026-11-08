@@ -90,6 +90,8 @@ ${rows.map(([k, v], i) => `<tr><td style="padding:9px 14px;font-size:13px;color:
 }
 const manageLink = (b: Booking) => `${appUrl()}/buchung/${b.manageToken}`;
 const ics = (b: Booking, c?: Category): Attachment[] => [{ filename: `jugendraum-${b.number}.ics`, content: Buffer.from(bookingIcs(b, c)).toString('base64') }];
+/** Stille Buchungen (vom Team für andere eingetragen) bekommen keine automatischen Mails. */
+const bookerTo = (b: Booking) => (b.silent ? [] : [b.email]);
 const firstName = (n: string) => esc(n.split(' ')[0]);
 
 /** Standardtexte. Das Orga-Team kann sie in der Verwaltung überschreiben (Einstellungen → E-Mail-Texte). */
@@ -113,44 +115,44 @@ export const mails = {
   verify: (b: Booking, c: Category | undefined, verifyToken: string) => {
     const cta = { href: `${appUrl()}/bestaetigen/${verifyToken}`, label: 'Anfrage bestätigen' };
     const blocks = [P(hello(b)), P('bitte bestätige kurz deine E-Mail-Adresse. Erst dann geht deine Anfrage an das Orga-Team.'), details(b, c)];
-    return sendMail({ kind: 'verify', to: b.email, bookingId: b.id, subject: `Bitte bestätige deine Anfrage ${b.number}`,
+    return sendMail({ kind: 'verify', to: bookerTo(b), bookingId: b.id, subject: `Bitte bestätige deine Anfrage ${b.number}`,
       ...build({ preheader: 'Ein Klick, dann geht deine Anfrage an das Orga-Team.', heading: 'Bitte bestätige deine Anfrage', blocks: [...blocks, SMALL('Ohne Bestätigung verfällt die Anfrage nach 24 Stunden. Du hast nichts angefragt? Dann ignoriere diese Mail einfach.')], cta }) });
   },
   received: async (b: Booking, c?: Category) => {
     const blocks = [P(hello(b)), paragraphs(await text('received')), details(b, c)];
-    return sendMail({ kind: 'received', to: b.email, bookingId: b.id, subject: `Anfrage eingegangen: ${b.title} am ${fmtDay(b.start)}`,
+    return sendMail({ kind: 'received', to: bookerTo(b), bookingId: b.id, subject: `Anfrage eingegangen: ${b.title} am ${fmtDay(b.start)}`,
       ...build({ preheader: 'Wir prüfen deine Anfrage.', heading: 'Deine Anfrage ist eingegangen', blocks, cta: { href: manageLink(b), label: 'Anfrage ansehen' } }) });
   },
   confirmed: async (b: Booking, c?: Category) => {
     const blocks = [P(hello(b)), paragraphs(await text('confirmed')), details(b, c, [['Ansprechperson', esc(b.agreedWith)]])];
-    return sendMail({ kind: 'confirmed', to: b.email, bookingId: b.id, subject: `Bestätigt: ${b.title} am ${fmtDay(b.start)}`, attachments: ics(b, c),
+    return sendMail({ kind: 'confirmed', to: bookerTo(b), bookingId: b.id, subject: `Bestätigt: ${b.title} am ${fmtDay(b.start)}`, attachments: ics(b, c),
       ...build({ preheader: `Der Jugendraum ist für dich reserviert: ${fmtLong(b.start)}.`, heading: 'Deine Buchung ist bestätigt', blocks, cta: { href: manageLink(b), label: 'Buchung ansehen' } }) });
   },
   changed: async (b: Booking, before: Booking, c?: Category, note?: string) => {
     const blocks = [P(hello(b)), P(`das Orga-Team hat deine Buchung geändert. Bisher: ${fmtLong(before.start)}, ${berlinHm(before.start)}–${berlinHm(before.end)} Uhr.`),
       ...(note ? [P(`<b>Hinweis:</b> ${esc(note)}`)] : []), details(b, c), SMALL('Passt der neue Termin nicht? Melde dich bitte bei deiner Ansprechperson oder sag über den Link ab.')];
-    return sendMail({ kind: 'changed', to: b.email, bookingId: b.id, subject: `Geändert: ${b.title} jetzt am ${fmtDay(b.start)}`, attachments: b.status === 'confirmed' ? ics(b, c) : undefined,
+    return sendMail({ kind: 'changed', to: bookerTo(b), bookingId: b.id, subject: `Geändert: ${b.title} jetzt am ${fmtDay(b.start)}`, attachments: b.status === 'confirmed' ? ics(b, c) : undefined,
       ...build({ preheader: `Neuer Termin: ${fmtLong(b.start)}, ${berlinHm(b.start)} Uhr.`, heading: 'Deine Buchung wurde geändert', blocks, cta: { href: manageLink(b), label: 'Buchung ansehen' } }) });
   },
   rejected: async (b: Booking, c?: Category) => {
     const blocks = [P(hello(b)), paragraphs(await text('rejected')), ...(b.rejectReason ? [P(`<b>Begründung:</b> ${esc(b.rejectReason)}`)] : []), details(b, c), P('Vielleicht passt ein anderer Termin.')];
-    return sendMail({ kind: 'rejected', to: b.email, bookingId: b.id, subject: `Absage: ${b.title} am ${fmtDay(b.start)}`,
+    return sendMail({ kind: 'rejected', to: bookerTo(b), bookingId: b.id, subject: `Absage: ${b.title} am ${fmtDay(b.start)}`,
       ...build({ preheader: 'Leider können wir deine Anfrage nicht bestätigen.', heading: 'Deine Anfrage wurde abgelehnt', blocks, cta: { href: appUrl(), label: 'Freie Termine ansehen' } }) });
   },
   cancelled: (b: Booking, c?: Category) => {
     const blocks = [P(hello(b)), P('deine Buchung wurde storniert. Der Termin ist wieder frei.'), ...(b.rejectReason ? [P(`<b>Grund:</b> ${esc(b.rejectReason)}`)] : []), details(b, c)];
-    return sendMail({ kind: 'cancelled', to: b.email, bookingId: b.id, subject: `Storniert: ${b.title} am ${fmtDay(b.start)}`,
+    return sendMail({ kind: 'cancelled', to: bookerTo(b), bookingId: b.id, subject: `Storniert: ${b.title} am ${fmtDay(b.start)}`,
       ...build({ preheader: 'Deine Buchung wurde storniert.', heading: 'Buchung storniert', blocks }) });
   },
   reminder: async (b: Booking, c: Category | undefined, when: '3d' | '1d') => {
     const blocks = [P(hello(b)), paragraphs(await text('reminder')), details(b, c, [['Ansprechperson', esc(b.agreedWith)]])];
     const label = when === '1d' ? 'Morgen' : 'In drei Tagen';
-    return sendMail({ kind: `reminder-${when}`, to: b.email, bookingId: b.id, subject: `${label}: ${b.title} im Jugendraum`,
+    return sendMail({ kind: `reminder-${when}`, to: bookerTo(b), bookingId: b.id, subject: `${label}: ${b.title} im Jugendraum`,
       ...build({ preheader: `${label}, ${berlinHm(b.start)} Uhr.`, heading: `${label} ist es so weit`, blocks, cta: { href: manageLink(b), label: 'Buchung ansehen' } }) });
   },
   followup: async (b: Booking) => {
     const blocks = [P(hello(b)), paragraphs(await text('followup'))];
-    return sendMail({ kind: 'followup', to: b.email, bookingId: b.id, subject: `Wie war es? ${b.title}`,
+    return sendMail({ kind: 'followup', to: bookerTo(b), bookingId: b.id, subject: `Wie war es? ${b.title}`,
       ...build({ preheader: 'Eine Minute für deine Rückmeldung.', heading: 'Danke fürs Vorbeikommen', blocks, cta: { href: `${manageLink(b)}/feedback`, label: 'Rückmeldung geben' } }) });
   },
 };

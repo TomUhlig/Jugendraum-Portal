@@ -13,7 +13,7 @@ export type Booking = {
   start: number; end: number; guests: number; bookerType: 'member' | 'external'; team: string;
   name: string; email: string; phone: string; agreedWith: string; manageToken: string; equipment: string[];
   rejectReason: string | null; internalNote: string; decidedBy: string | null; createdAt: number;
-  seriesId: string | null; createdBy: string | null;
+  seriesId: string | null; createdBy: string | null; silent: boolean;
   rent: number; deposit: number; rentPaid: boolean; depositReturned: boolean; depositWithheld: number;
   keyHandedOut: boolean; handoverAt: number | null; handoverBy: string | null; meterStart: number | null;
   returnAt: number | null; returnBy: string | null; meterEnd: number | null; conditionOk: boolean | null; damageNote: string;
@@ -30,7 +30,7 @@ const toBooking = (r: Row): Booking => ({
   name: r.name as string, email: r.email as string, phone: r.phone as string, agreedWith: r.agreed_with as string,
   manageToken: r.manage_token as string, equipment: (r.equipment as string[]) ?? [], rejectReason: (r.reject_reason as string) ?? null,
   internalNote: r.internal_note as string, decidedBy: (r.decided_by as string) ?? null, createdAt: +(r.created_at as Date),
-  seriesId: (r.series_id as string) ?? null, createdBy: (r.created_by as string) ?? null,
+  seriesId: (r.series_id as string) ?? null, createdBy: (r.created_by as string) ?? null, silent: !!r.silent,
   rent: num(r.rent_eur), deposit: num(r.deposit_eur), rentPaid: !!r.rent_paid, depositReturned: !!r.deposit_returned, depositWithheld: num(r.deposit_withheld_eur),
   keyHandedOut: !!r.key_handed_out, handoverAt: ts(r.handover_at), handoverBy: (r.handover_by as string) ?? null, meterStart: numOrNull(r.meter_start),
   returnAt: ts(r.return_at), returnBy: (r.return_by as string) ?? null, meterEnd: numOrNull(r.meter_end),
@@ -90,7 +90,7 @@ async function getSlots(q: Q, from: number, to: number): Promise<Slot[]> {
 }
 export async function getBlackouts(q: Q = db(), from = 0, to = Date.UTC(2100, 0, 1)): Promise<Blackout[]> {
   const rows = await q`select * from blackouts where ends_at > ${new Date(from)} and starts_at < ${new Date(to)} order by starts_at`;
-  return rows.map((r) => ({ id: r.id, start: +r.starts_at, end: +r.ends_at, reason: r.reason }));
+  return rows.map((r) => ({ id: r.id, start: +r.starts_at, end: +r.ends_at, reason: r.reason, scope: r.scope }));
 }
 
 /** Öffentliche, anonyme Belegung für den Kalender (ohne Namen, Notizen, Kontaktdaten). */
@@ -177,7 +177,7 @@ export async function cancelByBooker(manageToken: string): Promise<Booking | nul
 // ---------- Admin: direkt eintragen (auch als Serie) ----------
 /** Regeln, die ein Admin bewusst übergehen darf. Echte Überschneidungen bleiben immer gesperrt. */
 const OVERRIDABLE = new Set(['buffer', 'party-weekend', 'blackout', 'duration', 'horizon', 'past']);
-export type AdminNew = Omit<NewBooking, 'start' | 'end' | 'agreedWith'> & { agreedWith: string; slots: { start: number; end: number }[]; override: boolean; seriesRule?: string };
+export type AdminNew = Omit<NewBooking, 'start' | 'end' | 'agreedWith'> & { agreedWith: string; slots: { start: number; end: number }[]; override: boolean; seriesRule?: string; silent: boolean };
 export type AdminCreateResult = { created: Booking[]; skipped: { start: number; reasons: string[] }[]; seriesId: string | null };
 
 export async function adminCreate(actor: string, b: AdminNew): Promise<AdminCreateResult> {
@@ -200,7 +200,7 @@ export async function adminCreate(actor: string, b: AdminNew): Promise<AdminCrea
         guests: b.guests, booker_type: b.bookerType, team: b.team, name: b.name, email: b.email.toLowerCase(), phone: b.phone,
         agreed_with: b.agreedWith, party_weekend: overridden.includes('party-weekend') ? null : pw, manage_token: token(),
         equipment: b.equipment, created_by: actor, decided_by: actor, decided_at: new Date(), verified_at: new Date(), series_id: seriesId,
-        rent_eur: fees.rent, deposit_eur: fees.deposit,
+        rent_eur: fees.rent, deposit_eur: fees.deposit, silent: b.silent,
       })} returning *`;
       await audit(q, actor, row.id, 'admin-created', overridden.length ? { overridden } : {});
       created.push(toBooking(row));
@@ -252,6 +252,15 @@ export async function cancelSeries(seriesId: string, actor: string, reason: stri
     where series_id = ${seriesId} and status in ${q(ACTIVE_STATUSES)} and starts_at >= ${new Date(fromTs)} returning *`;
   for (const r of rows) await audit(q, actor, r.id, 'cancel', { reason, series: true });
   return rows.map(toBooking);
+}
+
+/** Automatische Mails an den Bucher für diese Buchung (und ihre Serie) an- oder abschalten. */
+export async function setSilent(id: string, actor: string, silent: boolean, wholeSeries: boolean) {
+  const q = db();
+  const [b] = await q`select series_id from bookings where id = ${id}`;
+  if (wholeSeries && b?.series_id) await q`update bookings set silent = ${silent} where series_id = ${b.series_id}`;
+  else await q`update bookings set silent = ${silent} where id = ${id}`;
+  await audit(q, actor, id, silent ? 'mails-off' : 'mails-on', { series: wholeSeries });
 }
 
 export async function updateInternal(id: string, actor: string, internalNote: string) {
@@ -327,9 +336,17 @@ export async function saveSettings(actor: string, settings: Record<string, unkno
     await audit(q, actor, null, 'settings', { keys: Object.keys(settings), cats: cats.length });
   });
 }
-export async function addBlackout(actor: string, start: number, end: number, reason: string) {
-  await db()`insert into blackouts (starts_at, ends_at, reason, created_by) values (${new Date(start)}, ${new Date(end)}, ${reason}, ${actor})`;
-  await audit(db(), actor, null, 'blackout-added', { start, end, reason });
+export async function addBlackout(actor: string, start: number, end: number, reason: string, scope: 'all' | 'party' = 'all') {
+  await db()`insert into blackouts (starts_at, ends_at, reason, created_by, scope) values (${new Date(start)}, ${new Date(end)}, ${reason}, ${actor}, ${scope})`;
+  await audit(db(), actor, null, 'blackout-added', { start, end, reason, scope });
+}
+/** Aktive Buchungen, die in einer Sperrzeit liegen (sie bleiben gültig, das Team soll sie aber sehen). */
+export async function bookingsDuring(start: number, end: number, scope: 'all' | 'party' = 'all'): Promise<Booking[]> {
+  const q = db();
+  const rows = await q`select b.* from bookings b join categories c on c.id = b.category_id
+    where b.status in ${q(ACTIVE_STATUSES)} and b.starts_at < ${new Date(end)} and b.ends_at > ${new Date(start)}
+    ${scope === 'party' ? q`and c.is_party` : q``} order by b.starts_at`;
+  return rows.map(toBooking);
 }
 export async function deleteBlackout(actor: string, id: string) {
   await db()`delete from blackouts where id = ${id}`;

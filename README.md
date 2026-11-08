@@ -21,13 +21,15 @@ Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen 
 **Für das Orga-Team** (`/admin`, Login per Magic Link)
 - Übersicht: offene Anfragen mit automatischer Konfliktprüfung, nächste Termine, Auslastung
 - Bestätigen / Ablehnen (mit Begründung) / Stornieren, jeweils mit Mail an den Bucher
-- Termine direkt eintragen, auch als Serie (wöchentlich, alle 2 Wochen, monatlich am n-ten Wochentag); Kollisionen werden übersprungen und aufgelistet
+- Termine direkt eintragen, auch für andere und als Serie (wöchentlich, alle 2 Wochen, monatlich am n-ten Wochentag); Kollisionen werden übersprungen und aufgelistet
+- Wählbar, welche Mails die Person bekommt: **keine** (Standard, auch keine Erinnerungen), nur Erinnerungen, oder Bestätigung und Erinnerungen. Pro Buchung oder Serie jederzeit umschaltbar
 - Termine bearbeiten und verschieben, Bucher wird mit neuer Kalenderdatei informiert
 - Regeln bei Bedarf bewusst übergehen (wird protokolliert), echte Überschneidungen bleiben gesperrt
 - Übergabe- und Rückgabeprotokoll: Schlüssel, Stromzähler, Zustand, Mängel
 - Nutzungsentgelt und Kaution mit Bezahlt/Abgerechnet/Einbehalten
 - „Zu erledigen“: fällige Schlüsselübergaben, offene Rückgaben und Kautionen, Schadensmeldungen, Mailfehler
-- Kalender mit Monats- und Wochenansicht (inkl. Pufferzeiten), Sperrzeiten
+- Kalender mit Monats- und Wochenansicht (inkl. Pufferzeiten); an jedem Tag „Termin eintragen“ und „Tag sperren“, in der Wochenansicht „Woche sperren“
+- **Sperrzeiten** mit Schnellauswahl (heute, dieses/nächstes Wochenende, diese/nächste Woche, Rest des Monats), ganztägig oder nur bestimmte Uhrzeiten, für alle Anfragen oder nur für Feiern. Bestehende Buchungen im Zeitraum werden angezeigt und bleiben gültig
 - Buchungsliste mit Suche, Filtern und CSV-Export für Excel
 - Statistik (Buchungen pro Monat, nach Art, Mitglieder/Externe, Mannschaften, Ablehnungsquote) und Rückmeldungen
 - E-Mail-Texte, Ausstattung und Kosten in den Einstellungen änderbar

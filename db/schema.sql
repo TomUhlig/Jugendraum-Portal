@@ -192,6 +192,13 @@ insert into settings (key, value) values
   ('contactNote', '"Fragen vorab? Michael Grieswelle oder Sigrid Brodig helfen dir weiter."')
 on conflict (key) do nothing;
 
+-- ---------- Version 3: stille Buchungen, Sperrzeiten nur für Feiern ----------
+alter table bookings add column if not exists silent boolean not null default false;  -- keine automatischen Mails an den Bucher
+alter table blackouts add column if not exists scope text not null default 'all';
+do $$ begin
+  alter table blackouts add constraint blackouts_scope check (scope in ('all', 'party'));
+exception when duplicate_object then null; end $$;
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then

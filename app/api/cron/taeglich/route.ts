@@ -26,19 +26,19 @@ export async function GET(req: Request) {
   report.expired = expired.length;
 
   // 2. Erinnerung 3 Tage vorher
-  const r3 = await load(await q`select id from bookings where status = 'confirmed' and reminded_3d_at is null
+  const r3 = await load(await q`select id from bookings where status = 'confirmed' and not silent and reminded_3d_at is null
     and starts_at >= ${new Date(berlinToUtc(addDays(today, 2), '00:00'))} and starts_at < ${new Date(berlinToUtc(addDays(today, 4), '00:00'))}`);
   for (const b of r3) if (await mails.reminder(b, cats.get(b.categoryId), '3d')) await q`update bookings set reminded_3d_at = now() where id = ${b.id}`;
   report.reminder3d = r3.length;
 
   // 3. Erinnerung am Vortag (bzw. am selben Tag, wenn kurzfristig gebucht)
-  const r1 = await load(await q`select id from bookings where status = 'confirmed' and reminded_1d_at is null
+  const r1 = await load(await q`select id from bookings where status = 'confirmed' and not silent and reminded_1d_at is null
     and starts_at > now() and starts_at < ${new Date(berlinToUtc(addDays(today, 2), '00:00'))}`);
   for (const b of r1) if (await mails.reminder(b, cats.get(b.categoryId), '1d')) await q`update bookings set reminded_1d_at = now(), reminded_3d_at = coalesce(reminded_3d_at, now()) where id = ${b.id}`;
   report.reminder1d = r1.length;
 
   // 4. Nachfrage nach dem Termin
-  const fu = await load(await q`select id from bookings where status = 'confirmed' and followup_at is null
+  const fu = await load(await q`select id from bookings where status = 'confirmed' and not silent and followup_at is null
     and ends_at < now() - interval '2 hours' and ends_at > now() - interval '4 days'`);
   for (const b of fu) if (await mails.followup(b)) await q`update bookings set followup_at = now() where id = ${b.id}`;
   report.followup = fu.length;

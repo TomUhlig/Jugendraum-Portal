@@ -1,4 +1,4 @@
-import { ArrowLeft, Mail, Pencil, Phone, Repeat } from 'lucide-react';
+import { ArrowLeft, Mail, MailX, Pencil, Phone, Repeat } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Flash } from '@/components/Flash';
@@ -8,12 +8,12 @@ import { db } from '@/lib/db';
 import { checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listSeries } from '@/lib/data';
 import { eur } from '@/lib/labels';
 import { berlinHm, berlinYmd, fmtDay, fmtLong } from '@/lib/time';
-import { cancelSeriesAction, changeAction, decideAction, handoverAction, moneyAction, noteAction } from '../../../actions';
+import { cancelSeriesAction, changeAction, decideAction, handoverAction, moneyAction, noteAction, silentAction } from '../../../actions';
 
 const fmtTs = (d: Date | number) => new Date(d).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'medium', timeStyle: 'short' });
 const ACTION: Record<string, string> = {
   created: 'Anfrage gestellt', verified: 'E-Mail-Adresse bestätigt', 'verified+auto-confirmed': 'E-Mail bestätigt, automatisch eingetragen', 'admin-created': 'Vom Orga-Team eingetragen',
-  confirm: 'Bestätigt', reject: 'Abgelehnt', cancel: 'Storniert', 'cancelled-by-booker': 'Vom Bucher abgesagt', 'internal-note': 'Interne Notiz geändert',
+  confirm: 'Bestätigt', reject: 'Abgelehnt', cancel: 'Storniert', 'cancelled-by-booker': 'Vom Bucher abgesagt', 'internal-note': 'Interne Notiz geändert', 'mails-off': 'E-Mails an den Bucher ausgeschaltet', 'mails-on': 'E-Mails an den Bucher eingeschaltet',
   handover: 'Übergabeprotokoll aktualisiert', money: 'Kosten aktualisiert', changed: 'Termin geändert', expired: 'Verfallen (E-Mail nicht bestätigt)', feedback: 'Rückmeldung erhalten',
 };
 const describe = (a: { action: string; detail: Record<string, unknown> }) => {
@@ -53,7 +53,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
       <div className="page-head" style={{ paddingInline: 0 }}>
         <div><Link href="/admin/buchungen" className="inline small muted" style={{ textDecoration: 'none', marginBottom: 6 }}><ArrowLeft className="icon-sm" />Buchungen</Link>
           <span className="eyebrow">Buchung <span className="refno">{b.number}</span>{b.createdBy && ` · eingetragen von ${b.createdBy}`}</span>
-          <div className="inline"><h1>{b.title}</h1><StatusBadge status={b.status} /></div></div>
+          <div className="inline"><h1>{b.title}</h1><StatusBadge status={b.status} />{b.silent && <span className="badge no-dot" title="An den Bucher werden keine automatischen Mails verschickt"><MailX className="icon-sm" />ohne E-Mails</span>}</div></div>
         {can && !editing && active && <Link className="btn" href={`/admin/buchung/${b.id}?bearbeiten=1`}><Pencil className="icon-sm" />Bearbeiten / verschieben</Link>}
       </div>
       <Flash sp={sp} />
@@ -98,7 +98,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
                 </div>
                 {extras.equipment.length > 0 && <div className="field"><span className="label">Ausstattung</span><div className="chips">{extras.equipment.map((e) => <label key={e} className="chip"><input type="checkbox" name="equipment" value={e} defaultChecked={b.equipment.includes(e)} />{e}</label>)}</div></div>}
                 <label className="check-inline"><input type="checkbox" name="override" /> Puffer, Sperrzeiten und Party-Regel bewusst übergehen</label>
-                <label className="check-inline"><input type="checkbox" name="notify" defaultChecked /> {b.name} per Mail über die Änderung informieren</label>
+                {b.silent ? <span className="muted small">Diese Buchung ist ohne E-Mails, der Bucher wird nicht informiert.</span> : <label className="check-inline"><input type="checkbox" name="notify" defaultChecked /> {b.name} per Mail über die Änderung informieren</label>}
                 <div className="field"><label htmlFor="e-msg">Hinweis in der Mail <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label><input id="e-msg" name="message" type="text" maxLength={300} placeholder="z. B. Am Samstag findet das Vereinsfest statt." /></div>
               </div>
               <div className="card-foot inline"><button className="btn btn-primary" type="submit">Änderungen speichern</button></div>
@@ -167,6 +167,16 @@ export default async function Detail({ params, searchParams }: { params: Promise
               {b.phone && <a href={`tel:${b.phone.replace(/[^\d+]/g, '')}`} className="inline"><Phone className="icon-sm" />{b.phone}</a>}
             </div>
           </section>
+
+          <form action={silentAction} className="card">
+            <div className="card-head"><div><h2>E-Mails an den Bucher</h2><p>{b.silent ? 'Aus: keine Erinnerungen, keine Infos bei Änderungen, keine Nachfrage.' : 'An: Erinnerungen, Infos bei Änderungen und Nachfrage nach dem Termin.'}</p></div>
+              <span className={`badge ${b.silent ? 'no-dot' : 'b-ok'}`}>{b.silent ? 'aus' : 'an'}</span></div>
+            {can && <div className="card-foot inline">
+              <input type="hidden" name="id" value={b.id} /><input type="hidden" name="silent" value={b.silent ? '0' : '1'} />
+              <button className="btn btn-sm" type="submit">{b.silent ? 'E-Mails einschalten' : 'E-Mails ausschalten'}</button>
+              {b.seriesId && <label className="check-inline small"><input type="checkbox" name="series" defaultChecked /> für die ganze Serie</label>}
+            </div>}
+          </form>
 
           {(b.status === 'confirmed' || b.rent > 0 || b.deposit > 0) && (
             <form action={moneyAction} className="card">

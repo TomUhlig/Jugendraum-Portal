@@ -11,7 +11,7 @@ export default async function Neu({ searchParams }: { searchParams: Promise<Reco
   const tomorrow = addDays(berlinYmd(Date.now()), 1);
   return (
     <>
-      <PageHead eyebrow="Direkt eintragen, ohne Anfrage und E-Mail-Bestätigung" title="Termin eintragen" />
+      <PageHead eyebrow="Für dich oder für andere, direkt bestätigt und ohne Anfrage" title="Termin eintragen" />
       <Flash sp={sp} />
       <form action={createAction} className="grid-2">
         <div className="stack">
@@ -45,7 +45,7 @@ export default async function Neu({ searchParams }: { searchParams: Promise<Reco
         </div>
         <div className="stack">
           <section className="card">
-            <div className="card-head"><div><h2>Für wen?</h2><p>Leer lassen, wenn du selbst verantwortlich bist</p></div></div>
+            <div className="card-head"><div><h2>Für wen?</h2><p>Leer lassen, wenn du selbst verantwortlich bist. Alle Angaben sind optional.</p></div></div>
             <div className="card-body stack">
               <div className="segmented" role="radiogroup" aria-label="Bucher">
                 <label className="chip" style={{ border: 0 }}><input type="radio" name="bookerType" value="member" defaultChecked />Mitglied</label>
@@ -56,7 +56,15 @@ export default async function Neu({ searchParams }: { searchParams: Promise<Reco
               <div className="field"><label htmlFor="n-email">E-Mail</label><input id="n-email" name="email" type="email" placeholder={me.email} /></div>
               <div className="field"><label htmlFor="n-phone">Telefon</label><input id="n-phone" name="phone" type="tel" /></div>
               <div className="field"><label htmlFor="n-ag">Abgesprochen mit</label><select id="n-ag" name="agreedWith" defaultValue=""><option value="">{me.name}</option><option>Michael Grieswelle</option><option>Sigrid Brodig</option></select></div>
-              <label className="check-inline"><input type="checkbox" name="notify" /> Bestätigung mit Kalenderdatei an diese E-Mail senden</label>
+            </div>
+          </section>
+          <section className="card">
+            <div className="card-head"><div><h2>E-Mails an diese Person</h2><p>Das Orga-Team bekommt bei eingetragenen Terminen keine Mails.</p></div></div>
+            <div className="card-body stack-sm" role="radiogroup" aria-label="E-Mails">
+              <label className="choice"><input type="radio" name="mails" value="none" defaultChecked /><span><b>Keine E-Mails</b><br /><span className="muted small">Keine Bestätigung, keine Erinnerungen, keine Nachfrage. Für Termine, die du selbst absprichst.</span></span></label>
+              <label className="choice"><input type="radio" name="mails" value="reminders" /><span><b>Nur Erinnerungen</b><br /><span className="muted small">Erinnerung vor dem Termin, Info bei Änderungen, Nachfrage danach.</span></span></label>
+              <label className="choice"><input type="radio" name="mails" value="confirm" /><span><b>Bestätigung und Erinnerungen</b><br /><span className="muted small">Wie eine normale Buchung, mit Kalenderdatei.</span></span></label>
+              <span className="muted small">Ohne E-Mail-Adresse werden nie Mails verschickt. Lässt sich später in der Buchung ändern.</span>
             </div>
           </section>
           <section className="card card-body stack-sm">

@@ -1,8 +1,9 @@
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lock, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { PageHead } from '@/components/Flash';
 import { requireAdmin } from '@/lib/auth';
 import { getBlackouts, getCategories, listBookings } from '@/lib/data';
+import { blackoutWhen } from '@/lib/rules';
 import { MIN, addDays, berlinHm, berlinToUtc, berlinYmd, weekdayOf } from '@/lib/time';
 
 const ACTIVE = ['pending_email', 'requested', 'confirmed'] as const;
@@ -34,14 +35,14 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
       <>
         <PageHead title="Kalender">
           <div className="segmented"><Link href={`?m=${w.slice(0, 7)}${all ? '&alle=1' : ''}`}>Monat</Link><Link href="#" aria-current="page">Woche</Link></div>
-          <Link className="btn btn-primary" href="/admin/neu"><Plus className="icon-sm" />Termin</Link>
+          <Link className="btn" href="/admin/sperrzeiten#neu"><Lock className="icon-sm" />Sperren</Link><Link className="btn btn-primary" href="/admin/neu"><Plus className="icon-sm" />Termin</Link>
         </PageHead>
         <section className="card">
           <div className="card-head">
             <div className="inline"><Link className="iconbtn" href={keep({ w: addDays(w, -7) })} aria-label="Vorherige Woche"><ChevronLeft className="icon" /></Link>
               <Link className="iconbtn" href={keep({ w: addDays(w, 7) })} aria-label="Nächste Woche"><ChevronRight className="icon" /></Link>
               <h2>{dLabel(w, { day: 'numeric', month: 'long' })} – {dLabel(addDays(w, 6), { day: 'numeric', month: 'long', year: 'numeric' })}</h2></div>
-            <div className="inline"><Link className="btn btn-sm" href={keep({ w: monday(today) })}>Heute</Link><Link className="small" href={`?ansicht=woche&w=${w}${all ? '' : '&alle=1'}`}>{all ? 'Nur aktive' : 'Auch stornierte'}</Link></div>
+            <div className="inline"><Link className="btn btn-sm" href={`/admin/sperrzeiten?von=${w < today ? today : w}&bis=${addDays(w, 6)}#neu`}><Lock className="icon-sm" />Woche sperren</Link><Link className="btn btn-sm" href={keep({ w: monday(today) })}>Heute</Link><Link className="small" href={`?ansicht=woche&w=${w}${all ? '' : '&alle=1'}`}>{all ? 'Nur aktive' : 'Auch stornierte'}</Link></div>
           </div>
           <div className="table-wrap">
             <div className="wgrid">
@@ -50,7 +51,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
               <div className="hours" style={{ height: SPAN * 42 }}>{Array.from({ length: SPAN }, (_, i) => <span key={i} style={{ top: `${(i / SPAN) * 100}%` }}>{i ? String((H0 + i) % 24).padStart(2, '0') + ':00' : ''}</span>)}</div>
               {days.map((d) => (
                 <div key={d} className="wcol" style={{ height: SPAN * 42 }}>
-                  {blackouts.map((x) => { const p = pos(d, x.start, x.end); return p && <div key={x.id} className="wev sys" style={{ '--c': 'var(--bad)', top: `${p.top}%`, height: `${p.height}%`, background: 'var(--bad-bg)' } as React.CSSProperties}><b>Gesperrt</b>{x.reason}</div>; })}
+                  {blackouts.map((x) => { const p = pos(d, x.start, x.end); return p && <Link href="/admin/sperrzeiten" key={x.id} className="wev sys" style={{ '--c': 'var(--bad)', top: `${p.top}%`, height: `${p.height}%`, background: 'var(--bad-bg)' } as React.CSSProperties}><b>{x.scope === 'party' ? 'Keine Feiern' : 'Gesperrt'}</b>{x.reason}</Link>; })}
                   {list.map((b) => {
                     const c = cat.get(b.categoryId); const p = pos(d, b.start, b.end); if (!p || !c) return null;
                     const pb = pos(d, b.start - c.bufferBefore * MIN, b.start), pa = pos(d, b.end, b.end + c.bufferAfter * MIN);
@@ -87,7 +88,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
     <>
       <PageHead title="Kalender">
         <div className="segmented"><Link href="#" aria-current="page">Monat</Link><Link href={`?ansicht=woche&w=${monday(m.slice(0, 7) === today.slice(0, 7) ? today : m)}${all ? '&alle=1' : ''}`}>Woche</Link></div>
-        <Link className="btn btn-primary" href="/admin/neu"><Plus className="icon-sm" />Termin</Link>
+        <Link className="btn" href="/admin/sperrzeiten#neu"><Lock className="icon-sm" />Sperren</Link><Link className="btn btn-primary" href="/admin/neu"><Plus className="icon-sm" />Termin</Link>
       </PageHead>
       <section className="card">
         <div className="card-head">
@@ -103,10 +104,13 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
               const ds = berlinToUtc(k, '00:00'), de = berlinToUtc(addDays(k, 1), '00:00');
               const items = list.filter((b) => b.start >= ds && b.start < de);
               const bo = blackouts.filter((b) => b.start < de && b.end > ds);
+              const fullBlock = bo.some((b) => b.scope !== 'party' && b.start <= ds && b.end >= de);
               return (
-                <div key={k} className={['mday', k.slice(0, 7) !== m.slice(0, 7) && 'out', k === today && 'today', bo.length && 'blocked'].filter(Boolean).join(' ')}>
-                  <span className="d"><span>{+k.slice(8)}</span>{k >= today && <Link href={`/admin/neu?datum=${k}`} className="muted" aria-label={`Termin am ${k} eintragen`} style={{ textDecoration: 'none' }}><Plus className="icon-sm" /></Link>}</span>
-                  {bo.map((x) => <span key={x.id} className="ev sys">Gesperrt: {x.reason}</span>)}
+                <div key={k} className={['mday', k.slice(0, 7) !== m.slice(0, 7) && 'out', k === today && 'today', fullBlock && 'blocked'].filter(Boolean).join(' ')}>
+                  <span className="d"><span>{+k.slice(8)}</span>{k >= today && <span className="day-tools">
+                    <Link href={`/admin/neu?datum=${k}`} aria-label={`Termin am ${k} eintragen`} title="Termin eintragen"><Plus className="icon-sm" /></Link>
+                    <Link href={`/admin/sperrzeiten?von=${k}&bis=${k}#neu`} aria-label={`${k} sperren`} title="Tag sperren"><Lock className="icon-sm" /></Link></span>}</span>
+                  {bo.map((x) => <Link key={x.id} href="/admin/sperrzeiten" className="ev sys" title={blackoutWhen(x)}>{x.scope === 'party' ? 'Keine Feiern' : 'Gesperrt'}: {x.reason}</Link>)}
                   {items.map((b) => (
                     <Link key={b.id} href={`/admin/buchung/${b.id}`} className={`ev ${b.status}`} title={`${b.title} · ${b.name}`} style={{ '--c': cat.get(b.categoryId)?.color } as React.CSSProperties}>
                       <span className="num">{berlinHm(b.start)}</span> {b.title}

@@ -88,5 +88,16 @@ describe('Hinweise', () => {
     const r = checkBooking({ categoryId: 'meet', start: t('2026-12-22', '10:00'), end: t('2026-12-22', '11:00'), guests: 1 },
       ctx([], { blackouts: [{ id: 'x', start: t('2026-12-21', '00:00'), end: t('2027-01-04', '00:00'), reason: 'Weihnachtspause' }] }));
     expect(r.messages[0].code).toBe('blackout');
+    expect(r.messages[0].text).toBe('Der Raum ist Mo., 21. Dez.–So., 3. Jan. gesperrt: Weihnachtspause.');
+  });
+  it('Sperrzeit „nur Feiern“ lässt Besprechungen zu, stundenweise Sperren gelten nur in ihrem Zeitfenster', () => {
+    const bo = [{ id: 'x', start: t('2026-12-12', '00:00'), end: t('2026-12-14', '00:00'), reason: 'Vereinsfest', scope: 'party' as const }];
+    expect(checkBooking({ categoryId: 'meet', start: t('2026-12-12', '10:00'), end: t('2026-12-12', '11:00'), guests: 5 }, ctx([], { blackouts: bo })).level).toBe('ok');
+    const p = checkBooking({ categoryId: 'party', start: t('2026-12-12', '19:00'), end: t('2026-12-12', '23:00'), guests: 30 }, ctx([], { blackouts: bo }));
+    expect(p.messages.map((m) => m.text)).toContain('Feiern sind Sa., 12. Dez.–So., 13. Dez. nicht möglich: Vereinsfest.');
+    const hours = [{ id: 'y', start: t('2026-12-09', '14:00'), end: t('2026-12-09', '18:00'), reason: 'Reinigung', scope: 'all' as const }];
+    expect(checkBooking({ categoryId: 'meet', start: t('2026-12-09', '19:00'), end: t('2026-12-09', '20:00'), guests: 5 }, ctx([], { blackouts: hours })).level).toBe('ok');
+    const r = checkBooking({ categoryId: 'meet', start: t('2026-12-09', '17:00'), end: t('2026-12-09', '18:30'), guests: 5 }, ctx([], { blackouts: hours }));
+    expect(r.messages[0].text).toBe('Der Raum ist Mi., 9. Dez. 14:00–18:00 Uhr gesperrt: Reinigung.');
   });
 });

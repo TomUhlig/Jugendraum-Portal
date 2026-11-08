@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
   Admin, MailTextKey, addBlackout, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
-  removeAdmin, saveSettings, updateHandover, updateInternal, updateMoney, upsertAdmin,
+  removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin,
 } from '@/lib/data';
 import { mails } from '@/lib/mail';
 import { afterDecision } from '@/lib/notify';
@@ -39,7 +39,7 @@ export async function decideAction(fd: FormData) {
   if (!b) go(backOf(fd), 'fehler', 'Die Buchung wurde inzwischen schon bearbeitet.');
   await afterDecision(b!);
   revalidatePath('/admin', 'layout');
-  go(backOf(fd), 'ok', { confirm: `„${b!.title}“ ist bestätigt.`, reject: `„${b!.title}“ wurde abgelehnt.`, cancel: `„${b!.title}“ wurde storniert.` }[action] + ` ${b!.name} wird per Mail informiert.`);
+  go(backOf(fd), 'ok', { confirm: `„${b!.title}“ ist bestätigt.`, reject: `„${b!.title}“ wurde abgelehnt.`, cancel: `„${b!.title}“ wurde storniert.` }[action] + (b!.silent ? ' Es wurde keine Mail verschickt.' : ` ${b!.name} wird per Mail informiert.`));
 }
 
 export async function cancelSeriesAction(fd: FormData) {
@@ -72,14 +72,17 @@ export async function createAction(fd: FormData) {
     rule = describeSeries(date, repeat, start, end, dates.length);
   }
   const contactEmail = str(fd, 'email', 120);
+  // Standard: Termine, die das Team für andere einträgt, lösen keine Mails aus (auch keine Erinnerungen).
+  const mailMode = str(fd, 'mails', 10) || 'none';
+  const silent = mailMode === 'none' || !contactEmail;
   const res = await adminCreate(admin.name, {
     categoryId, title, note: str(fd, 'note', 500), guests: Math.max(1, Number(fd.get('guests')) || 1),
     equipment: fd.getAll('equipment').map(String), bookerType: fd.get('bookerType') === 'external' ? 'external' : 'member',
     team: str(fd, 'team', 80), name: str(fd, 'name', 80) || admin.name, email: contactEmail || admin.email, phone: str(fd, 'phone', 40),
-    agreedWith: str(fd, 'agreedWith', 40) || admin.name, override: fd.get('override') === 'on', seriesRule: rule,
+    agreedWith: str(fd, 'agreedWith', 40) || admin.name, override: fd.get('override') === 'on', seriesRule: rule, silent,
     slots: dates.map((d) => range(d, start, end)),
   });
-  if (fd.get('notify') === 'on' && contactEmail && res.created[0]) {
+  if (mailMode === 'confirm' && !silent && res.created[0]) {
     const cat = (await getCategories()).find((c) => c.id === categoryId);
     await mails.confirmed(res.created[0], cat).catch(() => {});
   }
@@ -88,7 +91,8 @@ export async function createAction(fd: FormData) {
   const skippedNote = res.skipped.length ? ` ${res.skipped.length} Termin(e) übersprungen, siehe Verlauf.` : '';
   const target = `/admin/buchung/${res.created[0].id}`;
   const skippedParam = res.skipped.length ? `?uebersprungen=${encodeURIComponent(JSON.stringify(res.skipped.map((s) => [s.start, s.reasons[0]])))}` : '';
-  go(target + skippedParam, 'ok', res.created.length > 1 ? `${res.created.length} Termine angelegt.${skippedNote}` : `Termin angelegt.${skippedNote}`);
+  const mailNote = silent ? ' Es wurden keine E-Mails verschickt.' : mailMode === 'confirm' ? ` Bestätigung an ${contactEmail} gesendet.` : ' Erinnerungen gehen an die angegebene Adresse.';
+  go(target + skippedParam, 'ok', (res.created.length > 1 ? `${res.created.length} Termine eingetragen.` : 'Termin eingetragen.') + mailNote + skippedNote);
 }
 
 // ---------- Ändern / verschieben ----------
@@ -109,7 +113,16 @@ export async function changeAction(fd: FormData) {
     await mails.changed(res.booking, res.before, cat, str(fd, 'message', 500) || undefined).catch(() => {});
   }
   revalidatePath('/admin', 'layout'); revalidatePath('/');
-  go(`/admin/buchung/${id}`, 'ok', moved ? 'Termin verschoben.' + (fd.get('notify') === 'on' ? ' Der Bucher wurde informiert.' : '') : 'Änderungen gespeichert.');
+  const informed = fd.get('notify') === 'on' && res.ok && !res.booking.silent;
+  go(`/admin/buchung/${id}`, 'ok', (moved ? 'Termin verschoben.' : 'Änderungen gespeichert.') + (informed ? ' Der Bucher wurde informiert.' : ''));
+}
+
+export async function silentAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  const id = str(fd, 'id', 40);
+  const silent = fd.get('silent') === '1';
+  await setSilent(id, admin.name, silent, fd.get('series') === 'on');
+  go(`/admin/buchung/${id}`, 'ok', silent ? 'Für diese Buchung werden keine automatischen Mails mehr verschickt.' : 'Automatische Mails (Erinnerungen, Änderungen) sind wieder an.');
 }
 
 // ---------- Interna, Übergabe, Kosten ----------
@@ -178,11 +191,21 @@ export async function textsAction(fd: FormData) {
 
 export async function addBlackoutAction(fd: FormData) {
   const admin = await requireAdmin('manager');
-  const from = str(fd, 'from', 10), to = str(fd, 'to', 10), reason = str(fd, 'reason', 120);
-  if (!isDate(from) || !isDate(to) || to < from || !reason) go('/admin/sperrzeiten', 'fehler', 'Bitte Zeitraum (von bis) und Grund angeben.');
-  await addBlackout(admin.name, berlinToUtc(from, '00:00'), berlinToUtc(addDays(to, 1), '00:00'), reason);
+  const from = str(fd, 'from', 10), to = str(fd, 'to', 10) || from, reason = str(fd, 'reason', 120) || 'Keine Buchungen möglich';
+  const scope = fd.get('scope') === 'party' ? 'party' : 'all';
+  const fromTime = str(fd, 'fromTime', 5), toTime = str(fd, 'toTime', 5);
+  const back = backOf(fd, '/admin/sperrzeiten');
+  if (!isDate(from) || !isDate(to) || to < from) go(back, 'fehler', 'Bitte einen gültigen Zeitraum wählen (bis nicht vor von).');
+  let start = berlinToUtc(from, '00:00'), end = berlinToUtc(addDays(to, 1), '00:00');
+  if (fd.get('hours') === 'on') {
+    if (!isTime(fromTime) || !isTime(toTime)) go(back, 'fehler', 'Bitte Uhrzeiten angeben oder „nur bestimmte Uhrzeiten“ abwählen.');
+    start = berlinToUtc(from, fromTime);
+    end = toTime > fromTime || to > from ? berlinToUtc(to, toTime) : berlinToUtc(addDays(to, 1), toTime);
+    if (end <= start) go(back, 'fehler', 'Das Ende muss nach dem Beginn liegen.');
+  }
+  await addBlackout(admin.name, start, end, reason, scope);
   revalidatePath('/', 'layout');
-  go('/admin/sperrzeiten', 'ok', 'Sperrzeit eingetragen.');
+  go('/admin/sperrzeiten', 'ok', scope === 'party' ? 'Gesperrt für Feiern. Andere Termine bleiben möglich.' : 'Zeitraum gesperrt. Dort sind keine neuen Anfragen mehr möglich.');
 }
 export async function deleteBlackoutAction(fd: FormData) {
   const admin = await requireAdmin('manager');

@@ -40,7 +40,8 @@ export type ActiveStatus = 'pending_email' | 'requested' | 'confirmed';
 export const ACTIVE_STATUSES: ActiveStatus[] = ['pending_email', 'requested', 'confirmed'];
 
 export type Slot = { id: string; categoryId: string; start: number; end: number; status: ActiveStatus };
-export type Blackout = { id: string; start: number; end: number; reason: string };
+/** Sperrzeit. scope 'party' sperrt nur Feiern, 'all' jede Anfrage. */
+export type Blackout = { id: string; start: number; end: number; reason: string; scope?: 'all' | 'party' };
 export type Draft = { categoryId: string; start: number; end: number; guests: number };
 export type Level = 'ok' | 'warn' | 'block';
 export type Message = { level: Exclude<Level, 'ok'>; code: string; text: string };
@@ -85,8 +86,9 @@ export function checkBooking(d: Draft, ctx: Context): CheckResult {
 
   // Sperrzeiten
   for (const b of ctx.blackouts) {
+    if (b.scope === 'party' && !c.isParty) continue;
     if (d.start - c.bufferBefore * MIN < b.end && b.start < d.end + c.bufferAfter * MIN) {
-      add('block', 'blackout', `Der Raum ist ${fmtDay(b.start)}–${fmtDay(b.end - 1)} gesperrt: ${b.reason}.`);
+      add('block', 'blackout', blackoutText(b));
     }
   }
 
@@ -141,6 +143,18 @@ export function checkBooking(d: Draft, ctx: Context): CheckResult {
 
   const level: Level = messages.some((m) => m.level === 'block') ? 'block' : messages.length ? 'warn' : 'ok';
   return { level, messages, suggestion };
+}
+
+/** Zeitraum einer Sperrzeit, z. B. „Mo., 21. Dez.–So., 3. Jan.“ oder „Sa., 5. Dez. 14:00–18:00 Uhr“. */
+export function blackoutWhen(b: Blackout): string {
+  const fullDays = berlinHm(b.start) === '00:00' && berlinHm(b.end) === '00:00';
+  const sameDay = fmtDay(b.start) === fmtDay(b.end - 1);
+  if (fullDays) return sameDay ? fmtDay(b.start) : `${fmtDay(b.start)}–${fmtDay(b.end - 1)}`;
+  return sameDay ? `${fmtDay(b.start)} ${berlinHm(b.start)}–${berlinHm(b.end)} Uhr` : `${fmtDay(b.start)} ${berlinHm(b.start)} bis ${fmtDay(b.end)} ${berlinHm(b.end)} Uhr`;
+}
+/** Hinweistext für Buchende. */
+export function blackoutText(b: Blackout): string {
+  return b.scope === 'party' ? `Feiern sind ${blackoutWhen(b)} nicht möglich: ${b.reason}.` : `Der Raum ist ${blackoutWhen(b)} gesperrt: ${b.reason}.`;
 }
 
 function endsTooLate(end: number, latest: string): boolean {

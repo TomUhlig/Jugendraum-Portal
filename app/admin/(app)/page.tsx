@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, Check, KeyRound, MailWarning, Wallet, Wrench } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, KeyRound, Lock, MailWarning, Plus, Wallet, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { Flash, PageHead } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -40,7 +40,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHead eyebrow={fmtLong(now)} title="Übersicht"><Link className="btn btn-primary" href="/admin/neu">Termin eintragen</Link></PageHead>
+      <PageHead eyebrow={fmtLong(now)} title="Übersicht"><Link className="btn" href="/admin/sperrzeiten#neu"><Lock className="icon-sm" />Zeitraum sperren</Link><Link className="btn btn-primary" href="/admin/neu"><Plus className="icon-sm" />Termin eintragen</Link></PageHead>
       <Flash sp={sp} />
       <div className="kpis">
         <a href="#anfragen" className={`card kpi ${open.length ? 'attention' : ''}`}><span className="k">Offene Anfragen</span><span className="v">{open.length}</span><span className="s">{open.length ? 'warten auf Entscheidung' : 'alles erledigt'}</span></a>

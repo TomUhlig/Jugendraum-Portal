@@ -318,6 +318,11 @@ a.kpi:hover { border-color: var(--line-strong) }
 .mday { min-height: 112px; padding: 6px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 3px; min-width: 0 }
 .mday .d { font-size: .82rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); display: flex; justify-content: space-between }
 .mday.out { background: var(--surface-2) }
+.day-tools { display: inline-flex; gap: 2px; opacity: .35 }
+.mday:hover .day-tools, .day-tools:focus-within { opacity: 1 }
+.day-tools a { color: var(--muted); display: grid; place-items: center; width: 22px; height: 22px; border-radius: 5px }
+.day-tools a:hover { background: var(--surface-2); color: var(--brand-ink) }
+@media (hover: none) { .day-tools { opacity: 1 } }
 .mday.out .d { color: var(--muted) }
 .mday.today .d span:first-child { background: var(--brand); color: #fff; border-radius: 5px; padding: 0 6px }
 .mday.blocked { background: repeating-linear-gradient(135deg, transparent 0 6px, var(--bad-bg) 6px 9px) }
