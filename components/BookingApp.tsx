@@ -1,44 +1,56 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AlertTriangle, ArrowLeft, ArrowRight, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, Ellipsis,
+  GraduationCap, Megaphone, PartyPopper, Shirt, Users, XCircle,
+} from 'lucide-react';
 import { Blackout, Category, CheckResult, Settings, Slot, checkBooking, partyWeekendOf } from '@/lib/rules';
-import { MIN, addDays, berlinHm, berlinToUtc, berlinYmd, fmtDay, weekdayOf } from '@/lib/time';
+import { MIN, addDays, berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong, weekdayOf } from '@/lib/time';
 
-export type Occupancy = { categories: Category[]; settings: Settings; slots: Slot[]; blackouts: Blackout[] };
+type Fees = { rent: number; deposit: number };
+export type Occupancy = {
+  categories: Category[]; settings: Settings; slots: Slot[]; blackouts: Blackout[];
+  equipment: string[]; feesExternal: Fees; feesMemberParty: Fees;
+};
 
-const ICON: Record<string, string> = {
-  meet: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
-  team: '<circle cx="12" cy="12" r="10"/><path d="m12 7 4 3-1.5 5h-5L8 10z"/>',
-  event: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
-  work: '<path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>',
-  party: '<path d="M5.8 11.3 2 22l10.7-3.8"/><path d="M4 3h.01M22 8h.01M15 2h.01M22 20h.01"/><path d="m22 2-2.2.8a3 3 0 0 0-2 3.4l.1.4M11 13c1.9 1.9 2.6 4.4 1.8 5.2-.8.8-3.4.1-5.3-1.8C5.6 14.5 5 12 5.8 11.2 6.6 10.4 9.1 11.1 11 13z"/>',
-  misc: '<circle cx="12" cy="12" r="10"/><path d="M8 12h.01M12 12h.01M16 12h.01"/>',
+const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  meet: Users, team: Shirt, event: Megaphone, work: GraduationCap, party: PartyPopper, misc: Ellipsis,
 };
 const PEOPLE = ['Michael Grieswelle', 'Sigrid Brodig'];
-const monthStart = (key: string) => key.slice(0, 8) + '01';
-const shiftMonth = (key: string, n: number) => {
-  const [y, m] = key.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+const STEPS = ['Anlass', 'Termin', 'Kontakt', 'Prüfen'];
+const eur = (n: number) => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: n % 1 ? 2 : 0 });
+const monthStart = (k: string) => k.slice(0, 8) + '01';
+const shiftMonth = (k: string, n: number) => {
+  const [y, m] = k.split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + n, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`;
 };
-const monthLabel = (key: string) => new Date(key + 'T12:00:00Z').toLocaleDateString('de-DE', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const monthLabel = (k: string) => new Date(k + 'T12:00:00Z').toLocaleDateString('de-DE', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const dayLabel = (k: string) => new Date(k + 'T12:00:00Z').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+const toMin = (hm: string) => +hm.slice(0, 2) * 60 + +hm.slice(3);
+const toHm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const START_OPTIONS = Array.from({ length: (23 - 7) * 4 + 4 }, (_, i) => toHm(7 * 60 + i * 15));
+const initials = (n: string) => n.split(' ').map((p) => p[0]).join('').slice(0, 2);
 
-type Ticket = { number: string; email: string; title: string; start: number; end: number; category: string; agreedWith: string };
+type Done = { number: string; email: string };
 
-export default function BookingApp({ initial, initialMonth }: { initial: Occupancy; initialMonth: string }) {
-  const [data, setData] = useState<Occupancy>(initial);
+export default function BookingApp({ initial, initialMonth, contactNote }: { initial: Occupancy; initialMonth: string; contactNote: string }) {
+  const [data, setData] = useState(initial);
   const [month, setMonth] = useState(initialMonth);
   const [now, setNow] = useState(() => Date.now());
-  const [f, setF] = useState({ date: '', start: '18:00', end: '22:00', title: '', guests: '20', note: '', name: '', team: '', email: '', phone: '', website: '' });
+  const [step, setStep] = useState(0);
+  const [reached, setReached] = useState(0);
   const [catId, setCatId] = useState<string | null>(null);
+  const [f, setF] = useState({ title: '', guests: '20', note: '', date: '', start: '18:00', end: '22:00', name: '', team: '', email: '', phone: '', website: '' });
+  const [equipment, setEquipment] = useState<string[]>([]);
   const [bookerType, setBookerType] = useState<'member' | 'external'>('member');
-  const [agree, setAgree] = useState(false);
   const [who, setWho] = useState('');
+  const [agree, setAgree] = useState(false);
   const [rules, setRules] = useState(false);
-  const [errors, setErrors] = useState<Record<string, boolean>>({});
-  const [formError, setFormError] = useState('');
+  const [touched, setTouched] = useState(false);
+  const [serverError, setServerError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [ticket, setTicket] = useState<Ticket | null>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
+  const [done, setDone] = useState<Done | null>(null);
+  const topRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async (m: string) => {
     const from = berlinToUtc(addDays(m, -7), '00:00'), to = berlinToUtc(addDays(shiftMonth(m, 1), 7), '00:00');
@@ -47,265 +59,341 @@ export default function BookingApp({ initial, initialMonth }: { initial: Occupan
   }, []);
   useEffect(() => { if (month !== initialMonth) load(month); }, [month, initialMonth, load]);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
-  useEffect(() => { if (ticket) closeRef.current?.focus(); }, [ticket]);
 
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF((s) => ({ ...s, [k]: e.target.value }));
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF((s) => ({ ...s, [k]: e.target.value }));
   const cats = useMemo(() => new Map(data.categories.map((c) => [c.id, c])), [data.categories]);
   const cat = catId ? cats.get(catId) : undefined;
+  const fees: Fees = bookerType === 'external' ? data.feesExternal : cat?.isParty ? data.feesMemberParty : { rent: 0, deposit: 0 };
 
   const draft = useMemo(() => {
-    if (!f.date || !/^\d\d:\d\d$/.test(f.start) || !/^\d\d:\d\d$/.test(f.end)) return null;
+    if (!f.date) return null;
     const start = berlinToUtc(f.date, f.start);
-    let end = berlinToUtc(f.date, f.end);
-    if (end <= start) end = berlinToUtc(addDays(f.date, 1), f.end);
+    const end = toMin(f.end) > toMin(f.start) ? berlinToUtc(f.date, f.end) : berlinToUtc(addDays(f.date, 1), f.end);
     return { start, end, guests: +f.guests || 0 };
   }, [f.date, f.start, f.end, f.guests]);
+  const result: CheckResult | null = useMemo(() => (draft && catId ? checkBooking({ ...draft, categoryId: catId }, { ...data, now }) : null), [draft, catId, data, now]);
 
-  const result: CheckResult | null = useMemo(() => {
-    if (!draft || !catId) return null;
-    return checkBooking({ ...draft, categoryId: catId }, { ...data, now });
-  }, [draft, catId, data, now]);
+  const endOptions = useMemo(() => {
+    const s = toMin(f.start), max = (cat?.maxDurationMin ?? 16 * 60);
+    return Array.from({ length: Math.floor(Math.min(max, 18 * 60) / 15) }, (_, i) => s + (i + 1) * 15).map((m) => ({ v: toHm(m), next: m >= 24 * 60 }));
+  }, [f.start, cat]);
+  useEffect(() => { if (!endOptions.some((o) => o.v === f.end)) setF((s) => ({ ...s, end: endOptions[Math.min(7, endOptions.length - 1)].v })); }, [endOptions, f.end]);
 
-  function moveTo(start: number, end: number) {
-    const date = berlinYmd(start);
-    setF((s) => ({ ...s, date, start: berlinHm(start), end: berlinHm(end) }));
-    if (monthStart(date) !== month) setMonth(monthStart(date));
+  // ---------- Validierung pro Schritt ----------
+  const emailOk = /^\S+@\S+\.\S+$/.test(f.email.trim());
+  const stepErrors: Record<string, string>[] = [
+    { ...(!catId && { cat: 'Bitte wähle aus, was ihr vorhabt.' }), ...(f.title.trim().length < 2 && { title: 'Bitte gib einen Anlass an.' }), ...(!(+f.guests >= 1) && { guests: 'Bitte schätze die Personenzahl.' }) },
+    { ...(!f.date && { date: 'Bitte wähle einen Tag im Kalender.' }), ...(result?.level === 'block' && { time: 'Der gewählte Zeitraum ist nicht frei.' }) },
+    { ...(f.name.trim().length < 2 && { name: 'Bitte gib deinen Namen an.' }), ...(!emailOk && { email: 'Bitte gib eine gültige E-Mail-Adresse an.' }),
+      ...(f.phone.trim().length < 4 && { phone: 'Bitte gib eine Telefonnummer für Rückfragen an.' }), ...(bookerType === 'member' && !f.team.trim() && { team: 'Bitte gib deine Mannschaft oder Abteilung an.' }) },
+    { ...(!(agree && who) && { agree: 'Bitte bestätige die Absprache und wähle die Person aus.' }), ...(!rules && { rules: 'Bitte akzeptiere Hausordnung und Datenschutz.' }) },
+  ];
+  const err = (k: string) => (touched ? stepErrors[step][k] : undefined);
+
+  function go(to: number) {
+    if (to > step && Object.keys(stepErrors[step]).length) { setTouched(true); return; }
+    setTouched(false); setServerError('');
+    setStep(to); setReached((r) => Math.max(r, to));
+    topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const errs: Record<string, boolean> = {};
-    const missing: string[] = [];
-    const need: [keyof typeof f, string][] = [['title', 'Anlass'], ['name', 'Name'], ['email', 'E-Mail'], ['phone', 'Telefon']];
-    if (bookerType === 'member') need.push(['team', 'Mannschaft/Abteilung']);
-    for (const [k, l] of need) if (!f[k].trim()) { errs[k] = true; missing.push(l); }
-    if (f.email && !/^\S+@\S+\.\S+$/.test(f.email)) { errs.email = true; missing.push('gültige E-Mail'); }
-    if (!catId) missing.push('Kategorie');
-    if (!agree || !who) { errs.agree = true; missing.push('Absprache mit Michael Grieswelle oder Sigrid Brodig (Haken und Person)'); }
-    if (!rules) { errs.rules = true; missing.push('Hausordnung'); }
-    if (!draft || result?.level === 'block') missing.push('einen freien Zeitraum');
-    setErrors(errs);
-    if (missing.length) { setFormError('Bitte noch ergänzen: ' + missing.join(', ') + '.'); return; }
-    setFormError(''); setBusy(true);
+  async function submit() {
+    if (Object.keys(stepErrors[3]).length) { setTouched(true); return; }
+    for (let i = 0; i < 3; i++) if (Object.keys(stepErrors[i]).length) { setStep(i); setTouched(true); return; }
+    setBusy(true); setServerError('');
     try {
       const res = await fetch('/api/buchungen', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          categoryId: catId, title: f.title.trim(), note: f.note.trim(), date: f.date, start: f.start, end: f.end,
-          guests: +f.guests || 1, bookerType, team: bookerType === 'member' ? f.team.trim() : '', name: f.name.trim(),
-          email: f.email.trim(), phone: f.phone.trim(), agreedWith: who, agreed: agree, rulesAccepted: rules, website: f.website,
+          categoryId: catId, title: f.title.trim(), note: f.note.trim(), date: f.date, start: f.start, end: f.end, guests: +f.guests,
+          equipment, bookerType, team: bookerType === 'member' ? f.team.trim() : '', name: f.name.trim(), email: f.email.trim(),
+          phone: f.phone.trim(), agreedWith: who, agreed: agree, rulesAccepted: rules, website: f.website,
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setTicket({ number: json.number, email: f.email.trim(), title: f.title.trim(), start: draft!.start, end: draft!.end, category: cat!.name, agreedWith: who });
-        setF((s) => ({ ...s, title: '', note: '' })); setAgree(false); setWho(''); setRules(false);
-        load(month);
-      } else if (res.status === 409) {
-        setFormError('Der Termin ist inzwischen nicht mehr frei: ' + (json.check?.messages?.[0]?.text ?? 'bitte eine andere Zeit wählen.'));
-        load(month);
-      } else setFormError(json.error ?? 'Das hat nicht geklappt. Bitte versuch es gleich noch einmal.');
+      if (res.ok) { setDone({ number: json.number, email: f.email.trim() }); topRef.current?.scrollIntoView({ block: 'start' }); load(month); }
+      else if (res.status === 409) { await load(month); setStep(1); setServerError('Der Zeitraum wurde gerade vergeben: ' + (json.check?.messages?.[0]?.text ?? 'bitte wähle eine andere Zeit.')); }
+      else setServerError(json.error ?? 'Die Anfrage konnte nicht gesendet werden. Bitte versuche es gleich noch einmal.');
     } catch {
-      setFormError('Keine Verbindung. Bitte prüfe dein Internet und versuch es noch einmal.');
+      setServerError('Keine Verbindung zum Server. Bitte prüfe deine Internetverbindung.');
     } finally { setBusy(false); }
+  }
+
+  function reset() {
+    setDone(null); setStep(0); setReached(0); setCatId(null); setEquipment([]); setAgree(false); setWho(''); setRules(false);
+    setF((s) => ({ ...s, title: '', note: '', date: '' }));
   }
 
   // ---------- Kalender ----------
   const todayKey = berlinYmd(now);
   const partyWeekends = useMemo(() => new Set(data.slots.map((s) => partyWeekendOf(s.start, cats.get(s.categoryId), data.settings)).filter(Boolean)), [data, cats]);
   const cells = useMemo(() => {
-    const lead = (weekdayOf(month) + 6) % 7;
-    const first = addDays(month, -lead);
-    const out: string[] = [];
-    for (let i = 0; i < 42; i++) {
-      const k = addDays(first, i);
-      if (i >= 35 && k.slice(0, 7) !== month.slice(0, 7)) break;
-      out.push(k);
-    }
+    const first = addDays(month, -((weekdayOf(month) + 6) % 7)); const out: string[] = [];
+    for (let i = 0; i < 42; i++) { const k = addDays(first, i); if (i >= 35 && k.slice(0, 7) !== month.slice(0, 7)) break; out.push(k); }
     return out;
   }, [month]);
-
-  const status = !draft ? { cls: 'st-idle', head: 'Wähle Datum und Uhrzeit, dann prüfen wir sofort, ob der Raum frei ist.' }
-    : !catId ? { cls: 'st-idle', head: 'Wähle noch aus, was ihr vorhabt. Davon hängen die Pufferzeiten ab.' }
-    : { cls: 'st-' + result!.level, head: { ok: 'Frei! Der Raum ist zu dieser Zeit verfügbar.', warn: 'Möglich, aber bitte beachten:', block: 'So leider nicht möglich:' }[result!.level] };
-
-  // Tagesleiste 08:00 bis 02:00
+  const daySlots = (k: string) => {
+    const ds = berlinToUtc(k, '00:00'), de = berlinToUtc(addDays(k, 1), '00:00');
+    return data.slots.filter((s) => s.start < de && s.end > ds).sort((a, b) => a.start - b.start);
+  };
   const lineDate = f.date || todayKey;
   const w0 = berlinToUtc(lineDate, '08:00'), span = berlinToUtc(addDays(lineDate, 1), '02:00') - w0;
   const x = (t: number) => Math.max(0, Math.min(100, ((t - w0) / span) * 100));
+  const availability = !result ? null : result.level;
+
+  // ---------- Darstellung ----------
+  const Summary = (
+    <aside className="aside">
+      <section className="card summary" aria-labelledby="sum-h">
+        <div className="card-head"><h2 id="sum-h">Deine Anfrage</h2>
+          {availability && <span className={`badge b-${availability === 'block' ? 'bad' : availability === 'warn' ? 'warn' : 'ok'}`}>{availability === 'block' ? 'nicht verfügbar' : availability === 'warn' ? 'mit Hinweisen' : 'verfügbar'}</span>}
+        </div>
+        <div className="card-body" style={{ paddingBlock: 6 }}>
+          <dl>
+            <div className="item"><dt>Anlass</dt><dd className={f.title ? '' : 'tbd'}>{f.title || 'noch offen'}</dd></div>
+            <div className="item"><dt>Art</dt><dd className={cat ? '' : 'tbd'}>{cat ? <span className="catdot" style={{ '--c': cat.color } as React.CSSProperties}>{cat.name}</span> : 'noch offen'}</dd></div>
+            <div className="item"><dt>Datum</dt><dd className={f.date ? '' : 'tbd'}>{f.date ? dayLabel(f.date) : 'noch offen'}</dd></div>
+            <div className="item"><dt>Uhrzeit</dt><dd className={f.date ? 'num' : 'tbd'}>{f.date && draft ? `${f.start}–${f.end} Uhr${berlinYmd(draft.end) !== f.date ? ' (Folgetag)' : ''}` : 'noch offen'}</dd></div>
+            {cat && draft && <div className="item"><dt>Reserviert</dt><dd className="num" style={{ fontWeight: 400 }}>{berlinHm(draft.start - cat.bufferBefore * MIN)}–{berlinHm(draft.end + cat.bufferAfter * MIN)} Uhr<br /><span className="muted small">inkl. Auf- und Abbau</span></dd></div>}
+            <div className="item"><dt>Personen</dt><dd className="num">{f.guests || '–'}</dd></div>
+            {equipment.length > 0 && <div className="item"><dt>Ausstattung</dt><dd style={{ fontWeight: 400 }}>{equipment.join(', ')}</dd></div>}
+            {(fees.rent > 0 || fees.deposit > 0) && <div className="item"><dt>Kosten</dt><dd style={{ fontWeight: 400 }}>{fees.rent > 0 && <>Nutzungsentgelt {eur(fees.rent)}<br /></>}{fees.deposit > 0 && <>Kaution {eur(fees.deposit)} <span className="muted small">(zurück nach Abnahme)</span></>}</dd></div>}
+          </dl>
+        </div>
+      </section>
+      <section className="card card-body stack">
+        <h2 className="section-title">Ansprechpartner</h2>
+        {PEOPLE.map((p) => <div className="contact" key={p}><span className="avatar">{initials(p)}</span><div><b>{p}</b><br /><span className="muted small">Vorab-Absprache und Schlüssel</span></div></div>)}
+        {contactNote && <p className="muted small">{contactNote}</p>}
+      </section>
+      <section className="card card-body stack">
+        <h2 className="section-title">So geht es weiter</h2>
+        <ol className="next-steps">
+          <li>Du bestätigst deine E-Mail-Adresse über den Link in unserer Mail.</li>
+          <li>Das Orga-Team prüft die Anfrage. Besprechungen von Mitgliedern werden direkt eingetragen.</li>
+          <li>Du bekommst die Bestätigung mit Kalendereintrag und eine Erinnerung vor dem Termin.</li>
+        </ol>
+      </section>
+    </aside>
+  );
+
+  if (done) {
+    return (
+      <div className="wrap booking-layout" ref={topRef}>
+        <section className="card fade-in">
+          <div className="done-view">
+            <span className="seal"><CheckCircle2 className="icon" /></span>
+            <div><span className="eyebrow">Anfrage <span className="refno">{done.number}</span></span><h2>Bitte bestätige noch deine E-Mail-Adresse</h2></div>
+            <p>Wir haben eine Mail an <b>{done.email}</b> geschickt. Erst mit deiner Bestätigung geht die Anfrage an das Orga-Team. Ohne Bestätigung verfällt sie nach 24 Stunden.</p>
+            <p className="muted small">Keine Mail bekommen? Schau bitte im Spam-Ordner nach.</p>
+            <button className="btn" onClick={reset}>Weitere Anfrage stellen</button>
+          </div>
+        </section>
+        {Summary}
+      </div>
+    );
+  }
 
   return (
-    <div className="wrap grid">
-      <section className="panel" aria-labelledby="cal-title">
-        <span className="ribbon" id="cal-title">Belegung</span>
-        <div className="cal-head">
-          <button type="button" className="iconbtn" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Vorheriger Monat">‹</button>
-          <h3>{monthLabel(month)}</h3>
-          <button type="button" className="iconbtn" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Nächster Monat">›</button>
-        </div>
-        <div className="cal">
-          {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => <div className="dow" key={d}>{d}</div>)}
-          {cells.map((k) => {
-            const ds = berlinToUtc(k, '00:00'), de = berlinToUtc(addDays(k, 1), '00:00');
-            const list = data.slots.filter((s) => s.start >= ds && s.start < de).sort((a, b) => a.start - b.start);
-            const wd = weekdayOf(k);
-            const fri = wd === 5 ? k : wd === 6 ? addDays(k, -1) : wd === 0 ? addDays(k, -2) : null;
-            const past = k < todayKey;
-            const blackout = data.blackouts.some((b) => b.start < de && b.end > ds);
-            const cls = ['day', k.slice(0, 7) !== month.slice(0, 7) && 'out', past && 'past', k === todayKey && 'today', k === f.date && 'sel',
-              fri && partyWeekends.has(fri) && 'pw', blackout && 'bo'].filter(Boolean).join(' ');
-            return (
-              <button type="button" key={k} className={cls} disabled={past}
-                onClick={() => { setF((s) => ({ ...s, date: k })); if (monthStart(k) !== month) setMonth(monthStart(k)); }}
-                aria-label={`${new Date(k + 'T12:00:00Z').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}: ${list.length ? list.length + ' Termin(e)' : blackout ? 'gesperrt' : 'frei'}`}>
-                <span className="n">{+k.slice(8)}</span>
-                {list.some((s) => cats.get(s.categoryId)?.isParty) && <span className="tag-party">Party</span>}
-                {list.filter((s) => !cats.get(s.categoryId)?.isParty).map((s) => (
-                  <span key={s.id} className={`pip ${s.status !== 'confirmed' ? 'pending' : ''}`} style={{ '--c': cats.get(s.categoryId)?.color } as React.CSSProperties} />
-                ))}
+    <div className="wrap booking-layout" ref={topRef} style={{ scrollMarginTop: 90 }}>
+      <section className="card" aria-label="Anfrage stellen">
+        <ol className="steps">
+          {STEPS.map((s, i) => (
+            <li key={s}>
+              <button type="button" disabled={i > reached} onClick={() => go(i)} aria-current={i === step ? 'step' : undefined} className={i < step ? 'done' : ''}>
+                <span className="n">{i < step ? <Check className="icon-sm" /> : i + 1}</span>{s}
               </button>
-            );
-          })}
-        </div>
-        <div className="legend">
-          <span><i style={{ background: '#5B67C9' }} />Belegt</span>
-          <span><i style={{ border: '1.5px dashed #5B67C9' }} />Angefragt</span>
-          <span><i style={{ background: 'var(--gelb)' }} />Party</span>
-          <span><i style={{ background: 'repeating-linear-gradient(135deg,var(--surface) 0 3px,var(--muted) 3px 4px)' }} />Party-Wochenende vergeben</span>
-          <span><i style={{ background: 'repeating-linear-gradient(45deg,var(--surface) 0 3px,var(--belegt) 3px 4px)' }} />Gesperrt</span>
-        </div>
-        <div className="dayline">
-          <h4>Tagesansicht {new Date(lineDate + 'T12:00:00Z').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}</h4>
-          <div className="track">
-            {data.slots.filter((s) => s.end + 4 * 3600e3 > w0 && s.start - 3 * 3600e3 < w0 + span).map((s) => {
-              const c = cats.get(s.categoryId); if (!c) return null;
-              const st = { '--c': c.color } as React.CSSProperties;
-              return (
-                <span key={s.id}>
-                  <div className="buf" style={{ ...st, left: x(s.start - c.bufferBefore * MIN) + '%', width: x(s.start) - x(s.start - c.bufferBefore * MIN) + '%' }} />
-                  <div className="buf" style={{ ...st, left: x(s.end) + '%', width: x(s.end + c.bufferAfter * MIN) - x(s.end) + '%' }} />
-                  <div className={`blk ${c.isParty ? 'party' : ''}`} style={{ ...st, left: x(s.start) + '%', width: x(s.end) - x(s.start) + '%', opacity: s.status === 'confirmed' ? 1 : 0.6 }}>
-                    Belegt {berlinHm(s.start)}–{berlinHm(s.end)}
-                  </div>
-                </span>
-              );
-            })}
-            {draft && result && <div className="draft" style={{ '--st': `var(--${{ ok: 'frei', warn: 'hinweis', block: 'belegt' }[result.level]})`, left: x(draft.start) + '%', width: x(draft.end) - x(draft.start) + '%' } as React.CSSProperties} />}
-          </div>
-          <div className="ticks"><span>08</span><span>11</span><span>14</span><span>17</span><span>20</span><span>23</span><span>02 Uhr</span></div>
-          <div className="legend">
-            <span><i style={{ background: 'repeating-linear-gradient(135deg,var(--muted) 0 2px,transparent 2px 4px)' }} />Puffer (Auf- und Abbau)</span>
-            <span><i style={{ border: '2px solid var(--frei)' }} />Deine Anfrage</span>
-          </div>
-        </div>
-      </section>
+            </li>
+          ))}
+        </ol>
 
-      <section className="panel">
-        <form className="booking" onSubmit={submit} noValidate>
-          <fieldset>
-            <legend><span className="step">1</span>Wann brauchst du den Raum?</legend>
+        {step === 0 && (
+          <div className="step-body fade-in">
+            <div><h2>Was habt ihr vor?</h2><p className="lead">Davon hängen Vorbereitungszeit und Freigabe ab.</p></div>
+            <div className="options" role="group" aria-label="Art der Nutzung">
+              {data.categories.map((c) => {
+                const I = ICONS[c.id] ?? Ellipsis;
+                return (
+                  <button type="button" key={c.id} className="option" aria-pressed={c.id === catId} onClick={() => setCatId(c.id)} style={{ '--c': c.color } as React.CSSProperties}>
+                    <span className="ico"><I className="icon" /></span><b>{c.name}</b><small>{c.hint}</small>
+                  </button>
+                );
+              })}
+            </div>
+            {err('cat') && <p className="field-error">{err('cat')}</p>}
             <div className="row">
-              <div className="field"><label htmlFor="f-date">Datum</label><input type="date" id="f-date" min={todayKey} value={f.date} onChange={(e) => { set('date')(e); if (e.target.value) setMonth(monthStart(e.target.value)); }} required /></div>
-              <div className="field"><label htmlFor="f-start">Von</label><input type="time" id="f-start" step={900} value={f.start} onChange={set('start')} required /></div>
-              <div className="field"><label htmlFor="f-end">Bis</label><input type="time" id="f-end" step={900} value={f.end} onChange={set('end')} required />
-                {draft && berlinYmd(draft.end) !== berlinYmd(draft.start) && <small>endet am {fmtDay(draft.end)}</small>}</div>
+              <div className="field span-2"><label htmlFor="f-title" className="req">Anlass</label>
+                <input type="text" id="f-title" maxLength={80} value={f.title} onChange={set('title')} className={err('title') ? 'invalid' : ''} placeholder={cat?.isParty ? 'z. B. 40. Geburtstag' : 'z. B. Mannschaftssitzung D2'} />
+                {err('title') && <span className="field-error">{err('title')}</span>}</div>
+              <div className="field"><label htmlFor="f-guests" className="req">Personen (ca.)</label>
+                <input type="number" id="f-guests" min={1} max={200} value={f.guests} onChange={set('guests')} className={err('guests') ? 'invalid' : ''} />
+                {+f.guests > data.settings.capacity && <span className="hint" style={{ color: 'var(--warn)' }}>Zugelassen sind höchstens {data.settings.capacity} Personen.</span>}</div>
             </div>
-          </fieldset>
-
-          <fieldset>
-            <legend><span className="step">2</span>Was habt ihr vor?</legend>
-            <div className="cats" role="group" aria-label="Kategorie">
-              {data.categories.map((c) => (
-                <button type="button" key={c.id} className="cat" aria-pressed={c.id === catId} onClick={() => setCatId(c.id)}
-                  style={{ '--cc': c.isParty ? 'var(--hinweis)' : c.color } as React.CSSProperties}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICON[c.id] ?? ICON.misc }} />
-                  <b>{c.name}</b><small>{c.hint} · Puffer {c.bufferBefore}/{c.bufferAfter} min</small>
-                </button>
-              ))}
-            </div>
-            <div className="row">
-              <div className="field span2"><label htmlFor="f-title">Anlass</label><input type="text" id="f-title" maxLength={80} className={errors.title ? 'invalid' : ''} value={f.title} onChange={set('title')} placeholder="z. B. 40. Geburtstag, Mannschaftssitzung D2" /></div>
-              <div className="field"><label htmlFor="f-guests">Personen (ca.)</label><input type="number" id="f-guests" min={1} max={200} value={f.guests} onChange={set('guests')} /></div>
-            </div>
-            <div className="field"><label htmlFor="f-note">Notiz <small>(optional)</small></label><textarea id="f-note" maxLength={500} value={f.note} onChange={set('note')} placeholder="Was passiert genau? Brauchst du Beamer oder Musikanlage?" /></div>
-          </fieldset>
-
-          <div className={'status ' + status.cls} aria-live="polite">
-            <div className="head"><span className="dot" />{status.head}</div>
-            {result && result.messages.length > 0 && <ul>{result.messages.map((m, i) => <li key={i}>{m.text}</li>)}</ul>}
-            {result && cat && draft && result.level !== 'block' && (
-              <div style={{ fontSize: '.85rem', color: 'var(--muted)' }}>
-                Inklusive Puffer ist der Raum {berlinHm(draft.start - cat.bufferBefore * MIN)}–{berlinHm(draft.end + cat.bufferAfter * MIN)} Uhr für dich reserviert.{' '}
-                {cat.requiresApproval || bookerType === 'external' ? 'Das Orga-Team bestätigt deine Anfrage.' : 'Für Mitglieder wird sie nach der E-Mail-Bestätigung direkt eingetragen.'}
-              </div>
+            {data.equipment.length > 0 && (
+              <div className="field"><span className="label">Was braucht ihr? <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></span>
+                <div className="chips">{data.equipment.map((e) => (
+                  <button type="button" key={e} className="chip" aria-pressed={equipment.includes(e)} onClick={() => setEquipment((l) => (l.includes(e) ? l.filter((x) => x !== e) : [...l, e]))}>{e}</button>
+                ))}</div></div>
             )}
-            {result?.suggestion && <button type="button" className="fix" onClick={() => moveTo(result.suggestion!.start, result.suggestion!.end)}>{result.suggestion.label}</button>}
+            <div className="field"><label htmlFor="f-note">Nachricht ans Orga-Team <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
+              <textarea id="f-note" maxLength={500} value={f.note} onChange={set('note')} placeholder="Was ist geplant? Gibt es etwas, das wir wissen sollten?" />
+              <span className="hint">{f.note.length}/500</span></div>
           </div>
+        )}
 
-          <fieldset>
-            <legend><span className="step">3</span>Wer bucht?</legend>
-            <div className="seg" role="group" aria-label="Mitglied oder extern">
-              <button type="button" aria-pressed={bookerType === 'member'} onClick={() => setBookerType('member')}>Vereinsmitglied</button>
-              <button type="button" aria-pressed={bookerType === 'external'} onClick={() => setBookerType('external')}>Extern</button>
-            </div>
-            <div className="row">
-              <div className="field"><label htmlFor="f-name">Name</label><input type="text" id="f-name" autoComplete="name" className={errors.name ? 'invalid' : ''} value={f.name} onChange={set('name')} placeholder="Vor- und Nachname" /></div>
-              {bookerType === 'member' && <div className="field"><label htmlFor="f-team">Mannschaft / Abteilung</label><input type="text" id="f-team" className={errors.team ? 'invalid' : ''} value={f.team} onChange={set('team')} placeholder="z. B. D2-Jugend" /></div>}
-            </div>
-            <div className="row">
-              <div className="field"><label htmlFor="f-email">E-Mail</label><input type="email" id="f-email" autoComplete="email" className={errors.email ? 'invalid' : ''} value={f.email} onChange={set('email')} placeholder="du@beispiel.de" /></div>
-              <div className="field"><label htmlFor="f-phone">Telefon</label><input type="tel" id="f-phone" autoComplete="tel" className={errors.phone ? 'invalid' : ''} value={f.phone} onChange={set('phone')} placeholder="0521 …" /></div>
-            </div>
-            <div className="hp" aria-hidden="true"><label htmlFor="f-website">Website</label><input type="text" id="f-website" tabIndex={-1} autoComplete="off" value={f.website} onChange={set('website')} /></div>
-          </fieldset>
-
-          <fieldset>
-            <legend><span className="step">4</span>Bestätigen</legend>
-            <div className={'check must' + (errors.agree ? ' invalid' : '')}>
-              <input type="checkbox" id="f-agree" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+        {step === 1 && (
+          <div className="step-body fade-in">
+            <div><h2>Wann braucht ihr den Raum?</h2><p className="lead">Wähle einen Tag. Belegte Zeiten siehst du rechts, Puffer für Auf- und Abbau rechnen wir automatisch ein.</p></div>
+            {serverError && <div className="alert alert-bad"><XCircle className="icon" /><div>{serverError}</div></div>}
+            <div className="when">
               <div>
-                <label htmlFor="f-agree"><strong>Ich habe die Nutzung vorab mit Michael Grieswelle oder Sigrid Brodig abgesprochen.</strong> Ohne vorherige Absprache ist die Buchung ungültig.</label>
-                <div className="who" role="radiogroup" aria-label="Abgesprochen mit">
-                  {PEOPLE.map((p) => <label key={p}><input type="radio" name="who" value={p} checked={who === p} onChange={() => { setWho(p); setAgree(true); }} /> {p}</label>)}
+                <div className="cal-nav">
+                  <button type="button" className="iconbtn" onClick={() => setMonth(shiftMonth(month, -1))} disabled={month <= monthStart(todayKey)} aria-label="Vorheriger Monat"><ChevronLeft className="icon" /></button>
+                  <h3>{monthLabel(month)}</h3>
+                  <button type="button" className="iconbtn" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Nächster Monat"><ChevronRight className="icon" /></button>
+                </div>
+                <div className="month" role="grid" aria-label={monthLabel(month)}>
+                  {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => <div className="dow" key={d}>{d}</div>)}
+                  {cells.map((k) => {
+                    const list = daySlots(k);
+                    const ds = berlinToUtc(k, '00:00'), de = berlinToUtc(addDays(k, 1), '00:00');
+                    const blocked = data.blackouts.some((b) => b.start < de && b.end > ds);
+                    const wd = weekdayOf(k), fri = wd === 5 ? k : wd === 6 ? addDays(k, -1) : wd === 0 ? addDays(k, -2) : null;
+                    const cls = ['dcell', k.slice(0, 7) !== month.slice(0, 7) && 'out', k === todayKey && 'today', k === f.date && 'sel', blocked && 'blocked'].filter(Boolean).join(' ');
+                    return (
+                      <button type="button" key={k} className={cls} disabled={k < todayKey} onClick={() => { setF((s) => ({ ...s, date: k })); if (monthStart(k) !== month) setMonth(monthStart(k)); }}
+                        aria-label={`${dayLabel(k)}: ${blocked ? 'gesperrt' : list.length ? `${list.length} Termin(e)` : 'frei'}`} aria-pressed={k === f.date}>
+                        {fri && partyWeekends.has(fri) && <span className="pw-flag" title="Feier am Wochenende eingetragen" />}
+                        <span className="d">{+k.slice(8)}</span>
+                        <span className="dots">{list.slice(0, 3).map((s) => <i key={s.id} className={s.status !== 'confirmed' ? 'open' : ''} style={{ '--c': cats.get(s.categoryId)?.color } as React.CSSProperties} />)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="legend">
+                  <span><i style={{ '--c': 'var(--muted)' } as React.CSSProperties} />Termin eingetragen</span>
+                  <span><i style={{ background: 'transparent', boxShadow: 'inset 0 0 0 1.5px var(--muted)' }} />angefragt</span>
+                  <span><i style={{ background: 'var(--gelb)' }} />Feier am Wochenende</span>
                 </div>
               </div>
-            </div>
-            <div className={'check' + (errors.rules ? ' invalid' : '')}>
-              <input type="checkbox" id="f-rules" checked={rules} onChange={(e) => setRules(e.target.checked)} />
-              <label htmlFor="f-rules">Ich akzeptiere die <a href="/regeln" target="_blank">Hausordnung</a> und die <a href="/regeln#datenschutz" target="_blank">Datenschutzhinweise</a>.</label>
-            </div>
-            {formError && <div className="err" role="alert">{formError}</div>}
-          </fieldset>
 
-          <button className="cta" type="submit" disabled={busy || result?.level === 'block'}>{busy ? 'Wird gesendet …' : 'Anfrage senden'}</button>
-        </form>
-      </section>
+              <div className="dayplan">
+                {!f.date ? <p className="muted small" style={{ paddingTop: 6 }}>Wähle links einen Tag aus.</p> : (
+                  <>
+                    <h3>{dayLabel(f.date)}</h3>
+                    {daySlots(f.date).length ? (
+                      <ul className="busy">{daySlots(f.date).map((s) => (
+                        <li key={s.id} style={{ '--c': cats.get(s.categoryId)?.color } as React.CSSProperties}><span className="t">{berlinHm(s.start)}–{berlinHm(s.end)}</span><span>{s.status === 'confirmed' ? 'belegt' : 'angefragt'}</span></li>
+                      ))}</ul>
+                    ) : <p className="free-day"><CircleCheck className="icon-sm" />Noch keine Termine an diesem Tag</p>}
+                    <div className="row" style={{ gridTemplateColumns: '1fr 1fr', marginTop: 6 }}>
+                      <div className="field"><label htmlFor="f-start">Von</label>
+                        <select id="f-start" value={f.start} onChange={set('start')}>{START_OPTIONS.map((t) => <option key={t}>{t}</option>)}</select></div>
+                      <div className="field"><label htmlFor="f-end">Bis</label>
+                        <select id="f-end" value={f.end} onChange={set('end')}>{endOptions.map((o) => <option key={o.v + o.next} value={o.v}>{o.v}{o.next ? ' (+1)' : ''}</option>)}</select></div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
 
-      {ticket && (
-        <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) setTicket(null); }} onKeyDown={(e) => e.key === 'Escape' && setTicket(null)}>
-          <div className="ticket" role="dialog" aria-modal="true" aria-labelledby="t-h">
-            <div className="top"><img src="/logo.png" alt="" /><div><b id="t-h">Fast geschafft!</b><span className="mono" style={{ opacity: .85 }}>{ticket.number}</span></div></div>
-            <div className="body">
-              <span className="stamp tilt s-requested">E-Mail bestätigen</span>
-              <dl className="kv">
-                <dt>Anlass</dt><dd>{ticket.title}</dd>
-                <dt>Wann</dt><dd>{fmtDay(ticket.start)}<br /><span className="mono">{berlinHm(ticket.start)}–{berlinHm(ticket.end)} Uhr</span></dd>
-                <dt>Kategorie</dt><dd>{ticket.category}</dd>
-                <dt>Abgesprochen</dt><dd>{ticket.agreedWith}</dd>
-              </dl>
-            </div>
-            <div className="perf" />
-            <div className="body">
-              <ol>
-                <li>Wir haben dir eine Mail an <b>{ticket.email}</b> geschickt. Bestätige darin deine Anfrage. Ohne Bestätigung verfällt sie nach 24 Stunden.</li>
-                <li>Danach prüft das Orga-Team deine Anfrage und meldet sich per Mail.</li>
-                <li>3 Tage und 24 Stunden vorher erinnern wir dich an Termin und Schlüssel.</li>
-              </ol>
-              <div className="acts"><button className="btn primary" ref={closeRef} onClick={() => setTicket(null)}>Fertig</button></div>
-            </div>
+            {f.date && (
+              <div>
+                <div className="track" aria-hidden="true">
+                  {data.slots.filter((s) => s.end + 4 * 3.6e6 > w0 && s.start - 3 * 3.6e6 < w0 + span).map((s) => {
+                    const c = cats.get(s.categoryId); if (!c) return null; const st = { '--c': c.color } as React.CSSProperties;
+                    return (
+                      <span key={s.id}>
+                        <span className="buf" style={{ ...st, left: x(s.start - c.bufferBefore * MIN) + '%', width: x(s.start) - x(s.start - c.bufferBefore * MIN) + '%' }} />
+                        <span className="buf" style={{ ...st, left: x(s.end) + '%', width: x(s.end + c.bufferAfter * MIN) - x(s.end) + '%' }} />
+                        <span className={`blk ${s.status !== 'confirmed' ? 'open' : ''}`} style={{ ...st, left: x(s.start) + '%', width: x(s.end) - x(s.start) + '%' }} />
+                      </span>
+                    );
+                  })}
+                  {draft && result && <span className="mine" style={{ '--st': `var(--${result.level === 'block' ? 'bad' : result.level === 'warn' ? 'warn' : 'ok'})`, left: x(draft.start) + '%', width: x(draft.end) - x(draft.start) + '%' } as React.CSSProperties} />}
+                </div>
+                <div className="ticks"><span>08:00</span><span>11:00</span><span>14:00</span><span>17:00</span><span>20:00</span><span>23:00</span><span>02:00</span></div>
+              </div>
+            )}
+
+            {result && (
+              <div className={`alert alert-${result.level === 'block' ? 'bad' : result.level === 'warn' ? 'warn' : 'ok'}`} aria-live="polite">
+                {result.level === 'ok' ? <CheckCircle2 className="icon" /> : result.level === 'warn' ? <AlertTriangle className="icon" /> : <XCircle className="icon" />}
+                <div>
+                  <strong>{result.level === 'ok' ? 'Der Raum ist frei.' : result.level === 'warn' ? 'Möglich, bitte beachte:' : 'Zu dieser Zeit leider nicht möglich.'}</strong>
+                  {result.messages.length > 0 && <ul>{result.messages.map((m, i) => <li key={i}>{m.text}</li>)}</ul>}
+                  {result.suggestion && <div><button type="button" className="btn btn-sm" onClick={() => {
+                    const s = result.suggestion!; const d = berlinYmd(s.start);
+                    setF((v) => ({ ...v, date: d, start: berlinHm(s.start), end: berlinHm(s.end) })); if (monthStart(d) !== month) setMonth(monthStart(d));
+                  }}>{result.suggestion.label}</button></div>}
+                </div>
+              </div>
+            )}
+            {err('date') && <p className="field-error">{err('date')}</p>}
           </div>
+        )}
+
+        {step === 2 && (
+          <div className="step-body fade-in">
+            <div><h2>Wer fragt an?</h2><p className="lead">Wir nutzen die Angaben nur für diese Buchung.</p></div>
+            <div className="segmented" role="group" aria-label="Mitglied oder extern">
+              <button type="button" aria-pressed={bookerType === 'member'} onClick={() => setBookerType('member')}>Vereinsmitglied</button>
+              <button type="button" aria-pressed={bookerType === 'external'} onClick={() => setBookerType('external')}>Nicht im Verein</button>
+            </div>
+            <div className="row">
+              <div className="field"><label htmlFor="f-name" className="req">Vor- und Nachname</label><input type="text" id="f-name" autoComplete="name" value={f.name} onChange={set('name')} className={err('name') ? 'invalid' : ''} />{err('name') && <span className="field-error">{err('name')}</span>}</div>
+              {bookerType === 'member' && <div className="field"><label htmlFor="f-team" className="req">Mannschaft oder Abteilung</label><input type="text" id="f-team" value={f.team} onChange={set('team')} placeholder="z. B. D2-Jugend" className={err('team') ? 'invalid' : ''} />{err('team') && <span className="field-error">{err('team')}</span>}</div>}
+            </div>
+            <div className="row">
+              <div className="field"><label htmlFor="f-email" className="req">E-Mail</label><input type="email" id="f-email" autoComplete="email" value={f.email} onChange={set('email')} className={err('email') ? 'invalid' : ''} />{err('email') && <span className="field-error">{err('email')}</span>}</div>
+              <div className="field"><label htmlFor="f-phone" className="req">Telefon</label><input type="tel" id="f-phone" autoComplete="tel" value={f.phone} onChange={set('phone')} className={err('phone') ? 'invalid' : ''} />{err('phone') && <span className="field-error">{err('phone')}</span>}</div>
+            </div>
+            <div className="hp" aria-hidden="true"><label htmlFor="f-website">Website</label><input type="text" id="f-website" tabIndex={-1} autoComplete="off" value={f.website} onChange={set('website')} /></div>
+            {(fees.rent > 0 || fees.deposit > 0) && <div className="alert alert-info"><CalendarCheck className="icon" /><div>Für diese Nutzung fallen {fees.rent > 0 && <>ein Nutzungsentgelt von <b>{eur(fees.rent)}</b></>}{fees.rent > 0 && fees.deposit > 0 && ' und '}{fees.deposit > 0 && <>eine Kaution von <b>{eur(fees.deposit)}</b></>} an. Die Kaution bekommst du nach der Abnahme zurück.</div></div>}
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="step-body fade-in">
+            <div><h2>Prüfen und absenden</h2><p className="lead">Kontrolliere deine Angaben in der Übersicht. Mit dem Absenden stellst du eine verbindliche Anfrage.</p></div>
+            {cat && draft && (
+              <dl className="kv">
+                <dt>Anlass</dt><dd><b>{f.title}</b> · {cat.name}</dd>
+                <dt>Termin</dt><dd>{fmtLong(draft.start)}, {f.start}–{f.end} Uhr{berlinYmd(draft.end) !== f.date ? ` (bis ${fmtDay(draft.end)})` : ''}</dd>
+                <dt>Personen</dt><dd>{f.guests}</dd>
+                <dt>Kontakt</dt><dd>{f.name}{bookerType === 'member' ? `, ${f.team}` : ' (nicht im Verein)'}<br />{f.email} · {f.phone}</dd>
+                {f.note && <><dt>Nachricht</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{f.note}</dd></>}
+              </dl>
+            )}
+            <div className="stack-sm">
+              <div className={`choice important${err('agree') ? ' invalid' : ''}`}>
+                <input type="checkbox" id="f-agree" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+                <div className="stack-sm">
+                  <label htmlFor="f-agree"><b>Ich habe die Nutzung vorab mit Michael Grieswelle oder Sigrid Brodig abgesprochen.</b> Ohne vorherige Absprache ist die Buchung ungültig.</label>
+                  <div className="chips" role="radiogroup" aria-label="Abgesprochen mit">
+                    {PEOPLE.map((p) => <label key={p} className="chip"><input type="radio" name="who" checked={who === p} onChange={() => { setWho(p); setAgree(true); }} />{p}</label>)}
+                  </div>
+                </div>
+              </div>
+              {err('agree') && <span className="field-error">{err('agree')}</span>}
+              <label className={`choice${err('rules') ? ' invalid' : ''}`} htmlFor="f-rules">
+                <input type="checkbox" id="f-rules" checked={rules} onChange={(e) => setRules(e.target.checked)} />
+                <span>Ich habe die <a href="/raum#hausordnung" target="_blank">Hausordnung</a> gelesen und akzeptiere sie. Die <a href="/raum#datenschutz" target="_blank">Datenschutzhinweise</a> habe ich zur Kenntnis genommen.</span>
+              </label>
+              {err('rules') && <span className="field-error">{err('rules')}</span>}
+            </div>
+            {serverError && <div className="alert alert-bad"><XCircle className="icon" /><div>{serverError}</div></div>}
+          </div>
+        )}
+
+        <div className="step-actions">
+          {step > 0 ? <button type="button" className="btn" onClick={() => go(step - 1)}><ArrowLeft className="icon-sm" />Zurück</button> : <span />}
+          {step < 3
+            ? <button type="button" className="btn btn-primary" onClick={() => go(step + 1)} disabled={step === 1 && result?.level === 'block'}>Weiter<ArrowRight className="icon-sm" /></button>
+            : <button type="button" className="btn btn-primary btn-lg" onClick={submit} disabled={busy}>{busy ? 'Wird gesendet …' : 'Anfrage verbindlich senden'}</button>}
         </div>
-      )}
+      </section>
+      {Summary}
     </div>
   );
 }

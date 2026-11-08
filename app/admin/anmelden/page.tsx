@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
+import { MailCheck } from 'lucide-react';
 import { createLoginLink, currentAdmin } from '@/lib/auth';
 import { teamMails } from '@/lib/mail';
 import { appUrl } from '@/lib/url';
@@ -16,7 +17,6 @@ async function requestLink(formData: FormData) {
   const res = await createLoginLink(email, appUrl());
   if (res) {
     await teamMails.login(res.to, res.link);
-    // Entwicklung ohne Mailversand: Link direkt anzeigen
     if (!process.env.RESEND_API_KEY && process.env.NODE_ENV !== 'production') redirect('/admin/anmelden?gesendet=1&dev=' + encodeURIComponent(res.link));
   }
   redirect('/admin/anmelden?gesendet=1');
@@ -26,23 +26,25 @@ export default async function Login({ searchParams }: { searchParams: Promise<Re
   if (await currentAdmin()) redirect('/admin');
   const sp = await searchParams;
   return (
-    <main className="wrap narrow" style={{ paddingBlock: 40 }}>
-      <div className="panel stack">
-        <span className="ribbon" style={{ justifySelf: 'start' }}>Verwaltung</span>
-        <h1 style={{ fontSize: '1.8rem' }}>Anmelden</h1>
-        {sp.gesendet ? (
-          <>
-            <p className="notice">Wenn die Adresse zum Orga-Team gehört, ist jetzt ein Login-Link unterwegs. Er ist 15 Minuten gültig.</p>
-            {sp.dev && <p className="muted">Entwicklungsmodus (kein Mailversand eingerichtet): <a href={sp.dev}>Direkt anmelden</a></p>}
-          </>
-        ) : (
-          <form action={requestLink} className="stack">
-            <p className="muted" style={{ margin: 0 }}>Kein Passwort nötig. Wir schicken dir einen Link per Mail.</p>
-            <div className="field"><label htmlFor="email">E-Mail-Adresse</label><input type="email" id="email" name="email" required autoComplete="email" /></div>
-            <button className="cta" type="submit">Login-Link senden</button>
-          </form>
-        )}
-      </div>
+    <main className="wrap" style={{ paddingBlock: 56, maxWidth: 460 }}>
+      <section className="card">
+        <div className="card-body stack">
+          <div><span className="eyebrow">Jugendraum · Verwaltung</span><h1 style={{ fontSize: '1.5rem' }}>Anmelden</h1></div>
+          {sp.gesendet ? (
+            <>
+              <div className="alert alert-ok"><MailCheck className="icon" /><div>Wenn die Adresse zum Orga-Team gehört, ist jetzt ein Anmeldelink unterwegs. Er ist 15 Minuten gültig.</div></div>
+              {sp.dev && <p className="muted small">Entwicklungsmodus ohne Mailversand: <a href={sp.dev}>direkt anmelden</a></p>}
+              <a href="/admin/anmelden" className="small">Andere Adresse verwenden</a>
+            </>
+          ) : (
+            <form action={requestLink} className="stack">
+              <p className="muted">Kein Passwort nötig. Wir schicken dir einen Anmeldelink per E-Mail.</p>
+              <div className="field"><label htmlFor="email">E-Mail-Adresse</label><input type="email" id="email" name="email" required autoComplete="email" autoFocus /></div>
+              <button className="btn btn-primary btn-lg" type="submit">Anmeldelink senden</button>
+            </form>
+          )}
+        </div>
+      </section>
     </main>
   );
 }

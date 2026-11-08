@@ -1,20 +1,21 @@
 import 'server-only';
 import { db } from './db';
-import type { Booking } from './data';
+import { getExtras, type Booking, type MailTextKey } from './data';
 import type { Category } from './rules';
-import { fmtLong, berlinHm } from './time';
 import { bookingIcs } from './ics';
-
-export { appUrl } from './url';
+import { eur } from './labels';
+import { berlinHm, berlinYmd, fmtDay, fmtLong } from './time';
 import { appUrl } from './url';
+
+export { appUrl };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-type Attachment = { filename: string; content: string }; // content: base64
-type Mail = { to: string | string[]; subject: string; html: string; kind: string; bookingId?: string; attachments?: Attachment[] };
+type Attachment = { filename: string; content: string }; // base64
+type Mail = { to: string | string[]; subject: string; html: string; text: string; kind: string; bookingId?: string; attachments?: Attachment[]; replyTo?: string };
 
 /** Versand über Resend. Ohne RESEND_API_KEY wird die Mail nur in der Konsole ausgegeben (Entwicklung). */
 export async function sendMail(m: Mail): Promise<boolean> {
-  const to = Array.isArray(m.to) ? m.to : [m.to];
+  const to = (Array.isArray(m.to) ? m.to : [m.to]).filter(Boolean);
   if (!to.length) return true;
   let ok = true; let error: string | null = null;
   const key = process.env.RESEND_API_KEY;
@@ -25,14 +26,14 @@ export async function sendMail(m: Mail): Promise<boolean> {
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           from: process.env.MAIL_FROM ?? 'Jugendraum SV Heepen <jugendraum@sv-heepen.de>',
-          to, subject: m.subject, html: m.html, attachments: m.attachments,
+          to, subject: m.subject, html: m.html, text: m.text, attachments: m.attachments, reply_to: m.replyTo ?? process.env.MAIL_REPLY_TO,
         }),
       });
       if (!res.ok) { ok = false; error = `${res.status} ${await res.text()}`.slice(0, 500); }
     } catch (e) { ok = false; error = String(e).slice(0, 500); }
   } else {
     const links = [...m.html.matchAll(/href="([^"]+)"/g)].map((x) => x[1]).filter((u) => u.startsWith('http'));
-    console.log(`\n✉️  [${m.kind}] an ${to.join(', ')}: ${m.subject}\n${links.map((l) => '   → ' + l).join('\n')}`);
+    console.log(`\n[mail:${m.kind}] an ${to.join(', ')}: ${m.subject}\n${links.map((l) => '   → ' + l).join('\n')}`);
   }
   try {
     for (const r of to) await db()`insert into mail_log (kind, recipient, subject, booking_id, ok, error) values (${m.kind}, ${r}, ${m.subject}, ${m.bookingId ?? null}, ${ok}, ${error})`;
@@ -41,93 +42,140 @@ export async function sendMail(m: Mail): Promise<boolean> {
   return ok;
 }
 
-// ---------- Layout im Vereinsdesign ----------
-function layout(title: string, body: string, cta?: { href: string; label: string }) {
-  return `<!doctype html><html lang="de"><body style="margin:0;background:#F5F6FB;font-family:'Source Sans 3',Segoe UI,Arial,sans-serif;color:#151A3D">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F5F6FB;padding:24px 0"><tr><td align="center">
-<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border:1px solid #D9DCEC">
-<tr><td style="background:#2E367A;padding:18px 24px"><img src="${appUrl()}/logo.png" width="40" height="40" alt="SV Heepen" style="vertical-align:middle">
-<span style="font-family:Archivo,Arial Black,Arial,sans-serif;font-weight:900;color:#FFD800;font-size:20px;letter-spacing:2px;vertical-align:middle;margin-left:10px">JUGENDRAUM</span></td></tr>
-<tr><td style="padding:24px">
-<h1 style="font-family:Archivo,Arial Black,Arial,sans-serif;font-size:22px;margin:0 0 14px;color:#2E367A">${title}</h1>
-${body}
-${cta ? `<p style="margin:22px 0 4px"><a href="${cta.href}" style="display:inline-block;background:#FFD800;color:#1E2458;font-weight:800;text-decoration:none;padding:12px 22px;font-family:Archivo,Arial,sans-serif;text-transform:uppercase;letter-spacing:1px">${cta.label}</a></p>` : ''}
+// ---------- Layout ----------
+type Block = string;
+const P = (t: string) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#2B3050">${t}</p>`;
+const SMALL = (t: string) => `<p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:#646A85">${t}</p>`;
+const paragraphs = (t: string) => t.split(/\n{2,}/).map((x) => P(esc(x).replace(/\n/g, '<br>'))).join('');
+
+function layout(o: { preheader: string; heading: string; blocks: Block[]; cta?: { href: string; label: string } }) {
+  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(o.heading)}</title></head>
+<body style="margin:0;padding:0;background:#F4F5F8;font-family:'Source Sans 3','Segoe UI',Helvetica,Arial,sans-serif">
+<span style="display:none;max-height:0;overflow:hidden">${esc(o.preheader)}</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F5F8;padding:28px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#FFFFFF;border:1px solid #E1E4EC;border-top:4px solid #FFD800;border-radius:8px">
+<tr><td style="padding:20px 28px;border-bottom:1px solid #E1E4EC">
+  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+  <td><img src="${appUrl()}/logo.png" width="36" height="36" alt="SV Heepen" style="display:block"></td>
+  <td style="padding-left:12px;font-size:16px;line-height:1.2;color:#2E367A;font-weight:700">Jugendraum<br><span style="font-size:12px;color:#646A85;font-weight:400">SV Heepen</span></td>
+  </tr></table></td></tr>
+<tr><td style="padding:28px 28px 8px">
+<h1 style="margin:0 0 16px;font-size:21px;line-height:1.3;color:#161A33;font-weight:700">${esc(o.heading)}</h1>
+${o.blocks.join('\n')}
+${o.cta ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 22px"><tr><td style="background:#2E367A;border-radius:8px"><a href="${o.cta.href}" style="display:inline-block;padding:12px 22px;color:#FFFFFF;font-weight:600;font-size:15px;text-decoration:none">${esc(o.cta.label)}</a></td></tr></table>` : ''}
 </td></tr>
-<tr><td style="padding:14px 24px;border-top:1px solid #D9DCEC;font-size:12px;color:#5A6085">SV Heepen · Jugendraum am Sportplatz · Diese Mail wurde automatisch verschickt.</td></tr>
+<tr><td style="padding:16px 28px;border-top:1px solid #E1E4EC;font-size:12px;line-height:1.5;color:#646A85">Jugendraum des SV Heepen · Diese Nachricht wurde automatisch versendet. Bei Fragen antworte einfach auf diese Mail oder wende dich an Michael Grieswelle oder Sigrid Brodig.</td></tr>
 </table></td></tr></table></body></html>`;
 }
-const p = (t: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.5">${t}</p>`;
-function details(b: Booking, c?: Category) {
-  const row = (k: string, v: string) => `<tr><td style="padding:4px 14px 4px 0;color:#5A6085;font-size:14px;vertical-align:top">${k}</td><td style="padding:4px 0;font-size:14px;font-weight:600">${v}</td></tr>`;
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 14px;border-left:4px solid #FFD800;padding-left:12px">
-${row('Nr.', b.number)}${row('Anlass', esc(b.title))}${row('Wann', `${fmtLong(b.start)}<br>${berlinHm(b.start)}–${berlinHm(b.end)} Uhr`)}
-${c ? row('Kategorie', c.name) : ''}${row('Personen', String(b.guests))}${row('Abgesprochen mit', esc(b.agreedWith))}</table>`;
+function toText(heading: string, blocks: Block[], cta?: { href: string; label: string }) {
+  const body = blocks.join('\n').replace(/<br\s*\/?>/g, '\n').replace(/<\/(p|tr|h1)>/g, '\n').replace(/<\/td><td[^>]*>/g, ': ').replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/\n{3,}/g, '\n\n').trim();
+  return `${heading}\n\n${body}${cta ? `\n\n${cta.label}: ${cta.href}` : ''}\n\n--\nJugendraum des SV Heepen`;
+}
+function build(o: { preheader: string; heading: string; blocks: Block[]; cta?: { href: string; label: string } }) {
+  return { html: layout(o), text: toText(o.heading, o.blocks, o.cta) };
+}
+
+function details(b: Booking, c?: Category, extra: [string, string][] = []): Block {
+  const rows: [string, string][] = [
+    ['Buchung', b.number], ['Anlass', esc(b.title)], ['Termin', `${fmtLong(b.start)}<br>${berlinHm(b.start)}–${berlinHm(b.end)} Uhr${berlinYmd(b.end) !== berlinYmd(b.start) ? ` (bis ${fmtDay(b.end)})` : ''}`],
+    ...(c ? [['Art', esc(c.name)] as [string, string]] : []), ['Personen', String(b.guests)],
+    ...(b.equipment.length ? [['Ausstattung', esc(b.equipment.join(', '))] as [string, string]] : []),
+    ...(b.rent > 0 ? [['Nutzungsentgelt', eur(b.rent)] as [string, string]] : []), ...(b.deposit > 0 ? [['Kaution', eur(b.deposit)] as [string, string]] : []),
+    ...extra,
+  ];
+  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:4px 0 20px;background:#F8F9FB;border:1px solid #E1E4EC;border-radius:8px">
+${rows.map(([k, v], i) => `<tr><td style="padding:9px 14px;font-size:13px;color:#646A85;vertical-align:top;width:120px;${i ? 'border-top:1px solid #E1E4EC' : ''}">${k}</td><td style="padding:9px 14px;font-size:14px;color:#161A33;font-weight:600;${i ? 'border-top:1px solid #E1E4EC' : ''}">${v}</td></tr>`).join('')}
+</table>`;
 }
 const manageLink = (b: Booking) => `${appUrl()}/buchung/${b.manageToken}`;
 const ics = (b: Booking, c?: Category): Attachment[] => [{ filename: `jugendraum-${b.number}.ics`, content: Buffer.from(bookingIcs(b, c)).toString('base64') }];
+const firstName = (n: string) => esc(n.split(' ')[0]);
+
+/** Standardtexte. Das Orga-Team kann sie in der Verwaltung überschreiben (Einstellungen → E-Mail-Texte). */
+export const DEFAULT_TEXTS: Record<MailTextKey, string> = {
+  received: 'vielen Dank für deine Anfrage. Wir prüfen sie und melden uns so schnell wie möglich bei dir.',
+  confirmed: 'der Jugendraum ist für dich reserviert. Den Termin findest du als Kalenderdatei im Anhang.\n\nBitte stimm die Schlüsselübergabe rechtzeitig mit deiner Ansprechperson ab. Nach der Nutzung den Raum besenrein verlassen, Müll mitnehmen, Fenster schließen und Licht ausschalten.',
+  rejected: 'leider können wir deine Anfrage für diesen Termin nicht bestätigen.',
+  reminder: 'kurze Erinnerung an deine Buchung im Jugendraum. Hast du die Schlüsselübergabe schon abgestimmt?',
+  followup: 'danke, dass du den Jugendraum genutzt hast. Wir freuen uns über eine kurze Rückmeldung. Falls etwas kaputtgegangen ist oder fehlt, sag uns bitte Bescheid.',
+};
+export const TEXT_LABELS: Record<MailTextKey, string> = {
+  received: 'Anfrage eingegangen', confirmed: 'Buchung bestätigt', rejected: 'Anfrage abgelehnt', reminder: 'Erinnerung vor dem Termin', followup: 'Nachfrage nach dem Termin',
+};
+async function text(k: MailTextKey) {
+  try { return (await getExtras()).mailTexts[k]?.trim() || DEFAULT_TEXTS[k]; } catch { return DEFAULT_TEXTS[k]; }
+}
+const hello = (b: Booking) => `Hallo ${firstName(b.name)},`;
 
 // ---------- Mails an Bucher ----------
 export const mails = {
-  verify: (b: Booking, c: Category | undefined, verifyToken: string) => sendMail({
-    kind: 'verify', to: b.email, bookingId: b.id, subject: `Bitte bestätige deine Anfrage (${b.number})`,
-    html: layout('Fast geschafft!', p(`Hallo ${esc(b.name)}, bitte bestätige kurz deine E-Mail-Adresse. Erst dann landet deine Anfrage beim Orga-Team.`) + details(b, c)
-      + p('<small style="color:#5A6085">Ohne Bestätigung verfällt die Anfrage nach 24 Stunden.</small>'),
-      { href: `${appUrl()}/bestaetigen/${verifyToken}`, label: 'Anfrage bestätigen' }),
-  }),
-  received: (b: Booking, c?: Category) => sendMail({
-    kind: 'received', to: b.email, bookingId: b.id, subject: `Anfrage eingegangen: ${b.title} (${b.number})`,
-    html: layout('Deine Anfrage ist da', p('Danke! Das Orga-Team prüft deine Anfrage und meldet sich per Mail.') + details(b, c), { href: manageLink(b), label: 'Anfrage ansehen' }),
-  }),
-  confirmed: (b: Booking, c?: Category) => sendMail({
-    kind: 'confirmed', to: b.email, bookingId: b.id, subject: `Bestätigt: ${b.title} am ${fmtLong(b.start)}`, attachments: ics(b, c),
-    html: layout('Deine Buchung ist bestätigt', p(`Hallo ${esc(b.name)}, der Jugendraum ist für dich reserviert. Den Termin findest du als Kalenderdatei im Anhang.`) + details(b, c)
-      + p('<b>Vorher:</b> Schlüsselübergabe mit deiner Ansprechperson abstimmen.<br><b>Nachher:</b> Raum besenrein verlassen, Müll mitnehmen, Fenster zu, Licht aus.'),
-      { href: manageLink(b), label: 'Buchung ansehen' }),
-  }),
-  rejected: (b: Booking, c?: Category) => sendMail({
-    kind: 'rejected', to: b.email, bookingId: b.id, subject: `Leider abgelehnt: ${b.title} (${b.number})`,
-    html: layout('Das klappt leider nicht', p(`Hallo ${esc(b.name)}, deine Anfrage konnten wir leider nicht bestätigen.`) + details(b, c)
-      + (b.rejectReason ? p(`<b>Begründung:</b> ${esc(b.rejectReason)}`) : '') + p('Schau gern nach einem anderen Termin.'),
-      { href: appUrl(), label: 'Freie Termine ansehen' }),
-  }),
-  cancelled: (b: Booking, c?: Category) => sendMail({
-    kind: 'cancelled', to: b.email, bookingId: b.id, subject: `Storniert: ${b.title} (${b.number})`,
-    html: layout('Buchung storniert', p('Deine Buchung wurde storniert. Der Termin ist wieder frei.') + details(b, c)),
-  }),
-  reminder: (b: Booking, c: Category | undefined, when: '3d' | '1d') => sendMail({
-    kind: `reminder-${when}`, to: b.email, bookingId: b.id, subject: `${when === '1d' ? 'Morgen' : 'In 3 Tagen'}: ${b.title} im Jugendraum`,
-    html: layout(when === '1d' ? 'Morgen geht’s los' : 'Bald ist es so weit', p('Kurze Erinnerung an deine Buchung:') + details(b, c)
-      + p('Hast du den Schlüssel organisiert? Bei Fragen melde dich bei deiner Ansprechperson.'), { href: manageLink(b), label: 'Buchung ansehen' }),
-  }),
-  followup: (b: Booking) => sendMail({
-    kind: 'followup', to: b.email, bookingId: b.id, subject: `Alles gut gelaufen? (${b.number})`,
-    html: layout('Danke fürs Vorbeikommen!', p(`Hallo ${esc(b.name)}, wir hoffen, „${esc(b.title)}“ war ein voller Erfolg. Ist etwas kaputtgegangen oder fehlt etwas? Antworte einfach auf diese Mail.`)),
-  }),
+  verify: (b: Booking, c: Category | undefined, verifyToken: string) => {
+    const cta = { href: `${appUrl()}/bestaetigen/${verifyToken}`, label: 'Anfrage bestätigen' };
+    const blocks = [P(hello(b)), P('bitte bestätige kurz deine E-Mail-Adresse. Erst dann geht deine Anfrage an das Orga-Team.'), details(b, c)];
+    return sendMail({ kind: 'verify', to: b.email, bookingId: b.id, subject: `Bitte bestätige deine Anfrage ${b.number}`,
+      ...build({ preheader: 'Ein Klick, dann geht deine Anfrage an das Orga-Team.', heading: 'Bitte bestätige deine Anfrage', blocks: [...blocks, SMALL('Ohne Bestätigung verfällt die Anfrage nach 24 Stunden. Du hast nichts angefragt? Dann ignoriere diese Mail einfach.')], cta }) });
+  },
+  received: async (b: Booking, c?: Category) => {
+    const blocks = [P(hello(b)), paragraphs(await text('received')), details(b, c)];
+    return sendMail({ kind: 'received', to: b.email, bookingId: b.id, subject: `Anfrage eingegangen: ${b.title} am ${fmtDay(b.start)}`,
+      ...build({ preheader: 'Wir prüfen deine Anfrage.', heading: 'Deine Anfrage ist eingegangen', blocks, cta: { href: manageLink(b), label: 'Anfrage ansehen' } }) });
+  },
+  confirmed: async (b: Booking, c?: Category) => {
+    const blocks = [P(hello(b)), paragraphs(await text('confirmed')), details(b, c, [['Ansprechperson', esc(b.agreedWith)]])];
+    return sendMail({ kind: 'confirmed', to: b.email, bookingId: b.id, subject: `Bestätigt: ${b.title} am ${fmtDay(b.start)}`, attachments: ics(b, c),
+      ...build({ preheader: `Der Jugendraum ist für dich reserviert: ${fmtLong(b.start)}.`, heading: 'Deine Buchung ist bestätigt', blocks, cta: { href: manageLink(b), label: 'Buchung ansehen' } }) });
+  },
+  changed: async (b: Booking, before: Booking, c?: Category, note?: string) => {
+    const blocks = [P(hello(b)), P(`das Orga-Team hat deine Buchung geändert. Bisher: ${fmtLong(before.start)}, ${berlinHm(before.start)}–${berlinHm(before.end)} Uhr.`),
+      ...(note ? [P(`<b>Hinweis:</b> ${esc(note)}`)] : []), details(b, c), SMALL('Passt der neue Termin nicht? Melde dich bitte bei deiner Ansprechperson oder sag über den Link ab.')];
+    return sendMail({ kind: 'changed', to: b.email, bookingId: b.id, subject: `Geändert: ${b.title} jetzt am ${fmtDay(b.start)}`, attachments: b.status === 'confirmed' ? ics(b, c) : undefined,
+      ...build({ preheader: `Neuer Termin: ${fmtLong(b.start)}, ${berlinHm(b.start)} Uhr.`, heading: 'Deine Buchung wurde geändert', blocks, cta: { href: manageLink(b), label: 'Buchung ansehen' } }) });
+  },
+  rejected: async (b: Booking, c?: Category) => {
+    const blocks = [P(hello(b)), paragraphs(await text('rejected')), ...(b.rejectReason ? [P(`<b>Begründung:</b> ${esc(b.rejectReason)}`)] : []), details(b, c), P('Vielleicht passt ein anderer Termin.')];
+    return sendMail({ kind: 'rejected', to: b.email, bookingId: b.id, subject: `Absage: ${b.title} am ${fmtDay(b.start)}`,
+      ...build({ preheader: 'Leider können wir deine Anfrage nicht bestätigen.', heading: 'Deine Anfrage wurde abgelehnt', blocks, cta: { href: appUrl(), label: 'Freie Termine ansehen' } }) });
+  },
+  cancelled: (b: Booking, c?: Category) => {
+    const blocks = [P(hello(b)), P('deine Buchung wurde storniert. Der Termin ist wieder frei.'), ...(b.rejectReason ? [P(`<b>Grund:</b> ${esc(b.rejectReason)}`)] : []), details(b, c)];
+    return sendMail({ kind: 'cancelled', to: b.email, bookingId: b.id, subject: `Storniert: ${b.title} am ${fmtDay(b.start)}`,
+      ...build({ preheader: 'Deine Buchung wurde storniert.', heading: 'Buchung storniert', blocks }) });
+  },
+  reminder: async (b: Booking, c: Category | undefined, when: '3d' | '1d') => {
+    const blocks = [P(hello(b)), paragraphs(await text('reminder')), details(b, c, [['Ansprechperson', esc(b.agreedWith)]])];
+    const label = when === '1d' ? 'Morgen' : 'In drei Tagen';
+    return sendMail({ kind: `reminder-${when}`, to: b.email, bookingId: b.id, subject: `${label}: ${b.title} im Jugendraum`,
+      ...build({ preheader: `${label}, ${berlinHm(b.start)} Uhr.`, heading: `${label} ist es so weit`, blocks, cta: { href: manageLink(b), label: 'Buchung ansehen' } }) });
+  },
+  followup: async (b: Booking) => {
+    const blocks = [P(hello(b)), paragraphs(await text('followup'))];
+    return sendMail({ kind: 'followup', to: b.email, bookingId: b.id, subject: `Wie war es? ${b.title}`,
+      ...build({ preheader: 'Eine Minute für deine Rückmeldung.', heading: 'Danke fürs Vorbeikommen', blocks, cta: { href: `${manageLink(b)}/feedback`, label: 'Rückmeldung geben' } }) });
+  },
 };
 
 // ---------- Mails ans Orga-Team ----------
+const adminLink = (b: Booking) => `${appUrl()}/admin/buchung/${b.id}`;
+const who = (b: Booking) => `${esc(b.name)} (${b.bookerType === 'member' ? 'Mitglied' + (b.team ? ', ' + esc(b.team) : '') : 'nicht im Verein'}) · ${esc(b.email)} · ${esc(b.phone)}`;
 export const teamMails = {
-  newRequest: (to: string[], b: Booking, c?: Category, conflicts?: string) => sendMail({
-    kind: 'team-new', to, bookingId: b.id, subject: `Neue Anfrage: ${b.title} · ${fmtLong(b.start)}`,
-    html: layout('Neue Anfrage', p(`<b>${esc(b.name)}</b> (${b.bookerType === 'member' ? 'Mitglied' + (b.team ? ', ' + esc(b.team) : '') : 'Extern'}) · ${esc(b.email)} · ${esc(b.phone)}`)
-      + details(b, c) + (b.note ? p(`<i>„${esc(b.note)}“</i>`) : '') + (conflicts ? p(`<span style="color:#C2323A"><b>Achtung:</b> ${esc(conflicts)}</span>`) : ''),
-      { href: `${appUrl()}/admin/buchung/${b.id}`, label: 'Prüfen und entscheiden' }),
-  }),
-  autoConfirmed: (to: string[], b: Booking, c?: Category) => sendMail({
-    kind: 'team-info', to, bookingId: b.id, subject: `Neu eingetragen: ${b.title} · ${fmtLong(b.start)}`,
-    html: layout('Neuer Termin (automatisch bestätigt)', details(b, c) + p(`${esc(b.name)} · ${esc(b.team)}`), { href: `${appUrl()}/admin/buchung/${b.id}`, label: 'Ansehen' }),
-  }),
-  cancelled: (to: string[], b: Booking, c?: Category) => sendMail({
-    kind: 'team-cancelled', to, bookingId: b.id, subject: `Storniert: ${b.title} · ${fmtLong(b.start)}`,
-    html: layout('Buchung storniert', p(`${esc(b.name)} hat storniert. Der Termin ist wieder frei.`) + details(b, c)),
-  }),
-  login: (to: string, link: string) => sendMail({
-    kind: 'login', to, subject: 'Dein Login-Link für die Jugendraum-Verwaltung',
-    html: layout('Anmelden', p('Klick auf den Button, um dich anzumelden. Der Link ist 15 Minuten gültig und funktioniert einmal.'), { href: link, label: 'Jetzt anmelden' }),
-  }),
-  digest: (to: string[], items: { b: Booking; c?: Category }[], open: number) => sendMail({
-    kind: 'digest', to, subject: `Jugendraum diese Woche: ${items.length} Termine${open ? `, ${open} offene Anfragen` : ''}`,
-    html: layout('Die Woche im Jugendraum', (items.length ? items.map(({ b, c }) => p(`<b>${fmtLong(b.start)}</b>, ${berlinHm(b.start)}–${berlinHm(b.end)}<br>${esc(b.title)} · ${c?.name ?? ''} · ${esc(b.name)}`)).join('') : p('Keine Termine diese Woche.'))
-      + (open ? p(`<b>${open} Anfrage(n)</b> warten auf eine Entscheidung.`) : ''), { href: `${appUrl()}/admin`, label: 'Zur Verwaltung' }),
-  }),
+  newRequest: (to: string[], b: Booking, c?: Category, conflicts?: string) => {
+    const blocks = [P(who(b)), details(b, c, [['Abgesprochen mit', esc(b.agreedWith)]]), ...(b.note ? [P(`„${esc(b.note)}“`)] : []),
+      ...(conflicts ? [P(`<span style="color:#B42F36"><b>Achtung:</b> ${esc(conflicts)}</span>`)] : [])];
+    return sendMail({ kind: 'team-new', to, bookingId: b.id, replyTo: b.email, subject: `Neue Anfrage: ${b.title}, ${fmtDay(b.start)}`,
+      ...build({ preheader: `${b.name} fragt ${fmtLong(b.start)} an.`, heading: 'Neue Anfrage', blocks, cta: { href: adminLink(b), label: 'Prüfen und entscheiden' } }) });
+  },
+  autoConfirmed: (to: string[], b: Booking, c?: Category) => sendMail({ kind: 'team-info', to, bookingId: b.id, subject: `Eingetragen: ${b.title}, ${fmtDay(b.start)}`,
+    ...build({ preheader: 'Automatisch bestätigt.', heading: 'Neuer Termin (automatisch bestätigt)', blocks: [P(who(b)), details(b, c)], cta: { href: adminLink(b), label: 'Ansehen' } }) }),
+  cancelled: (to: string[], b: Booking, c?: Category) => sendMail({ kind: 'team-cancelled', to, bookingId: b.id, subject: `Abgesagt: ${b.title}, ${fmtDay(b.start)}`,
+    ...build({ preheader: 'Der Termin ist wieder frei.', heading: 'Buchung abgesagt', blocks: [P(`${esc(b.name)} hat abgesagt. Der Termin ist wieder frei.`), details(b, c)], cta: { href: adminLink(b), label: 'Ansehen' } }) }),
+  damage: (to: string[], b: Booking, comment: string) => sendMail({ kind: 'team-damage', to, bookingId: b.id, replyTo: b.email, subject: `Schaden gemeldet: ${b.title} (${b.number})`,
+    ...build({ preheader: 'Bei der Rückmeldung wurde ein Schaden gemeldet.', heading: 'Schaden gemeldet', blocks: [P(who(b)), P(comment ? `„${esc(comment)}“` : 'Ohne Beschreibung.'), details(b)], cta: { href: adminLink(b), label: 'Zur Buchung' } }) }),
+  login: (to: string, link: string) => sendMail({ kind: 'login', to, subject: 'Dein Anmeldelink für die Jugendraum-Verwaltung',
+    ...build({ preheader: 'Gültig für 15 Minuten.', heading: 'Anmelden', blocks: [P('Mit dem Button meldest du dich in der Verwaltung an. Der Link ist 15 Minuten gültig und funktioniert einmal.'), SMALL('Du hast keine Anmeldung angefordert? Dann ignoriere diese Mail.')], cta: { href: link, label: 'Jetzt anmelden' } }) }),
+  digest: (to: string[], items: { b: Booking; c?: Category }[], open: number) => {
+    const rows = items.length ? items.map(({ b, c }) => P(`<b>${fmtLong(b.start)}</b>, ${berlinHm(b.start)}–${berlinHm(b.end)} Uhr<br>${esc(b.title)} · ${esc(c?.name ?? '')} · ${esc(b.name)}`)).join('') : P('Diese Woche sind keine Termine eingetragen.');
+    return sendMail({ kind: 'digest', to, subject: `Jugendraum diese Woche: ${items.length} Termine${open ? `, ${open} offene Anfragen` : ''}`,
+      ...build({ preheader: `${items.length} Termine, ${open} offene Anfragen.`, heading: 'Die Woche im Jugendraum', blocks: [rows, ...(open ? [P(`<b>${open} Anfrage(n)</b> warten auf eine Entscheidung.`)] : [])], cta: { href: `${appUrl()}/admin`, label: 'Zur Verwaltung' } }) });
+  },
 };

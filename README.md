@@ -8,19 +8,30 @@ Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen 
 
 ## Was die App kann
 
-**Für Bucher**
+**Für Bucher** (Anfrage in vier Schritten: Anlass, Termin, Kontakt, Prüfen)
 - Belegungskalender (anonym) mit Tagesansicht inkl. Pufferzeiten
 - Formular in 4 Schritten mit Live-Prüfung: frei / Hinweis / belegt, inkl. Vorschlag für die nächste freie Zeit bzw. das nächste freie Party-Wochenende
 - Pflicht-Haken „mit Michael Grieswelle oder Sigrid Brodig abgesprochen“ plus Auswahl der Person
 - E-Mail-Bestätigung (Double-Opt-in). Unbestätigte Anfragen verfallen nach 24 h
-- Persönliche Buchungsseite mit Status und Storno
+- Ausstattung auswählen (Beamer, Musikanlage, …), Kosten und Kaution werden vorab angezeigt
+- Persönliche Buchungsseite mit Statusverlauf, Kalenderdatei und Absage
+- Rückmeldung nach dem Termin, inklusive Schadensmeldung (geht sofort ans Team)
 - Mails: Bestätigungslink, Eingang, Bestätigung mit Kalenderdatei (.ics), Ablehnung mit Begründung, Erinnerung 3 Tage und 1 Tag vorher, Nachfrage danach
 
 **Für das Orga-Team** (`/admin`, Login per Magic Link)
 - Übersicht: offene Anfragen mit automatischer Konfliktprüfung, nächste Termine, Auslastung
 - Bestätigen / Ablehnen (mit Begründung) / Stornieren, jeweils mit Mail an den Bucher
-- Interne Notiz, Schlüssel ausgegeben, Kaution erhalten
-- Monatskalender, Sperrzeiten (Ferien, Renovierung)
+- Termine direkt eintragen, auch als Serie (wöchentlich, alle 2 Wochen, monatlich am n-ten Wochentag); Kollisionen werden übersprungen und aufgelistet
+- Termine bearbeiten und verschieben, Bucher wird mit neuer Kalenderdatei informiert
+- Regeln bei Bedarf bewusst übergehen (wird protokolliert), echte Überschneidungen bleiben gesperrt
+- Übergabe- und Rückgabeprotokoll: Schlüssel, Stromzähler, Zustand, Mängel
+- Nutzungsentgelt und Kaution mit Bezahlt/Abgerechnet/Einbehalten
+- „Zu erledigen“: fällige Schlüsselübergaben, offene Rückgaben und Kautionen, Schadensmeldungen, Mailfehler
+- Kalender mit Monats- und Wochenansicht (inkl. Pufferzeiten), Sperrzeiten
+- Buchungsliste mit Suche, Filtern und CSV-Export für Excel
+- Statistik (Buchungen pro Monat, nach Art, Mitglieder/Externe, Mannschaften, Ablehnungsquote) und Rückmeldungen
+- E-Mail-Texte, Ausstattung und Kosten in den Einstellungen änderbar
+- Als App aufs Handy installierbar (PWA)
 - Regeln einstellen: Puffer pro Kategorie, Freigabepflicht, „Party sperrt das ganze Wochenende“, Vorlauf, Kapazität
 - Team & Rollen (Admin / Verwalter / Lesezugriff), Mail-Benachrichtigung pro Person
 - Persönliches Kalender-Abo (iCal) für Handy oder Outlook
@@ -41,7 +52,7 @@ Voraussetzungen: Node.js 20+, PostgreSQL 15+ (lokal oder Supabase).
 ```bash
 npm install
 cp .env.example .env.local        # Werte eintragen
-npm run db:migrate                # Tabellen anlegen (mehrfach ausführbar)
+npm run db:migrate                # Tabellen anlegen bzw. aktualisieren (mehrfach ausführbar)
 npm run admin:add -- du@example.de "Dein Name" admin
 npm run db:seed                   # optional: Beispielbuchungen für eine Test-Datenbank
 npm run dev                       # http://localhost:3000
@@ -49,7 +60,7 @@ npm run dev                       # http://localhost:3000
 
 Ohne `RESEND_API_KEY` werden Mails nicht verschickt, sondern mit allen Links in der Konsole ausgegeben. Im Dev-Modus zeigt die Login-Seite den Login-Link dann auch direkt an.
 
-Tests: `npm test` (Regel-Engine, Zeitzonen, iCal). Typprüfung: `npm run lint`.
+Tests: `npm test` (Regel-Engine, Zeitzonen, Serien, iCal). Typprüfung: `npm run lint`.
 
 ## Live schalten (ca. 30 Minuten, 0 €)
 
@@ -70,13 +81,16 @@ app/
   api/buchungen             Anfrage anlegen (Prüfung, Sperre, Mail)
   bestaetigen/[token]       E-Mail-Bestätigung
   buchung/[token]           Buchung ansehen / stornieren
-  regeln                    Hausordnung, Party-Regel, Datenschutz
-  admin/(app)/…             Übersicht, Buchung, Kalender, Einstellungen, Team, Protokoll
+  raum                      Raum & Regeln, Hausordnung, Datenschutz
+  buchung/[token]/feedback  Rückmeldung nach dem Termin
+  admin/(app)/…             Übersicht, Kalender, Buchungen, Termin eintragen, Statistik,
+                            Rückmeldungen, Sperrzeiten, Einstellungen, Team, Protokoll
   admin/anmelden            Magic-Link-Login
   api/ical/[token]          Kalender-Abo fürs Team
   api/cron/taeglich         Verfall, Erinnerungen, Nachfrage, Wochenübersicht, Löschung
 components/BookingApp.tsx   Kalender, Tagesleiste, Formular, Ticket
 lib/rules.ts                Buchungsregeln (+ rules.test.ts)
+lib/series.ts               Serientermine (+ series.test.ts)
 lib/time.ts                 Rechnen in Europe/Berlin
 lib/data.ts                 Datenbankzugriffe
 lib/mail.ts                 Mail-Vorlagen im Vereinsdesign

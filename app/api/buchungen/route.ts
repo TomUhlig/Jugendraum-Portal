@@ -13,6 +13,7 @@ const schema = z.object({
   start: z.string().regex(/^\d{2}:\d{2}$/),
   end: z.string().regex(/^\d{2}:\d{2}$/),
   guests: z.coerce.number().int().min(1).max(500),
+  equipment: z.array(z.string().max(60)).max(20).default([]),
   bookerType: z.enum(['member', 'external']),
   team: z.string().trim().max(80).default(''),
   name: z.string().trim().min(2).max(80),

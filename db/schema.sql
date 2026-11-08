@@ -124,12 +124,12 @@ create table if not exists mail_log (
 
 -- Startwerte (werden nicht überschrieben, wenn schon vorhanden)
 insert into categories (id, name, hint, color, buffer_before_min, buffer_after_min, requires_approval, is_party, max_duration_min, sort) values
-  ('meet',  'Besprechung',          'Trainer, Vorstand',     '#5B67C9',  15,  15, false, false,  360, 1),
-  ('team',  'Mannschaftssitzung',   'Teamabend',             '#1F8FA3',  15,  30, false, false,  360, 2),
-  ('event', 'Vereinsveranstaltung', 'Elternabend, Ehrung',   '#2E367A',  60,  60, true,  false,  480, 3),
-  ('work',  'Workshop / Schulung',  'Erste Hilfe, Lizenz',   '#7A5BC9',  30,  30, true,  false,  600, 4),
-  ('party', 'Party / Feier',        'Geburtstag, Abschluss', '#FFD800', 120, 180, true,  true,   960, 5),
-  ('misc',  'Sonstiges',            'alles andere',          '#7A80A6',  30,  30, true,  false,  360, 6)
+  ('meet',  'Besprechung',          'Trainer, Vorstand',     '#2A78D6',  15,  15, false, false,  360, 1),
+  ('team',  'Mannschaftssitzung',   'Teamabend',             '#1BAF7A',  15,  30, false, false,  360, 2),
+  ('event', 'Vereinsveranstaltung', 'Elternabend, Ehrung',   '#EB6834',  60,  60, true,  false,  480, 3),
+  ('work',  'Workshop / Schulung',  'Erste Hilfe, Lizenz',   '#6250D6',  30,  30, true,  false,  600, 4),
+  ('party', 'Feier / Party',        'Geburtstag, Abschluss', '#EDA100', 120, 180, true,  true,   960, 5),
+  ('misc',  'Sonstiges',            'alles andere',          '#E87BA4',  30,  30, true,  false,  360, 6)
 on conflict (id) do nothing;
 
 insert into settings (key, value) values
@@ -143,6 +143,55 @@ insert into settings (key, value) values
   ('weekendUntilHour', '6')
 on conflict (key) do nothing;
 
+-- ---------- Version 2: Ausstattung, Serien, Kosten, Übergabe, Feedback ----------
+alter table bookings add column if not exists equipment       text[] not null default '{}';
+alter table bookings add column if not exists series_id       uuid;
+alter table bookings add column if not exists created_by      text;            -- Admin, der direkt eingetragen hat
+alter table bookings add column if not exists rent_eur        numeric(8,2) not null default 0;
+alter table bookings add column if not exists deposit_eur     numeric(8,2) not null default 0;
+alter table bookings add column if not exists rent_paid       boolean not null default false;
+alter table bookings add column if not exists deposit_returned boolean not null default false;
+alter table bookings add column if not exists deposit_withheld_eur numeric(8,2) not null default 0;
+alter table bookings add column if not exists handover_at     timestamptz;
+alter table bookings add column if not exists handover_by     text;
+alter table bookings add column if not exists meter_start     numeric(10,1);
+alter table bookings add column if not exists return_at       timestamptz;
+alter table bookings add column if not exists return_by       text;
+alter table bookings add column if not exists meter_end       numeric(10,1);
+alter table bookings add column if not exists condition_ok    boolean;
+alter table bookings add column if not exists damage_note     text not null default '';
+alter table bookings add column if not exists changed_notice_at timestamptz;
+
+create table if not exists series (
+  id          uuid primary key default gen_random_uuid(),
+  rule        text not null,
+  created_by  text not null,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists feedback (
+  booking_id  uuid primary key references bookings(id) on delete cascade,
+  rating      int not null check (rating between 1 and 5),
+  comment     text not null default '',
+  damage      boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+
+-- Neue Standardfarben (farbenblind-geprüft) nur übernehmen, wenn noch die alten Werte gesetzt sind
+update categories set color = v.new from (values
+  ('meet', '#5B67C9', '#2A78D6'), ('team', '#1F8FA3', '#1BAF7A'), ('event', '#2E367A', '#EB6834'),
+  ('work', '#7A5BC9', '#6250D6'), ('party', '#FFD800', '#EDA100'), ('misc', '#7A80A6', '#E87BA4')
+) as v(id, old, new) where categories.id = v.id and categories.color = v.old;
+update categories set name = 'Feier / Party' where id = 'party' and name = 'Party / Feier';
+
+insert into settings (key, value) values
+  ('equipment', '["Beamer & Leinwand", "Musikanlage", "Küche", "Kühlschrank", "Grill (draußen)", "Bierzeltgarnituren"]'),
+  ('feesExternal', '{"rent": 0, "deposit": 0}'),
+  ('feesMemberParty', '{"rent": 0, "deposit": 0}'),
+  ('mailTexts', '{}'),
+  ('contactNote', '"Fragen vorab? Michael Grieswelle oder Sigrid Brodig helfen dir weiter."')
+on conflict (key) do nothing;
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -154,5 +203,7 @@ do $$ begin
     execute 'alter table blackouts enable row level security';
     execute 'alter table categories enable row level security';
     execute 'alter table settings enable row level security';
+    execute 'alter table series enable row level security';
+    execute 'alter table feedback enable row level security';
   end if;
 end $$;

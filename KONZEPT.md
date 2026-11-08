@@ -229,93 +229,81 @@ Die Party-Regel lässt sich direkt in der Datenbank absichern: ein **partieller 
 
 ---
 
-## 9. Art Direction
+## 9. Art Direction (Version 2)
 
-### Leitidee: „Vereinsheim, aber in gut"
+### Leitidee: ruhig, klar, vereinsnah
 
-Das Logo liefert alles, was wir brauchen: **Königsblau und Signalgelb**, ein kräftiges **V** und das **Namensband** „HEEPEN". Die Seite soll wirken wie ein gut gemachter Spieltagsflyer: selbstbewusst, sportlich und klar, ohne nach Behördenformular oder Startup-Template auszusehen.
+Die erste Fassung (Plakat-Optik mit schrägen Bändern, Versalien und gekippten Stempeln) war zu laut und wirkte generisch. Version 2 orientiert sich an gut gemachten Buchungs- und Verwaltungswerkzeugen: viel Weißraum, klare Hierarchie, wenige, gezielte Vereinsakzente. Die Seite soll aussehen wie ein Werkzeug, dem man seinen Termin anvertraut.
 
-**Drei Stilelemente aus dem Logo:**
-
-1. **Das Band**: blaue Querbalken mit gelber Versalschrift (wie „HEEPEN" im Logo) für Seitentitel, Status-Labels und den Header.
-2. **Die V-Diagonale**: Schräge Schnittkanten (Winkel aus dem Logo, ca. 62°) an Hero, Buttons und Abschnittswechseln. Sparsam eingesetzt, eine Diagonale pro Ansicht.
-3. **Der Ring**: Der doppelte Kreisrand des Logos wird zum Fokus- und Auswahlring (ausgewählter Tag, aktive Kategorie-Kachel).
+**Vereinsakzente, sparsam eingesetzt:**
+1. **Gelber Streifen** (4 px) über dem weißen Header, wie die Kante eines Trikots.
+2. **Vereinsblau** als einzige große Fläche: Seitenkopf der Buchungsseite, Hauptbuttons, aktive Auswahl.
+3. **Gelb als Markierung**, nie als Fläche oder Textfarbe: aktive Navigation (Unterstrich), heutiger Tag, Hinweis auf eine Feier am Wochenende.
 
 ### Farben
 
-| Token | Hex | Einsatz |
+| Token | Hell | Einsatz |
 |---|---|---|
-| `--heepen-blau` | `#2E367A` | Primärfarbe, Header, Text auf Gelb |
-| `--heepen-gelb` | `#FFD800` | Akzent, Hauptbutton, Auswahl |
-| `--nacht` | `#151A3D` | Dark Mode Hintergrund, Footer |
-| `--kreide` | `#F5F6FB` | heller Seitenhintergrund (leicht blaustichig) |
-| `--linie` | `#D9DCEC` | Rahmen, Trennlinien |
-| `--frei` | `#1F9D6B` | Status frei / bestätigt |
-| `--hinweis` | `#E08A00` | Puffer / angefragt |
-| `--belegt` | `#D64045` | belegt / abgelehnt |
+| `--brand` | `#2E367A` | Vereinsblau: Seitenkopf, Hauptbuttons, ausgewählter Tag |
+| `--gelb` | `#FFD800` | Streifen, aktive Navigation, heutiger Tag |
+| `--bg` / `--surface` | `#F4F5F8` / `#FFFFFF` | Seitenhintergrund (leicht bläulich) / Karten |
+| `--ink` / `--muted` | `#161A33` / `#646A85` | Text / Nebentext |
+| `--ok` / `--warn` / `--bad` | `#157A52` / `#9A5B00` / `#B42F36` | Status: frei, Hinweis, belegt. Immer mit Text und Icon, nie nur Farbe |
 
-**Kontrastregeln:** Gelb nie als Textfarbe auf Weiß (nicht lesbar). Gelb immer als Fläche mit blauem Text oder als Text auf Blau. Blau auf Weiß und Gelb auf Blau erfüllen WCAG AA.
+Dunkelmodus folgt automatisch der Systemeinstellung.
 
-**Kategoriefarben** (Kalender): Besprechung Blau-hell `#5B67C9`, Mannschaft Türkis `#1F8FA3`, Vereinsevent Blau `#2E367A`, Workshop Violett `#7A5BC9`, Party Gelb `#FFD800` mit blauem Text, Sonstiges Grau-blau `#7A80A6`.
+**Kategoriefarben** (Kalender, Diagramme): Besprechung `#2A78D6`, Mannschaftssitzung `#1BAF7A`, Vereinsveranstaltung `#EB6834`, Workshop `#6250D6`, Feier `#EDA100`, Sonstiges `#E87BA4`. Die Palette ist mit einem Validator auf Unterscheidbarkeit bei Farbsehschwäche geprüft. Kategorien stehen trotzdem immer mit Namen daneben.
 
 ### Typografie
 
 | Rolle | Schrift | Verwendung |
 |---|---|---|
-| Display | **Archivo** (Expanded/Black, 800–900, Versalien) | Headlines, Band-Labels, große Zahlen; erinnert an Trikotnummern und Vereinsschilder |
-| Text | **Source Sans 3** | Fließtext, Formulare; gut lesbar, freundlich |
-| Daten | **JetBrains Mono** oder Tabular-Ziffern | Uhrzeiten, Buchungsnummern (`JR-2026-0142`) |
+| Überschriften | **Archivo** 700, normale Breite, Satzschreibung | Seitentitel, Kartentitel, Kennzahlen |
+| Text | **Source Sans 3** | alles andere; Zahlen mit Tabellenziffern |
 
-Alle über Google Fonts, oder selbst gehostet (DSGVO-sicherer, empfohlen).
+Die Schriften werden beim Build eingebettet und vom eigenen Server ausgeliefert (keine Verbindung zu Google beim Seitenaufruf).
 
 ### Formsprache
 
-- Ecken: 6 px bei Eingabefeldern, große Flächen kantig. Keine runden Pillen-Buttons; der Hauptbutton bekommt eine schräge rechte Kante (V-Diagonale).
-- Schatten: kaum; Tiefe entsteht über Farbflächen (Blau/Gelb) statt Weichzeichner.
-- Icons: Lucide (Linienstärke 2), z. B. `users`, `whistle` → `megaphone`, `party-popper`, `graduation-cap`.
-- Fotos: echte Fotos vom Jugendraum und vom Platz (Flutlicht, Vereinsheim), mit Blau-Duoton für Einheitlichkeit. Keine Stockfotos.
-- Bewegung: ein Moment, der hängen bleibt. Nach erfolgreicher Anfrage fährt ein „Ticket" mit Buchungsnummer hoch (Spieltagsticket-Optik). Sonst nur kurze 150-ms-Übergänge; `prefers-reduced-motion` wird respektiert.
+- Karten mit 1 px Rahmen, 10 px Radius, kaum Schatten. Struktur über Kartenköpfe und Trennlinien, nicht über Effekte.
+- Einheitliches Icon-Set (Lucide, 2 px Linie), keine Emojis.
+- Status als kleine Badges mit Punkt („Bestätigt“, „Angefragt“). Hinweise als Kästen mit Icon.
+- Bewegung nur als kurzes Einblenden beim Schrittwechsel; respektiert „Bewegung reduzieren“.
 
-### Tonalität (Texte)
+### Buchungsseite
 
-- **Du-Form**, vereinsnah, kurz: „Wann brauchst du den Raum?" statt „Bitte geben Sie den gewünschten Zeitraum ein".
-- Regeln freundlich, aber eindeutig: „Pro Wochenende gibt's nur eine Feier, damit Nachbarn und Raum durchatmen können."
-- Fehlermeldungen sagen, was zu tun ist: „Ab 18:30 wäre frei, soll ich das übernehmen?"
+Geführter Ablauf in vier Schritten (**Anlass → Termin → Kontakt → Prüfen**) mit Fortschrittsleiste. Rechts steht immer eine Zusammenfassung „Deine Anfrage“ mit Verfügbarkeit, reservierter Zeit inklusive Puffer und Kosten, darunter die Ansprechpartner und „So geht es weiter“. Das entspricht den gängigen Empfehlungen: erst den Tag wählen, dann die Uhrzeit; belegte Tage direkt sichtbar; Kosten und Kaution früh nennen; Eingaben bleiben beim Zurückgehen erhalten.
 
-### Komponenten (Auswahl)
+### Verwaltung
 
-- **Header-Band**: Logo links (Kreis, 40 px), „Jugendraum" im Band, rechts „Kalender" und „Anfragen".
-- **Kategorie-Kacheln**: 2×3-Raster, Icon + Name + Puffer-Info, ausgewählt = Ring + gelbe Fläche.
-- **Verfügbarkeits-Ampel**: Live-Leiste unter der Zeitauswahl (frei / Puffer / belegt).
-- **Status-Stempel**: Versal-Labels im Band-Stil: `ANGEFRAGT`, `BESTÄTIGT`, `ABGELEHNT`.
-- **Buchungsticket**: Bestätigungsansicht und E-Mail mit Perforationslinie, Buchungsnummer, QR-Code für die Verwaltungsseite.
+Seitenleiste mit drei Gruppen (Betrieb, Auswertung, Verwaltung). Die Übersicht beginnt mit vier Kennzahlen, darunter die offenen Anfragen und eine Liste „Zu erledigen“ (Schlüssel, Kautionen, Schadensmeldungen, nicht zugestellte Mails).
 
----
+### Tonalität
+
+Du-Form, kurze Sätze, sagt was passiert („Anfrage verbindlich senden“, „Termin verschoben. Der Bucher wurde informiert.“). Fehlermeldungen sagen, was zu tun ist.
 
 ## 10. Seitenstruktur
 
 **Öffentlich**
-- `/`: Hero (Raumfoto, „Euer Raum. Euer Abend."), Kalender-Vorschau, CTA „Raum anfragen", Eckdaten (Kapazität, Ausstattung, Regeln)
-- `/buchen`: das Formular (vier Schritte auf einer Seite, mobil zuerst)
-- `/buchung/[token]`: eigene Buchung ansehen, ändern anfragen, stornieren
-- `/regeln`: Hausordnung, Party-Regel, FAQ
-- `/impressum`, `/datenschutz`
+- `/`: Anfrage in vier Schritten mit Belegungskalender
+- `/raum`: Raum & Regeln (Ausstattung, Ablauf, Feiern, Puffer, Kosten, Übergabe, Hausordnung, Absagen, Datenschutz)
+- `/bestaetigen/[token]`: E-Mail-Adresse bestätigen
+- `/buchung/[token]`: eigene Buchung mit Statusverlauf, Kalenderdatei, Absage; danach Rückmeldung unter `/feedback`
 
-**Admin** (`/admin`)
-- Übersicht, Anfragen, Kalender, Sperrzeiten, Einstellungen, Team, Protokoll
-
----
+**Verwaltung** (`/admin`)
+- Übersicht, Kalender (Monat/Woche), Buchungen (Suche, Filter, CSV), Termin eintragen (auch als Serie)
+- Statistik, Rückmeldungen
+- Sperrzeiten, Einstellungen (Regeln, Ausstattung und Kosten, E-Mail-Texte), Team, Protokoll
 
 ## 11. Roadmap
 
-| Phase | Umfang | Aufwand (grob) |
+| Phase | Umfang | Stand |
 |---|---|---|
-| **0 – Abstimmung** | Konzept mit Michael & Sigrid durchgehen, offene Fragen klären, Raumfotos machen | 1 Woche |
-| **1 – MVP** ✅ | Buchungsformular, Regeln (Puffer, Party), Double-Opt-in, Admin: Anfragen + Kalender, Bestätigungs-/Reminder-Mails. Zusätzlich schon dabei: Sperrzeiten, iCal-Abo, Wochenübersicht, Rollen, Protokoll | erledigt |
-| **2 – Komfort** | Drag & Drop im Kalender, Admin bucht für andere, Serientermine, Ausstattung, Mail-Vorlagen im Admin editierbar, PWA/Push | 2–3 Wochenenden |
-| **3 – Extras** | Kaution/Miete-Tracking, Schlüsselübergabe-Checkliste, Statistik, Feedback-Auswertung | nach Bedarf |
+| **1 – MVP** | Anfrage, Regeln, Double-Opt-in, Freigabe, Mails, Kalender, Rollen, Protokoll, iCal-Abo | ✅ umgesetzt |
+| **2 – Komfort** | Admin trägt direkt ein, Serientermine, Verschieben mit Benachrichtigung, Ausstattung, editierbare Mail-Texte, Wochenansicht, Buchungsliste mit CSV-Export, installierbar als App (PWA) | ✅ umgesetzt |
+| **3 – Extras** | Übergabe- und Rückgabeprotokoll mit Zählerstand, Entgelt und Kaution, Rückmeldung mit Schadensmeldung, Statistik, „Zu erledigen“ | ✅ umgesetzt |
+| **Offen** | Drag & Drop im Kalender, Push-Nachrichten aufs Handy, Online-Zahlung, digitales Türschloss | bei Bedarf |
 
----
 
 ## 12. Offene Fragen an den Verein
 
