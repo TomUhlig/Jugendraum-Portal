@@ -23,7 +23,7 @@ export function bookingIcs(b: Booking, c?: Category): string {
   return icsJoin([
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//SV Heepen//Jugendraum//DE', 'METHOD:PUBLISH',
     'BEGIN:VEVENT',
-    `UID:${b.id}@jugendraum.sv-heepen.de`,
+    `UID:${b.id}@${new URL(appUrl()).hostname}`,
     `DTSTAMP:${icsStamp(Date.now())}`,
     `DTSTART:${icsStamp(b.start)}`,
     `DTEND:${icsStamp(b.end)}`,

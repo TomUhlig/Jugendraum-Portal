@@ -1,4 +1,5 @@
 import 'server-only';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { db } from './db';
 import { getExtras, type Booking, type MailTextKey } from './data';
 import type { Category } from './rules';
@@ -13,28 +14,59 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 type Attachment = { filename: string; content: string }; // base64
 type Mail = { to: string | string[]; subject: string; html: string; text: string; kind: string; bookingId?: string; attachments?: Attachment[]; replyTo?: string };
 
-/** Versand über Resend. Ohne RESEND_API_KEY wird die Mail nur in der Konsole ausgegeben (Entwicklung). */
+/**
+ * Versandweg, je nach Umgebungsvariablen:
+ *  - RESEND_API_KEY gesetzt → Resend (braucht eine eigene, bestätigte Domain)
+ *  - SMTP_HOST/SMTP_USER/SMTP_PASS gesetzt → normales Postfach (Gmail, GMX, web.de, …), keine eigene Domain nötig
+ *  - sonst → Mails werden nur in der Server-Konsole ausgegeben (Entwicklung)
+ */
+export type MailMode = 'resend' | 'smtp' | 'console';
+export function mailMode(): MailMode {
+  if (process.env.RESEND_API_KEY) return 'resend';
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) return 'smtp';
+  return 'console';
+}
+export function mailFrom(): string {
+  if (process.env.MAIL_FROM) return process.env.MAIL_FROM;
+  return mailMode() === 'smtp' ? `Jugendraum SV Heepen <${process.env.SMTP_USER}>` : 'Jugendraum SV Heepen <onboarding@resend.dev>';
+}
+
+const g = globalThis as unknown as { __smtp?: Transporter };
+function smtp(): Transporter {
+  if (!g.__smtp) {
+    const port = Number(process.env.SMTP_PORT || 587);
+    g.__smtp = nodemailer.createTransport({
+      host: process.env.SMTP_HOST, port, secure: port === 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+  }
+  return g.__smtp;
+}
+
 export async function sendMail(m: Mail): Promise<boolean> {
   const to = (Array.isArray(m.to) ? m.to : [m.to]).filter(Boolean);
   if (!to.length) return true;
   let ok = true; let error: string | null = null;
-  const key = process.env.RESEND_API_KEY;
-  if (key) {
-    try {
+  const mode = mailMode();
+  const replyTo = m.replyTo || process.env.MAIL_REPLY_TO || undefined;
+  try {
+    if (mode === 'resend') {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: process.env.MAIL_FROM ?? 'Jugendraum SV Heepen <jugendraum@sv-heepen.de>',
-          to, subject: m.subject, html: m.html, text: m.text, attachments: m.attachments, reply_to: m.replyTo ?? process.env.MAIL_REPLY_TO,
-        }),
+        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: mailFrom(), to, subject: m.subject, html: m.html, text: m.text, attachments: m.attachments, reply_to: replyTo }),
       });
       if (!res.ok) { ok = false; error = `${res.status} ${await res.text()}`.slice(0, 500); }
-    } catch (e) { ok = false; error = String(e).slice(0, 500); }
-  } else {
-    const links = [...m.html.matchAll(/href="([^"]+)"/g)].map((x) => x[1]).filter((u) => u.startsWith('http'));
-    console.log(`\n[mail:${m.kind}] an ${to.join(', ')}: ${m.subject}\n${links.map((l) => '   → ' + l).join('\n')}`);
-  }
+    } else if (mode === 'smtp') {
+      await smtp().sendMail({
+        from: mailFrom(), to, subject: m.subject, html: m.html, text: m.text, replyTo,
+        attachments: m.attachments?.map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64', contentType: 'text/calendar; charset=utf-8' })),
+      });
+    } else {
+      const links = [...m.html.matchAll(/href="([^"]+)"/g)].map((x) => x[1]).filter((u) => u.startsWith('http'));
+      console.log(`\n[mail:${m.kind}] an ${to.join(', ')}: ${m.subject}\n${links.map((l) => '   → ' + l).join('\n')}`);
+    }
+  } catch (e) { ok = false; error = String(e).slice(0, 500); }
   try {
     for (const r of to) await db()`insert into mail_log (kind, recipient, subject, booking_id, ok, error) values (${m.kind}, ${r}, ${m.subject}, ${m.bookingId ?? null}, ${ok}, ${error})`;
   } catch { /* Protokoll darf den Versand nicht verhindern */ }
@@ -173,6 +205,8 @@ export const teamMails = {
     ...build({ preheader: 'Der Termin ist wieder frei.', heading: 'Buchung abgesagt', blocks: [P(`${esc(b.name)} hat abgesagt. Der Termin ist wieder frei.`), details(b, c)], cta: { href: adminLink(b), label: 'Ansehen' } }) }),
   damage: (to: string[], b: Booking, comment: string) => sendMail({ kind: 'team-damage', to, bookingId: b.id, replyTo: b.email, subject: `Schaden gemeldet: ${b.title} (${b.number})`,
     ...build({ preheader: 'Bei der Rückmeldung wurde ein Schaden gemeldet.', heading: 'Schaden gemeldet', blocks: [P(who(b)), P(comment ? `„${esc(comment)}“` : 'Ohne Beschreibung.'), details(b)], cta: { href: adminLink(b), label: 'Zur Buchung' } }) }),
+  test: (to: string) => sendMail({ kind: 'test', to, subject: 'Testmail: Jugendraum-Portal',
+    ...build({ preheader: 'Der Mailversand funktioniert.', heading: 'Der Mailversand funktioniert', blocks: [P('Diese Mail kommt aus dem Jugendraum-Portal. Wenn du sie liest, ist alles richtig eingerichtet.'), SMALL(`Versandweg: ${mailMode() === 'smtp' ? 'eigenes Postfach (SMTP)' : mailMode() === 'resend' ? 'Resend' : 'Konsole'} · Absender: ${esc(mailFrom())}`)] }) }),
   login: (to: string, link: string) => sendMail({ kind: 'login', to, subject: 'Dein Anmeldelink für die Jugendraum-Verwaltung',
     ...build({ preheader: 'Gültig für 15 Minuten.', heading: 'Anmelden', blocks: [P('Mit dem Button meldest du dich in der Verwaltung an. Der Link ist 15 Minuten gültig und funktioniert einmal.'), SMALL('Du hast keine Anmeldung angefordert? Dann ignoriere diese Mail.')], cta: { href: link, label: 'Jetzt anmelden' } }) }),
   digest: (to: string[], items: { b: Booking; c?: Category }[], open: number) => {

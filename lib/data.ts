@@ -66,7 +66,9 @@ export async function getSettings(q: Q = db()): Promise<Settings> {
 
 export type Fees = { rent: number; deposit: number };
 export type MailTextKey = 'confirmed' | 'rejected' | 'reminder' | 'followup' | 'received';
-export type Extras = { equipment: string[]; feesExternal: Fees; feesMemberParty: Fees; mailTexts: Partial<Record<MailTextKey, string>>; contactNote: string };
+export type Operator = { name: string; address: string; email: string; phone: string; responsible: string };
+export type Extras = { equipment: string[]; feesExternal: Fees; feesMemberParty: Fees; mailTexts: Partial<Record<MailTextKey, string>>; contactNote: string; operator: Operator };
+export const operatorComplete = (o: Operator) => !!(o.name.trim() && o.address.trim() && o.email.trim());
 export async function getExtras(q: Q = db()): Promise<Extras> {
   const r = await settingsRows(q);
   return {
@@ -75,6 +77,7 @@ export async function getExtras(q: Q = db()): Promise<Extras> {
     feesMemberParty: (r.feesMemberParty as Fees) ?? { rent: 0, deposit: 0 },
     mailTexts: (r.mailTexts as Extras['mailTexts']) ?? {},
     contactNote: (r.contactNote as string) ?? '',
+    operator: { name: '', address: '', email: '', phone: '', responsible: '', ...((r.operator as Partial<Operator>) ?? {}) },
   };
 }
 /** Miete und Kaution, die für eine Anfrage gelten (Externe immer, Mitglieder nur bei Feiern). */

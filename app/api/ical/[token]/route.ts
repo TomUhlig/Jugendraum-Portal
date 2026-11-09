@@ -16,7 +16,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   const cat = new Map(cats.map((c) => [c.id, c]));
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//SV Heepen//Jugendraum//DE', 'X-WR-CALNAME:Jugendraum SV Heepen', 'X-PUBLISHED-TTL:PT1H', 'REFRESH-INTERVAL;VALUE=DURATION:PT1H'];
   for (const b of bookings) {
-    lines.push('BEGIN:VEVENT', `UID:${b.id}@jugendraum.sv-heepen.de`, `DTSTAMP:${stamp(now)}`, `DTSTART:${stamp(b.start)}`, `DTEND:${stamp(b.end)}`,
+    lines.push('BEGIN:VEVENT', `UID:${b.id}@${new URL(appUrl()).hostname}`, `DTSTAMP:${stamp(now)}`, `DTSTART:${stamp(b.start)}`, `DTEND:${stamp(b.end)}`,
       `SUMMARY:${text(`${b.status === 'requested' ? '[Anfrage] ' : ''}${b.title}`)}`,
       `DESCRIPTION:${text(`${cat.get(b.categoryId)?.name ?? ''} · ${b.guests} Pers.\n${b.name}${b.team ? ' (' + b.team + ')' : ''} · ${b.phone}\nAbsprache: ${b.agreedWith}\n${appUrl()}/admin/buchung/${b.id}`)}`,
       `STATUS:${b.status === 'confirmed' ? 'CONFIRMED' : 'TENTATIVE'}`, 'END:VEVENT');

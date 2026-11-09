@@ -7,7 +7,7 @@ import {
   Admin, MailTextKey, addBlackout, addRecurring, deleteRecurring, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
   removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin,
 } from '@/lib/data';
-import { mails } from '@/lib/mail';
+import { mailMode, mails, teamMails } from '@/lib/mail';
 import { afterDecision } from '@/lib/notify';
 import { Freq, describeSeries, seriesDates } from '@/lib/series';
 import { addDays, berlinToUtc } from '@/lib/time';
@@ -179,6 +179,22 @@ export async function offerAction(fd: FormData) {
   revalidatePath('/', 'layout');
   go('/admin/einstellungen#angebot', 'ok', 'Ausstattung und Kosten gespeichert.');
 }
+export async function operatorAction(fd: FormData) {
+  const admin = await requireAdmin('admin');
+  await saveSettings(admin.name, { operator: {
+    name: str(fd, 'opName', 120), address: String(fd.get('opAddress') ?? '').trim().slice(0, 300), email: str(fd, 'opEmail', 120),
+    phone: str(fd, 'opPhone', 40), responsible: str(fd, 'opResponsible', 200),
+  } }, []);
+  revalidatePath('/', 'layout');
+  go('/admin/einstellungen#betreiber', 'ok', 'Betreiberangaben gespeichert. Impressum und Datenschutz sind aktualisiert.');
+}
+export async function testMailAction() {
+  const admin = await requireAdmin('manager');
+  if (mailMode() === 'console') go('/admin/einstellungen#mail', 'fehler', 'Es ist noch kein Mailversand eingerichtet (siehe Anleitung EINRICHTUNG.md, Schritt 4).');
+  const ok = await teamMails.test(admin.email);
+  go('/admin/einstellungen#mail', ok ? 'ok' : 'fehler', ok ? `Testmail an ${admin.email} verschickt. Schau in dein Postfach (auch im Spam).` : 'Die Testmail konnte nicht verschickt werden. Den Fehler findest du unter Protokoll → E-Mails.');
+}
+
 export async function textsAction(fd: FormData) {
   const admin = await requireAdmin('admin');
   const keys: MailTextKey[] = ['received', 'confirmed', 'rejected', 'reminder', 'followup'];

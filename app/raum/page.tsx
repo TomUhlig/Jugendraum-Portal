@@ -1,4 +1,4 @@
-import { CalendarClock, Clock, KeyRound, PartyPopper, ShieldCheck, Users } from 'lucide-react';
+import { CalendarClock, Clock, PartyPopper, ShieldCheck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { getCategories, getExtras, getRecurring, getSettings } from '@/lib/data';
 import { describeRecurring } from '@/lib/rules';
@@ -87,11 +87,13 @@ export default async function Raum() {
             Für Änderungen an Datum oder Uhrzeit melde dich bei deiner Ansprechperson. Das Orga-Team kann Termine verschieben, du wirst dann per Mail informiert.</p>
 
           <h2 id="datenschutz">Datenschutz</h2>
-          <p>Wir verarbeiten deine Angaben (Name, Kontaktdaten, Termin, Nachricht) nur, um die Buchung abzuwickeln. Zugriff haben ausschließlich die zuständigen Personen im SV Heepen.
-            Im öffentlichen Kalender steht nur, dass ein Termin belegt ist, nie dein Name. Personenbezogene Daten werden 12 Monate nach dem Termin automatisch gelöscht.
-            Es werden keine Tracking- oder Werbe-Cookies gesetzt. Verantwortlich ist der SV Heepen, die vollständigen Datenschutzhinweise und das Impressum findest du auf <a href="https://www.sv-heepen.de">sv-heepen.de</a>.</p>
-          <p className="inline" style={{ marginTop: 8 }}><ShieldCheck className="icon" style={{ color: 'var(--ok)' }} /><span className="muted small">Gehostet in Rechenzentren in Frankfurt am Main.</span></p>
-          <p className="inline"><KeyRound className="icon" style={{ color: 'var(--muted)' }} /><span className="muted small">Fragen zu deinen Daten oder zur Löschung: an deine Ansprechperson oder den Vorstand.</span></p>
+          <p><b>Verantwortlich</b> für die Verarbeitung deiner Daten ist {x.operator.name ? <>{x.operator.name}, {x.operator.address.replace(/\n/g, ', ')}, E-Mail {x.operator.email}</> : 'der im Impressum genannte Betreiber'}.</p>
+          <p><b>Welche Daten und wofür:</b> Name, E-Mail, Telefon, Mannschaft, Termin, Anlass und deine Nachricht. Wir nutzen sie nur, um die Anfrage zu bearbeiten, dich zu informieren und an den Termin zu erinnern (Art. 6 Abs. 1 lit. b DSGVO). Zugriff haben nur die Personen, die den Jugendraum verwalten.</p>
+          <p><b>Öffentlicher Kalender:</b> Dort steht nur, dass ein Zeitraum belegt ist, nie dein Name oder Anlass.</p>
+          <p><b>Speicherdauer:</b> Personenbezogene Angaben werden 12 Monate nach dem Termin automatisch gelöscht. Unbestätigte Anfragen verfallen nach 24 Stunden.</p>
+          <p><b>Dienstleister:</b> Die Seite und die Datenbank laufen bei Hosting-Anbietern mit Servern in der EU (Frankfurt am Main). Für den Versand von E-Mails wird ein E-Mail-Dienst genutzt. Es werden keine Tracking- oder Werbe-Cookies gesetzt; gespeichert werden nur die Anmeldung der Verwaltung und deine Wahl zwischen hell und dunkel.</p>
+          <p><b>Deine Rechte:</b> Du kannst Auskunft, Berichtigung und Löschung deiner Daten verlangen sowie der Verarbeitung widersprechen. Wende dich dafür an {x.operator.email ? <a href={`mailto:${x.operator.email}`}>{x.operator.email}</a> : 'den Betreiber'}. Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren, in NRW bei der LDI NRW.</p>
+          <p className="inline" style={{ marginTop: 8 }}><ShieldCheck className="icon" style={{ color: 'var(--ok)' }} /><span className="muted small">Hinweis: Mustertext, bitte vor der Veröffentlichung prüfen lassen.</span></p>
         </article>
       </div>
     </main>

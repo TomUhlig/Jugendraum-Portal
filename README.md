@@ -58,24 +58,27 @@ Voraussetzungen: Node.js 20+, PostgreSQL 15+ (lokal oder Supabase).
 npm install
 cp .env.example .env.local        # Werte eintragen
 npm run db:migrate                # Tabellen anlegen bzw. aktualisieren (mehrfach ausführbar)
-npm run admin:add -- du@example.de "Dein Name" admin
+npm run admin:add -- du@example.de "Dein Name" admin   # oder INITIAL_ADMIN_EMAIL setzen
 npm run db:seed                   # optional: Beispielbuchungen für eine Test-Datenbank
 npm run dev                       # http://localhost:3000
 ```
 
-Ohne `RESEND_API_KEY` werden Mails nicht verschickt, sondern mit allen Links in der Konsole ausgegeben. Im Dev-Modus zeigt die Login-Seite den Login-Link dann auch direkt an.
+Ohne Mailzugang (SMTP oder Resend) werden Mails nicht verschickt, sondern mit allen Links in der Konsole ausgegeben. Im Dev-Modus zeigt die Login-Seite den Login-Link dann auch direkt an.
 
 Tests: `npm test` (Regel-Engine, Zeitzonen, Serien, iCal). Typprüfung: `npm run lint`.
 
-## Live schalten (ca. 30 Minuten, 0 €)
+## Online stellen
 
-1. **Datenbank:** Projekt bei [Supabase](https://supabase.com) anlegen, Region *Frankfurt (eu-central-1)*. Unter *Connect → Session pooler* die Verbindungs-URL kopieren. Lokal `DATABASE_URL=… npm run db:migrate` und `npm run admin:add` ausführen.
-2. **Mails:** Konto bei [Resend](https://resend.com) (EU-Region), Domain `sv-heepen.de` verifizieren (DNS-Einträge SPF/DKIM beim Domain-Anbieter setzen), API-Key erzeugen.
-3. **Hosting:** Repo bei [Vercel](https://vercel.com) importieren. Umgebungsvariablen aus `.env.example` setzen (`APP_URL` = endgültige Adresse, `SESSION_SECRET` und `CRON_SECRET` mit `openssl rand -hex 32` erzeugen). Die Region `fra1` und der tägliche Cron-Lauf (06:00 UTC) sind in `vercel.json` hinterlegt.
-4. **Domain:** In Vercel `jugendraum.sv-heepen.de` hinzufügen und den CNAME beim Domain-Anbieter eintragen.
-5. **Team einladen:** In der Verwaltung unter *Team* Michael Grieswelle, Sigrid Brodig und weitere Personen anlegen.
+**Schritt-für-Schritt-Anleitung: [EINRICHTUNG.md](EINRICHTUNG.md)** (Supabase + Vercel + eigenes Postfach, ca. 1 Stunde, 0 €, ohne eigene Domain).
 
-Datenschutz: Auftragsverarbeitungsverträge (AVV) mit Supabase, Vercel und Resend abschließen (bei allen im Dashboard verfügbar). Personenbezogene Daten werden 12 Monate nach dem Termin automatisch entfernt.
+Kurzfassung:
+1. Supabase-Projekt (Frankfurt) anlegen, `db/schema.sql` im SQL Editor ausführen.
+2. Repository bei Vercel importieren, Umgebungsvariablen aus `.env.example` setzen (u. a. `INITIAL_ADMIN_EMAIL` und SMTP-Zugang eines Postfachs).
+3. `/admin` öffnen, mit `INITIAL_ADMIN_EMAIL` anmelden, unter Einstellungen Testmail senden und Impressum ausfüllen.
+
+**Mailversand** geht wahlweise über ein normales Postfach per SMTP (Gmail, GMX, web.de; keine eigene Domain nötig) oder über Resend (mit eigener Domain). Ohne beides werden Mails nur in der Konsole ausgegeben.
+
+Datenschutz: Auftragsverarbeitungsverträge (AVV) mit Supabase und Vercel abschließen (im jeweiligen Dashboard bzw. in den Rechtsdokumenten der Anbieter). Personenbezogene Daten werden 12 Monate nach dem Termin automatisch entfernt.
 
 ## Aufbau
 

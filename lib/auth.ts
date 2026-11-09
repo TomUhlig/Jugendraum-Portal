@@ -17,7 +17,14 @@ const sign = (v: string) => createHmac('sha256', secret()).update(v).digest('bas
 
 /** Legt einen einmaligen Login-Link an. Gibt null zurück, wenn die Adresse nicht im Team ist. */
 export async function createLoginLink(email: string, baseUrl: string): Promise<{ to: string; link: string } | null> {
-  const [admin] = await db()`select id, email from admins where email = ${email.trim().toLowerCase()}`;
+  const mail = email.trim().toLowerCase();
+  let [admin] = await db()`select id, email from admins where email = ${mail}`;
+  // Ersteinrichtung: Solange noch niemand im Team ist, wird INITIAL_ADMIN_EMAIL automatisch Admin.
+  const initial = process.env.INITIAL_ADMIN_EMAIL?.trim().toLowerCase();
+  if (!admin && initial && mail === initial) {
+    const [{ n }] = await db()`select count(*)::int as n from admins`;
+    if (n === 0) [admin] = await db()`insert into admins (email, name, role) values (${mail}, ${mail.split('@')[0]}, 'admin') returning id, email`;
+  }
   if (!admin) return null;
   const token = randomBytes(32).toString('base64url');
   await db()`insert into login_tokens (token_hash, admin_id, expires_at) values (${sha(token)}, ${admin.id}, now() + interval '15 minutes')`;

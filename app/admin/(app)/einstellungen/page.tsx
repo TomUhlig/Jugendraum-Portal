@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { Flash, PageHead } from '@/components/Flash';
 import { requireAdmin } from '@/lib/auth';
-import { getCategories, getExtras, getSettings } from '@/lib/data';
-import { DEFAULT_TEXTS, TEXT_LABELS } from '@/lib/mail';
+import { getCategories, getExtras, getSettings, operatorComplete } from '@/lib/data';
+import { DEFAULT_TEXTS, TEXT_LABELS, mailFrom, mailMode } from '@/lib/mail';
 import type { MailTextKey } from '@/lib/data';
-import { offerAction, settingsAction, textsAction } from '../../actions';
+import { offerAction, operatorAction, settingsAction, testMailAction, textsAction } from '../../actions';
 
 const de = (n: number) => n.toString().replace('.', ',');
 
@@ -13,11 +13,41 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const [cats, s, x] = await Promise.all([getCategories(), getSettings(), getExtras()]);
   const ro = me.role !== 'admin';
+  const mode = mailMode();
   return (
     <>
       <PageHead title="Einstellungen"><Link className="btn" href="/admin/sperrzeiten">Sperrzeiten</Link></PageHead>
       <Flash sp={sp} />
       {ro && <div className="alert alert-info"><div>Nur Admins können Einstellungen ändern. Du siehst sie hier zur Information.</div></div>}
+
+      <section className="card" id="mail">
+        <div className="card-head"><div><h2>Mailversand</h2><p>Wird über Umgebungsvariablen beim Hosting eingerichtet (siehe EINRICHTUNG.md)</p></div>
+          <span className={`badge ${mode === 'console' ? 'b-bad' : 'b-ok'}`}>{mode === 'console' ? 'nicht eingerichtet' : 'aktiv'}</span></div>
+        <div className="card-body stack-sm">
+          <dl className="kv"><dt>Versandweg</dt><dd>{({ resend: 'Resend (eigene Domain)', smtp: `Eigenes Postfach über ${process.env.SMTP_HOST}`, console: 'nicht eingerichtet' } as const)[mode]}</dd>{mode !== 'console' && <><dt>Absender</dt><dd>{mailFrom()}</dd></>}</dl>
+          {mode === 'console' && <p className="muted small">Ohne Mailversand bekommen weder Buchende noch das Team Nachrichten, und niemand kann sich in der Verwaltung anmelden.</p>}
+        </div>
+        <form action={testMailAction} className="card-foot inline"><button className="btn" type="submit" disabled={mode === 'console'}>Testmail an {me.email} senden</button></form>
+      </section>
+
+      <form action={operatorAction} className="card" id="betreiber">
+        <div className="card-head"><div><h2>Betreiber und Impressum</h2><p>Pflichtangaben für eine eigenständige Website. Erscheinen im Impressum und in den Datenschutzhinweisen.</p></div>
+          <span className={`badge ${operatorComplete(x.operator) ? 'b-ok' : 'b-warn'}`}>{operatorComplete(x.operator) ? 'vollständig' : 'unvollständig'}</span></div>
+        <fieldset disabled={ro} className="card-body stack" style={{ border: 0, margin: 0 }}>
+          <div className="row">
+            <div className="field"><label htmlFor="op1" className="req">Name (Person oder Verein)</label><input id="op1" name="opName" type="text" defaultValue={x.operator.name} placeholder="z. B. SV Heepen e. V., vertreten durch …" /></div>
+            <div className="field"><label htmlFor="op3" className="req">E-Mail</label><input id="op3" name="opEmail" type="email" defaultValue={x.operator.email} /></div>
+            <div className="field"><label htmlFor="op4">Telefon</label><input id="op4" name="opPhone" type="tel" defaultValue={x.operator.phone} /></div>
+          </div>
+          <div className="row">
+            <div className="field"><label htmlFor="op2" className="req">Anschrift</label><textarea id="op2" name="opAddress" defaultValue={x.operator.address} style={{ minHeight: 80 }} placeholder={'Straße Nr.\nPLZ Ort'} /></div>
+            <div className="field"><label htmlFor="op5">Inhaltlich verantwortlich</label><input id="op5" name="opResponsible" type="text" defaultValue={x.operator.responsible} placeholder="Name, Anschrift (falls abweichend)" />
+              <span className="hint">Bei einem Verein zusätzlich sinnvoll: Vereinsregister und Registernummer im Namensfeld oder hier.</span></div>
+          </div>
+          <span className="muted small">Hinweis: Das ist keine Rechtsberatung. Lass die Angaben im Zweifel vom Vorstand prüfen.</span>
+        </fieldset>
+        {!ro && <div className="card-foot"><button className="btn btn-primary" type="submit">Speichern</button></div>}
+      </form>
 
       <form action={settingsAction} className="card" id="regeln">
         <div className="card-head"><div><h2>Regeln</h2><p>Gelten sofort für neue Anfragen, auch in der Live-Prüfung auf der Buchungsseite</p></div></div>

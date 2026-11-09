@@ -1,10 +1,11 @@
-import { AlertTriangle, ArrowRight, Check, KeyRound, Lock, MailWarning, Plus, Wallet, Wrench } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, KeyRound, Lock, MailWarning, Plus, Settings2, Wallet, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { Flash, PageHead } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { checkExisting, getCategories, listBookings } from '@/lib/data';
+import { checkExisting, getCategories, getExtras, listBookings, operatorComplete } from '@/lib/data';
+import { mailMode } from '@/lib/mail';
 import { eur } from '@/lib/labels';
 import { DAY, addDays, berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong, fmtRange } from '@/lib/time';
 import { decideAction } from '../actions';
@@ -30,13 +31,14 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     q`select id, number, title, name, starts_at from bookings where status = 'confirmed' and not key_handed_out and starts_at between now() and now() + interval '3 days' order by starts_at`,
   ]);
   const cat = new Map(cats.map((c) => [c.id, c]));
+  const setup = [...(mailMode() === 'console' ? ['Mailversand einrichten'] : []), ...(operatorComplete((await getExtras()).operator) ? [] : ['Impressum ausfüllen'])];
   const checks = await Promise.all(open.map((b) => checkExisting(b)));
   const todays = upcoming.filter((b) => b.start < tEnd && b.end > tStart && b.status === 'confirmed');
   const week = upcoming.filter((b) => b.status === 'confirmed' && b.start < now + 7 * DAY).length;
   const hours = monthB.reduce((s, b) => s + (b.end - b.start) / 3.6e6, 0);
   const days = Math.round((berlinToUtc(mNext, '00:00') - berlinToUtc(m, '00:00')) / DAY);
   const canDecide = me.role !== 'viewer';
-  const todo = keysOut.length + deposits.length + damages.length + keysDue.length + (failed[0].n ? 1 : 0);
+  const todo = setup.length + keysOut.length + deposits.length + damages.length + keysDue.length + (failed[0].n ? 1 : 0);
 
   return (
     <>
@@ -78,6 +80,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <div className="card-head"><h2>Zu erledigen</h2>{todo > 0 && <span className="badge b-warn">{todo}</span>}</div>
             {todo === 0 ? <div className="empty">Nichts offen. Schlüssel, Kautionen und Schadensmeldungen sind erledigt.</div> : (
               <ul className="list">
+                {setup.map((t) => <li key={t} className="todo"><Settings2 className="icon" style={{ color: 'var(--bad)' }} /><span><Link href={t.startsWith('Mail') ? '/admin/einstellungen#mail' : '/admin/einstellungen#betreiber'}>{t}</Link> <span className="muted">(Einrichtung)</span></span></li>)}
                 {keysDue.map((b) => <li key={'d' + b.id} className="todo"><KeyRound className="icon" style={{ color: 'var(--info)' }} /><span>Schlüssel übergeben für <Link href={`/admin/buchung/${b.id}`}>{b.title}</Link> <span className="muted">({fmtDay(+b.starts_at)})</span></span></li>)}
                 {keysOut.map((b) => <li key={'k' + b.id} className="todo"><KeyRound className="icon" style={{ color: 'var(--warn)' }} /><span>Schlüssel noch nicht zurück: <Link href={`/admin/buchung/${b.id}`}>{b.title}</Link> <span className="muted">({b.name})</span></span></li>)}
                 {deposits.map((b) => <li key={'p' + b.id} className="todo"><Wallet className="icon" style={{ color: 'var(--warn)' }} /><span>Kaution {eur(+b.deposit_eur)} abrechnen: <Link href={`/admin/buchung/${b.id}`}>{b.title}</Link></span></li>)}

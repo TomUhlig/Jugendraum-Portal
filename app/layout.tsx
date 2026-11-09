@@ -45,8 +45,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <div className="wrap">
             <span className="grow"><img src="/logo.png" alt="" width={24} height={24} />Jugendraum des SV Heepen</span>
             <Link href="/raum#hausordnung">Hausordnung</Link>
+            <Link href="/impressum">Impressum</Link>
             <Link href="/raum#datenschutz">Datenschutz</Link>
-            <a href="https://www.sv-heepen.de" rel="noopener">sv-heepen.de</a>
+            <a href="https://www.sv-heepen.de" rel="noopener">Zum SV Heepen</a>
           </div>
         </footer>
       </body>
