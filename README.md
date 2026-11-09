@@ -74,7 +74,8 @@ Tests: `npm test` (Regel-Engine, Zeitzonen, Serien, iCal). Typprüfung: `npm run
 Kurzfassung:
 1. Supabase-Projekt (Frankfurt) anlegen, `db/schema.sql` im SQL Editor ausführen.
 2. Repository bei Vercel importieren, Umgebungsvariablen aus `.env.example` setzen (u. a. `INITIAL_ADMIN_EMAIL` und SMTP-Zugang eines Postfachs).
-3. `/admin` öffnen, mit `INITIAL_ADMIN_EMAIL` anmelden, unter Einstellungen Testmail senden und Impressum ausfüllen.
+3. `/status` öffnen und prüfen, ob alles grün ist (Diagnose der Einrichtung).
+4. `/admin` öffnen, mit `INITIAL_ADMIN_EMAIL` anmelden, unter Einstellungen Testmail senden und Impressum ausfüllen.
 
 **Mailversand** geht wahlweise über ein normales Postfach per SMTP (Gmail, GMX, web.de; keine eigene Domain nötig) oder über Resend (mit eigener Domain). Ohne beides werden Mails nur in der Konsole ausgegeben.
 

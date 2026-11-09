@@ -74,6 +74,7 @@ Am einfachsten ist ein **eigenes Postfach nur für den Jugendraum**, zum Beispie
 | `MAIL_FROM` | optional, z. B. `Jugendraum SV Heepen <jugendraum.heepen@gmail.com>` (muss zum Postfach passen) |
 
 5. **Deploy** klicken und warten (2–3 Minuten).
+6. `https://deine-adresse.vercel.app/status` öffnen. Alle Punkte sollten grün sein. Wenn nicht, steht dort, was zu tun ist.
 
 Der tägliche Erinnerungslauf (06:00 Uhr UTC, also 7 bzw. 8 Uhr deutscher Zeit) ist in `vercel.json` hinterlegt und wird von Vercel automatisch eingerichtet.
 
@@ -120,9 +121,11 @@ Eine eigene Domain wie `jugendraum-heepen.de` kostet bei üblichen Anbietern etw
 
 ## Hilfe bei Problemen
 
+**Erste Anlaufstelle: `https://deine-adresse.vercel.app/status`.** Die Seite prüft alle Einstellungen und die Datenbankverbindung und sagt auf Deutsch, was fehlt. Werte werden dort nie angezeigt. Sobald jemand im Team ist, sehen nur angemeldete Team-Mitglieder die Einzelheiten.
+
 | Problem | Lösung |
 |---|---|
-| Seite zeigt „Application error“ | In Vercel unter **Logs** nachsehen. Meist ist `DATABASE_URL` falsch (Passwort nicht ersetzt?) oder das Schema aus Schritt 2.4 fehlt. |
+| Seite zeigt „Hier ist etwas schiefgelaufen“ | `/status` öffnen. Häufigste Ursachen: Passwort in `DATABASE_URL` nicht ersetzt, „Direct connection“ statt „Session pooler“ kopiert, `db/schema.sql` nicht ausgeführt. Details stehen auch in Vercel unter **Logs**. |
 | Kein Anmeldelink | Einstellungen werden erst nach Login sichtbar, daher: in Vercel prüfen, ob alle `SMTP_…`-Werte stimmen, dann Redeploy. Bei Gmail muss es das App-Passwort sein, nicht das normale Passwort. |
 | Mails landen im Spam | Bei Gmail einmal „Kein Spam“ markieren. Dauerhaft hilft eine eigene Domain mit Resend. |
 | Erinnerungen kommen nicht | In Vercel unter **Settings → Cron Jobs** prüfen, ob der Job läuft, und ob `CRON_SECRET` gesetzt ist. |
