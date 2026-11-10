@@ -76,7 +76,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
             </form>
           </section>
         )}
-        <p className="muted small" style={{ textAlign: 'center' }}>Diese Seite ist nur über deinen persönlichen Link erreichbar. Bitte gib ihn nicht weiter.</p>
+        <p className="muted small" style={{ textAlign: 'center' }}>Diese Seite ist nur über deinen persönlichen Link erreichbar. Bitte gib ihn nicht weiter. Alle deine Buchungen findest du unter <a href="/meine-buchungen">Meine Buchungen</a>.</p>
       </div>
     </main>
   );

@@ -4,11 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
-  Admin, MailTextKey, addBlackout, addRecurring, deleteRecurring, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
+  Admin, MailTextKey, addBlackout, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
   removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin,
 } from '@/lib/data';
 import { mailMode, mails, teamMails } from '@/lib/mail';
-import { afterDecision } from '@/lib/notify';
+import { afterDecision, notifyWaitlist } from '@/lib/notify';
 import { Freq, describeSeries, seriesDates } from '@/lib/series';
 import { addDays, berlinToUtc } from '@/lib/time';
 
@@ -52,6 +52,7 @@ export async function cancelSeriesAction(fd: FormData) {
     const cat = (await getCategories()).find((c) => c.id === list[0].categoryId);
     await mails.cancelled(list[0], cat).catch(() => {});
   }
+  await notifyWaitlist(list);
   revalidatePath('/admin', 'layout');
   go(`/admin/buchung/${id}`, 'ok', `${list.length} Termine der Serie storniert.`);
 }
@@ -108,6 +109,7 @@ export async function changeAction(fd: FormData) {
   }, fd.get('override') === 'on');
   if (!res.ok) go(`/admin/buchung/${id}?bearbeiten=1`, 'fehler', res.messages.map((m) => m.text).join(' '));
   const moved = res.ok && (res.before.start !== res.booking.start || res.before.end !== res.booking.end);
+  if (moved && res.ok) await notifyWaitlist([res.before]);
   if (res.ok && fd.get('notify') === 'on' && ['confirmed', 'requested'].includes(res.booking.status)) {
     const cat = (await getCategories()).find((c) => c.id === res.booking.categoryId);
     await mails.changed(res.booking, res.before, cat, str(fd, 'message', 500) || undefined).catch(() => {});
@@ -123,6 +125,24 @@ export async function silentAction(fd: FormData) {
   const silent = fd.get('silent') === '1';
   await setSilent(id, admin.name, silent, fd.get('series') === 'on');
   go(`/admin/buchung/${id}`, 'ok', silent ? 'Für diese Buchung werden keine automatischen Mails mehr verschickt.' : 'Automatische Mails (Erinnerungen, Änderungen) sind wieder an.');
+}
+
+/** Verschieben per Drag & Drop im Kalender. Gibt eine Meldung zurück statt umzuleiten. */
+export async function moveAction(id: string, start: number, end: number, notify: boolean): Promise<{ ok: boolean; message: string }> {
+  const admin = await requireAdmin('manager');
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return { ok: false, message: 'Ungültige Zeit.' };
+  const b = await getBooking(id);
+  if (!b) return { ok: false, message: 'Buchung nicht gefunden.' };
+  const res = await changeBooking(id, admin.name, { categoryId: b.categoryId, title: b.title, guests: b.guests, equipment: b.equipment, start, end }, false);
+  if (!res.ok) return { ok: false, message: res.messages.map((m) => m.text).join(' ') };
+  await notifyWaitlist([res.before]);
+  const informed = notify && !res.booking.silent && ['confirmed', 'requested'].includes(res.booking.status);
+  if (informed) {
+    const cat = (await getCategories()).find((c) => c.id === res.booking.categoryId);
+    await mails.changed(res.booking, res.before, cat).catch(() => {});
+  }
+  revalidatePath('/admin', 'layout'); revalidatePath('/');
+  return { ok: true, message: `„${b.title}“ verschoben.${informed ? ` ${b.name} wurde per Mail informiert.` : ''}` };
 }
 
 // ---------- Interna, Übergabe, Kosten ----------
@@ -225,7 +245,8 @@ export async function addBlackoutAction(fd: FormData) {
 }
 export async function deleteBlackoutAction(fd: FormData) {
   const admin = await requireAdmin('manager');
-  await deleteBlackout(admin.name, str(fd, 'id', 40));
+  const freed = await deleteBlackout(admin.name, str(fd, 'id', 40));
+  if (freed) await notifyWaitlist([freed]);
   revalidatePath('/', 'layout');
   go('/admin/sperrzeiten', 'ok', 'Sperrzeit gelöscht.');
 }
@@ -251,8 +272,15 @@ export async function addRecurringAction(fd: FormData) {
 export async function deleteRecurringAction(fd: FormData) {
   const admin = await requireAdmin('manager');
   await deleteRecurring(admin.name, str(fd, 'id', 40));
+  await notifyWaitlist([{ start: Date.now(), end: Date.now() + 400 * 86400e3 }]);
   revalidatePath('/', 'layout');
   go('/admin/sperrzeiten#regelmaessig', 'ok', 'Regelmäßige Sperre aufgehoben.');
+}
+
+export async function removeWaitAction(fd: FormData) {
+  await requireAdmin('manager');
+  await removeWaitById(str(fd, 'id', 40));
+  go('/admin/warteliste', 'ok', 'Eintrag entfernt.');
 }
 
 // ---------- Team ----------

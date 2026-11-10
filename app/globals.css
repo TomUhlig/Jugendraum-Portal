@@ -415,3 +415,39 @@ a.kpi:hover { border-color: var(--line-strong) }
   .fade-in { animation: fade .25s ease-out }
   @keyframes fade { from { opacity: 0; transform: translateY(4px) } }
 }
+
+/* ---------- Druckansicht (immer hell, A4) ---------- */
+.print-doc { background: #fff; color: #161A33; border: 1px solid var(--line); border-radius: var(--r); padding: 36px 40px; font-size: 13.5px; line-height: 1.45; color-scheme: light }
+.print-doc h1 { font-size: 22px; color: #161A33 }
+.print-doc h2 { font-size: 14px; margin: 18px 0 6px; color: #2E367A; text-transform: none }
+.pd-head { display: grid; grid-template-columns: 56px 1fr auto; gap: 14px; align-items: center; padding-bottom: 12px; border-bottom: 3px solid #FFD800 }
+.pd-kicker { font-size: 12px; color: #646A85 }
+.pd-ref { text-align: right; font-size: 12px; color: #646A85 }
+.pd-ref b { color: #161A33; font-size: 14px }
+.pd-table, .pd-grid { width: 100%; border-collapse: collapse; font-size: 13px }
+.pd-table th { width: 170px; text-align: left; font-weight: 600; color: #3D4260; padding: 4px 8px 4px 0; background: none; border: 0; font-size: 13px; white-space: normal }
+.pd-table td { padding: 4px 0; border: 0 }
+.pd-grid th, .pd-grid td { border: 1px solid #A9AEC4; padding: 7px 8px; text-align: left; vertical-align: top; background: none; color: #161A33; font-size: 12.5px }
+.pd-grid thead th { background: #F1F2F7 }
+.pd-grid td { width: 38% }
+.pd-grid tr.tall td { height: 70px }
+.pd-list { margin: 0; padding-left: 18px; display: grid; gap: 2px }
+.pd-note { margin-top: 14px; font-size: 12px; color: #3D4260 }
+.pd-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px }
+.pd-sign span { display: block; border-bottom: 1px solid #161A33; height: 28px }
+.pd-sign small { color: #646A85; font-size: 11px }
+.pd-foot { margin-top: 28px; font-size: 10.5px; color: #8A8FA8; border-top: 1px solid #E1E4EC; padding-top: 6px }
+@media print {
+  @page { size: A4; margin: 14mm }
+  :root { color-scheme: light }
+  body { background: #fff !important }
+  .site-header, .site-footer, .no-print, .sidebar { display: none !important }
+  main.wrap { padding: 0 !important; max-width: none !important }
+  .print-doc { border: 0; padding: 0; border-radius: 0 }
+  .pd-grid, .pd-sign { break-inside: avoid }
+}
+
+/* Drag & Drop in der Wochenansicht */
+.wev.movable { cursor: grab; touch-action: none; user-select: none }
+.wev.dragging { cursor: grabbing; z-index: 5; box-shadow: var(--shadow-lg); opacity: .92 }
+.move-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 30; padding: 12px 16px; display: flex; gap: 12px 20px; align-items: center; flex-wrap: wrap; box-shadow: var(--shadow-lg); width: min(760px, calc(100% - 32px)); justify-content: space-between }

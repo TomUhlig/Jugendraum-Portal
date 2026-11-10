@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Lock, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { PageHead } from '@/components/Flash';
+import { WeekBoard } from '@/components/WeekBoard';
 import { requireAdmin } from '@/lib/auth';
 import { getAllBlocks, getCategories, listBookings } from '@/lib/data';
 import { blackoutWhen } from '@/lib/rules';
@@ -11,7 +12,7 @@ const monday = (d: string) => addDays(d, -((weekdayOf(d) + 6) % 7));
 const dLabel = (d: string, o: Intl.DateTimeFormatOptions) => new Date(d + 'T12:00:00Z').toLocaleDateString('de-DE', { ...o, timeZone: 'UTC' });
 
 export default async function Kalender({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  await requireAdmin();
+  const me = await requireAdmin();
   const sp = await searchParams;
   const today = berlinYmd(Date.now());
   const week = sp.ansicht === 'woche';
@@ -25,12 +26,6 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
     const days = Array.from({ length: 7 }, (_, i) => addDays(w, i));
     const from = berlinToUtc(w, '00:00'), to = berlinToUtc(addDays(w, 8), '06:00');
     const [list, blackouts] = await Promise.all([listBookings({ from, to, status: all ? undefined : [...ACTIVE] }), getAllBlocks(undefined, from, to)]);
-    const H0 = 8, SPAN = 18; // 08:00 bis 02:00
-    const pos = (d: string, a: number, b: number) => {
-      const w0 = berlinToUtc(d, '08:00'), w1 = w0 + SPAN * 3600e3;
-      const s = Math.max(a, w0), e = Math.min(b, w1);
-      return e <= s ? null : { top: ((s - w0) / (w1 - w0)) * 100, height: ((e - s) / (w1 - w0)) * 100 };
-    };
     return (
       <>
         <PageHead title="Kalender">
@@ -44,33 +39,9 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
               <h2>{dLabel(w, { day: 'numeric', month: 'long' })} – {dLabel(addDays(w, 6), { day: 'numeric', month: 'long', year: 'numeric' })}</h2></div>
             <div className="inline"><Link className="btn btn-sm" href={`/admin/sperrzeiten?von=${w < today ? today : w}&bis=${addDays(w, 6)}#neu`}><Lock className="icon-sm" />Woche sperren</Link><Link className="btn btn-sm" href={keep({ w: monday(today) })}>Heute</Link><Link className="small" href={`?ansicht=woche&w=${w}${all ? '' : '&alle=1'}`}>{all ? 'Nur aktive' : 'Auch stornierte'}</Link></div>
           </div>
-          <div className="table-wrap">
-            <div className="wgrid">
-              <div />
-              {days.map((d) => <div key={d} className={`wh ${d === today ? 'today' : ''}`}>{dLabel(d, { weekday: 'short' })} {+d.slice(8)}.</div>)}
-              <div className="hours" style={{ height: SPAN * 42 }}>{Array.from({ length: SPAN }, (_, i) => <span key={i} style={{ top: `${(i / SPAN) * 100}%` }}>{i ? String((H0 + i) % 24).padStart(2, '0') + ':00' : ''}</span>)}</div>
-              {days.map((d) => (
-                <div key={d} className="wcol" style={{ height: SPAN * 42 }}>
-                  {blackouts.map((x) => { const p = pos(d, x.start, x.end); return p && <Link href="/admin/sperrzeiten" key={x.id} className="wev sys" style={{ '--c': 'var(--bad)', top: `${p.top}%`, height: `${p.height}%`, background: 'var(--bad-bg)' } as React.CSSProperties}><b>{x.scope === 'party' ? 'Keine Feiern' : 'Gesperrt'}</b>{x.reason}</Link>; })}
-                  {list.map((b) => {
-                    const c = cat.get(b.categoryId); const p = pos(d, b.start, b.end); if (!p || !c) return null;
-                    const pb = pos(d, b.start - c.bufferBefore * MIN, b.start), pa = pos(d, b.end, b.end + c.bufferAfter * MIN);
-                    const st = { '--c': c.color } as React.CSSProperties;
-                    return (
-                      <span key={b.id}>
-                        {pb && <div className="wbuf" style={{ ...st, top: `${pb.top}%`, height: `${pb.height}%` }} />}
-                        {pa && <div className="wbuf" style={{ ...st, top: `${pa.top}%`, height: `${pa.height}%` }} />}
-                        <Link href={`/admin/buchung/${b.id}`} className={`wev ${b.status}`} style={{ ...st, top: `${p.top}%`, height: `${p.height}%` }} title={`${b.title} · ${b.name}`}>
-                          <b>{b.title}</b><span className="num">{berlinHm(b.start)}–{berlinHm(b.end)}</span>
-                        </Link>
-                      </span>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="card-foot legend" style={{ marginTop: 0 }}>{cats.map((c) => <span key={c.id}><i style={{ '--c': c.color } as React.CSSProperties} />{c.name}</span>)}<span>schraffiert: Auf- und Abbau</span><span>gestrichelt: angefragt</span></div>
+          <WeekBoard days={days} today={today} canEdit={me.role !== 'viewer'} blocks={blackouts}
+            events={list.flatMap((b) => { const c = cat.get(b.categoryId); return c ? [{ id: b.id, title: b.title, name: b.name, start: b.start, end: b.end, status: b.status, color: c.color, before: c.bufferBefore, after: c.bufferAfter, silent: b.silent }] : []; })} />
+          <div className="card-foot legend" style={{ marginTop: 0 }}>{cats.map((c) => <span key={c.id}><i style={{ '--c': c.color } as React.CSSProperties} />{c.name}</span>)}<span>schraffiert: Auf- und Abbau</span><span>gestrichelt: angefragt</span>{me.role !== 'viewer' && <span>Termine lassen sich mit der Maus verschieben</span>}</div>
         </section>
       </>
     );

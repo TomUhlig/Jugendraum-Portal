@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { Booking, getBooking, getCategories, listBookings, notifyRecipients } from '@/lib/data';
 import { mails, teamMails } from '@/lib/mail';
+import { notifyWaitlist } from '@/lib/notify';
 import { DAY, addDays, berlinParts, berlinToUtc, berlinYmd } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
@@ -21,9 +22,11 @@ export async function GET(req: Request) {
   const load = async (rows: { id: string }[]) => (await Promise.all(rows.map((r) => getBooking(r.id)))).filter(Boolean) as Booking[];
 
   // 1. Unbestätigte Anfragen nach 24 h freigeben
-  const expired = await q`update bookings set status = 'expired' where status = 'pending_email' and created_at < now() - interval '24 hours' returning id`;
+  const expired = await q`update bookings set status = 'expired' where status = 'pending_email' and created_at < now() - interval '24 hours' returning id, starts_at, ends_at`;
   for (const r of expired) await q`insert into audit_log (actor, booking_id, action) values ('system', ${r.id}, 'expired')`;
   report.expired = expired.length;
+  await notifyWaitlist(expired.map((r) => ({ start: +r.starts_at, end: +r.ends_at })));
+  await q`delete from waitlist where ends_at < now()`;
 
   // 2. Erinnerung 3 Tage vorher
   const r3 = await load(await q`select id from bookings where status = 'confirmed' and not silent and reminded_3d_at is null

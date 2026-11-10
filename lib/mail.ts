@@ -189,6 +189,25 @@ export const mails = {
   },
 };
 
+const waitLink = (w: { categoryId: string; start: number; end: number }) =>
+  `${appUrl()}/?datum=${berlinYmd(w.start)}&von=${berlinHm(w.start)}&bis=${berlinHm(w.end)}&art=${w.categoryId}`;
+export const bookerMails = {
+  waitlistJoined: (w: { name: string; email: string; token: string; start: number; end: number }) => sendMail({ kind: 'waitlist-joined', to: w.email,
+    subject: `Warteliste: ${fmtDay(w.start)}, ${berlinHm(w.start)}–${berlinHm(w.end)} Uhr`,
+    ...build({ preheader: 'Wir melden uns, sobald der Termin frei wird.', heading: 'Du stehst auf der Warteliste', blocks: [
+      P(`Hallo ${firstName(w.name)},`), P(`wir schreiben dir, sobald der Jugendraum am <b>${fmtLong(w.start)}, ${berlinHm(w.start)}–${berlinHm(w.end)} Uhr</b> frei wird. Dann kannst du ihn ganz normal anfragen.`),
+      SMALL('Ein freier Termin ist nicht reserviert: Wer zuerst anfragt, bekommt ihn.'),
+      SMALL(`Kein Interesse mehr? <a href="${appUrl()}/warteliste/${w.token}" style="color:#2E367A">Von der Warteliste abmelden</a>.`)] }) }),
+  waitlistFree: (w: { name: string; email: string; categoryId: string; start: number; end: number }) => sendMail({ kind: 'waitlist-free', to: w.email,
+    subject: `Jetzt frei: Jugendraum am ${fmtDay(w.start)}`,
+    ...build({ preheader: 'Der Termin, auf den du gewartet hast, ist wieder frei.', heading: 'Dein Wunschtermin ist frei geworden', blocks: [
+      P(`Hallo ${firstName(w.name)},`), P(`der Jugendraum ist am <b>${fmtLong(w.start)}, ${berlinHm(w.start)}–${berlinHm(w.end)} Uhr</b> wieder frei. Wenn du ihn noch brauchst, frag ihn jetzt an. Datum und Uhrzeit sind schon eingetragen.`),
+      SMALL('Der Termin ist nicht für dich reserviert. Andere auf der Warteliste wurden ebenfalls informiert.')], cta: { href: waitLink(w), label: 'Jetzt anfragen' } }) }),
+
+  myBookings: (to: string, link: string) => sendMail({ kind: 'my-bookings', to, subject: 'Deine Buchungen im Jugendraum',
+    ...build({ preheader: 'Link zu deiner Übersicht, 7 Tage gültig.', heading: 'Deine Buchungen', blocks: [P('Hier ist der Link zu all deinen Buchungen im Jugendraum. Dort kannst du sie ansehen, in den Kalender übernehmen oder absagen.'), SMALL('Der Link ist 7 Tage gültig. Du hast ihn nicht angefordert? Dann ignoriere diese Mail.')], cta: { href: link, label: 'Meine Buchungen ansehen' } }) }),
+};
+
 // ---------- Mails ans Orga-Team ----------
 const adminLink = (b: Booking) => `${appUrl()}/admin/buchung/${b.id}`;
 const who = (b: Booking) => `${esc(b.name)} (${b.bookerType === 'member' ? 'Mitglied' + (b.team ? ', ' + esc(b.team) : '') : 'nicht im Verein'}) · ${esc(b.email)} · ${esc(b.phone)}`;

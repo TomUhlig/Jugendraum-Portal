@@ -16,6 +16,8 @@ Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen 
 - Ausstattung auswählen (Beamer, Musikanlage, …), Kosten und Kaution werden vorab angezeigt
 - Persönliche Buchungsseite mit Statusverlauf, Kalenderdatei und Absage
 - Rückmeldung nach dem Termin, inklusive Schadensmeldung (geht sofort ans Team)
+- **Meine Buchungen:** Link zu allen eigenen Buchungen per Mail anfordern (7 Tage gültig)
+- **Warteliste:** Bei belegtem Termin oder vergebenem Feier-Wochenende eintragen; wird der Termin frei (Absage, Ablehnung, Storno, Verfall, Verschieben, aufgehobene Sperre), kommt automatisch eine Mail mit vorausgefülltem Anfrage-Link
 - Mails: Bestätigungslink, Eingang, Bestätigung mit Kalenderdatei (.ics), Ablehnung mit Begründung, Erinnerung 3 Tage und 1 Tag vorher, Nachfrage danach
 
 **Für das Orga-Team** (`/admin`, Login per Magic Link)
@@ -26,9 +28,11 @@ Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen 
 - Termine bearbeiten und verschieben, Bucher wird mit neuer Kalenderdatei informiert
 - Regeln bei Bedarf bewusst übergehen (wird protokolliert), echte Überschneidungen bleiben gesperrt
 - Übergabe- und Rückgabeprotokoll: Schlüssel, Stromzähler, Zustand, Mängel
+- **Nutzungsvereinbarung zum Ausdrucken** (A4, mit Regeln, Übergabeprotokoll und Unterschriftsfeldern)
+- Warteliste einsehen; auf jeder Buchung steht, wie viele auf diesen Zeitraum warten
 - Nutzungsentgelt und Kaution mit Bezahlt/Abgerechnet/Einbehalten
 - „Zu erledigen“: fällige Schlüsselübergaben, offene Rückgaben und Kautionen, Schadensmeldungen, Mailfehler
-- Kalender mit Monats- und Wochenansicht (inkl. Pufferzeiten); an jedem Tag „Termin eintragen“ und „Tag sperren“, in der Wochenansicht „Woche sperren“
+- Kalender mit Monats- und Wochenansicht (inkl. Pufferzeiten); in der Wochenansicht **Termine per Drag & Drop verschieben** (15-Minuten-Raster, mit Rückfrage und Regelprüfung); an jedem Tag „Termin eintragen“ und „Tag sperren“, in der Wochenansicht „Woche sperren“
 - **Sperrzeiten** mit Schnellauswahl (heute, dieses/nächstes Wochenende, diese/nächste Woche, Rest des Monats), ganztägig oder nur bestimmte Uhrzeiten, für alle Anfragen oder nur für Feiern. Bestehende Buchungen im Zeitraum werden angezeigt und bleiben gültig
 - **Regelmäßige Sperren** nach Wochentagen, ganztägig oder stundenweise, optional befristet. Vorlagen: „Montags geschlossen“, „Werktags erst ab 17 Uhr“, „Sonntags keine Feiern“, „Nachts geschlossen“. Erscheinen auch öffentlich unter „Raum & Regeln“
 - Buchungsliste mit Suche, Filtern und CSV-Export für Excel

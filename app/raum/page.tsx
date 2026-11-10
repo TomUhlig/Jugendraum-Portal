@@ -2,6 +2,7 @@ import { CalendarClock, Clock, PartyPopper, ShieldCheck, Users } from 'lucide-re
 import Link from 'next/link';
 import { getCategories, getExtras, getRecurring, getSettings } from '@/lib/data';
 import { describeRecurring } from '@/lib/rules';
+import { hausordnung } from '@/lib/hausordnung';
 import { eur } from '@/lib/labels';
 
 export const dynamic = 'force-dynamic';
@@ -72,15 +73,7 @@ export default async function Raum() {
           </ul>
 
           <h2 id="hausordnung">Hausordnung</h2>
-          <ul>
-            <li>Höchstens {s.capacity} Personen im Raum.</li>
-            <li>Ab 22 Uhr draußen Ruhe, Musik nur bei geschlossenen Fenstern und Türen.</li>
-            <li>Rauchen nur draußen. Keine Pyrotechnik, kein Konfetti, keine offenen Flammen außer am Grill.</li>
-            <li>Raum besenrein verlassen: Tische abwischen, Boden fegen, Küche und Geschirr sauber, Müll mitnehmen.</li>
-            <li>Beim Gehen: Fenster schließen, Licht aus, Heizung runter, abschließen.</li>
-            <li>Schäden bitte sofort melden. Wer bucht, haftet für Schäden während der Nutzung und ist verantwortlich für alle Gäste.</li>
-            <li>Bei Veranstaltungen mit Minderjährigen gilt das Jugendschutzgesetz.</li>
-          </ul>
+          <ul>{hausordnung(s.capacity).map((h) => <li key={h}>{h}</li>)}</ul>
 
           <h2 id="storno">Absagen und Änderungen</h2>
           <p>Absagen kannst du jederzeit selbst über den Link in deiner Bestätigungsmail. Bitte sag so früh wie möglich ab, damit andere den Termin nutzen können.

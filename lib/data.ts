@@ -329,6 +329,15 @@ export async function listBookings(f: ListFilter = {}): Promise<Booking[]> {
     order by starts_at limit ${f.limit ?? 500}`;
   return rows.map(toBooking);
 }
+export async function listByEmail(email: string): Promise<Booking[]> {
+  const rows = await db()`select * from bookings where lower(email) = ${email.trim().toLowerCase()} and status <> 'pending_email'
+    and ends_at > now() - interval '12 months' order by starts_at desc limit 100`;
+  return rows.map(toBooking);
+}
+export async function hasBookings(email: string): Promise<boolean> {
+  const [r] = await db()`select 1 from bookings where lower(email) = ${email.trim().toLowerCase()} and status <> 'pending_email' limit 1`;
+  return !!r;
+}
 export async function listSeries(seriesId: string): Promise<Booking[]> {
   return (await db()`select * from bookings where series_id = ${seriesId} order by starts_at`).map(toBooking);
 }
@@ -375,9 +384,10 @@ export async function bookingsDuring(start: number, end: number, scope: 'all' | 
     ${scope === 'party' ? q`and c.is_party` : q``} order by b.starts_at`;
   return rows.map(toBooking);
 }
-export async function deleteBlackout(actor: string, id: string) {
-  await db()`delete from blackouts where id = ${id}`;
+export async function deleteBlackout(actor: string, id: string): Promise<{ start: number; end: number } | null> {
+  const [r] = await db()`delete from blackouts where id = ${id} returning starts_at, ends_at`;
   await audit(db(), actor, null, 'blackout-removed', { id });
+  return r ? { start: +r.starts_at, end: +r.ends_at } : null;
 }
 
 // ---------- Feedback ----------
@@ -432,4 +442,50 @@ export async function removeAdmin(id: string) {
 }
 export async function notifyRecipients(): Promise<string[]> {
   return (await db()`select email from admins where notify and role <> 'viewer'`).map((r) => r.email as string);
+}
+
+// ---------- Warteliste ----------
+export type WaitEntry = { id: string; token: string; categoryId: string; start: number; end: number; name: string; email: string; notifiedAt: number | null; createdAt: number };
+const toWait = (r: Row): WaitEntry => ({ id: r.id as string, token: r.token as string, categoryId: r.category_id as string, start: +(r.starts_at as Date), end: +(r.ends_at as Date),
+  name: r.name as string, email: r.email as string, notifiedAt: ts(r.notified_at), createdAt: +(r.created_at as Date) });
+export async function addWaitlist(e: { categoryId: string; start: number; end: number; name: string; email: string }): Promise<WaitEntry> {
+  const q = db();
+  const mail = e.email.trim().toLowerCase();
+  // Doppelte Einträge für denselben Zeitraum vermeiden
+  const [dup] = await q`select * from waitlist where email = ${mail} and starts_at = ${new Date(e.start)} and ends_at = ${new Date(e.end)} and notified_at is null`;
+  if (dup) return toWait(dup);
+  const [row] = await q`insert into waitlist (token, category_id, starts_at, ends_at, name, email) values (${token()}, ${e.categoryId}, ${new Date(e.start)}, ${new Date(e.end)}, ${e.name}, ${mail}) returning *`;
+  return toWait(row);
+}
+export async function getWaitByToken(t: string): Promise<WaitEntry | null> {
+  const [r] = await db()`select * from waitlist where token = ${t}`;
+  return r ? toWait(r) : null;
+}
+export async function removeWait(t: string) { await db()`delete from waitlist where token = ${t}`; }
+export async function removeWaitById(id: string) { await db()`delete from waitlist where id = ${id}`; }
+export async function listWaitlist(): Promise<WaitEntry[]> {
+  return (await db()`select * from waitlist where ends_at > now() order by starts_at`).map(toWait);
+}
+/**
+ * Prüft nach einer Absage, welche Wartenden den Termin jetzt anfragen könnten,
+ * markiert sie als benachrichtigt und gibt sie zurück (Versand macht notify.ts).
+ */
+export async function freeWaitlistFor(freedStart: number, freedEnd: number): Promise<WaitEntry[]> {
+  const q = db();
+  const rows = await q`select * from waitlist where notified_at is null and starts_at > now()
+    and starts_at < ${new Date(freedEnd + 4 * DAY)} and ends_at > ${new Date(freedStart - 4 * DAY)} order by created_at`;
+  if (!rows.length) return [];
+  const entries = rows.map(toWait);
+  const from = Math.min(...entries.map((e) => e.start)), to = Math.max(...entries.map((e) => e.end));
+  const [categories, settings, slots, blackouts] = await Promise.all([
+    getCategories(q), getSettings(q), getSlots(q, from - 10 * DAY, to + 10 * DAY), getAllBlocks(q, from - DAY, to + DAY),
+  ]);
+  const free: WaitEntry[] = [];
+  for (const e of entries) {
+    const r = checkBooking({ categoryId: e.categoryId, start: e.start, end: e.end, guests: 1 }, { categories, settings, slots, blackouts, now: Date.now() });
+    if (r.level === 'block') continue;
+    await q`update waitlist set notified_at = now() where id = ${e.id}`;
+    free.push(e);
+  }
+  return free;
 }

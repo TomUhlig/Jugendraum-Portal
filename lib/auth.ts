@@ -71,3 +71,15 @@ export async function adminFromFeedToken(token: string): Promise<Admin | null> {
   const [admin] = await db()`select id, email, name, role, notify from admins where id = ${id}`;
   return (admin as unknown as Admin) ?? null;
 }
+
+/** Link für „Meine Buchungen“: enthält die E-Mail-Adresse und ein Ablaufdatum, signiert (7 Tage gültig). */
+export function bookerToken(email: string): string {
+  const payload = Buffer.from(`${email.trim().toLowerCase()}|${Date.now() + 7 * 864e5}`).toString('base64url');
+  return `${payload}.${sign('booker:' + payload).slice(0, 32)}`;
+}
+export function emailFromBookerToken(token: string): string | null {
+  const [payload, sig] = token.split('.');
+  if (!payload || !sig || sig !== sign('booker:' + payload).slice(0, 32)) return null;
+  const [email, exp] = Buffer.from(payload, 'base64url').toString().split('|');
+  return +exp > Date.now() ? email : null;
+}

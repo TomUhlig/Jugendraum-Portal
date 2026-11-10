@@ -213,6 +213,20 @@ create table if not exists recurring_blocks (
   created_at  timestamptz not null default now()
 );
 
+-- ---------- Version 5: Warteliste ----------
+create table if not exists waitlist (
+  id          uuid primary key default gen_random_uuid(),
+  token       text not null unique,
+  category_id text not null references categories(id),
+  starts_at   timestamptz not null,
+  ends_at     timestamptz not null,
+  name        text not null,
+  email       text not null,
+  notified_at timestamptz,
+  created_at  timestamptz not null default now()
+);
+create index if not exists waitlist_starts_at on waitlist (starts_at) where notified_at is null;
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -227,5 +241,6 @@ do $$ begin
     execute 'alter table series enable row level security';
     execute 'alter table feedback enable row level security';
     execute 'alter table recurring_blocks enable row level security';
+    execute 'alter table waitlist enable row level security';
   end if;
 end $$;

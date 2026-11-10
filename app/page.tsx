@@ -5,8 +5,11 @@ import { addDays, berlinToUtc, berlinYmd } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Home() {
-  const month = berlinYmd(Date.now()).slice(0, 8) + '01';
+export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  const sp = await searchParams;
+  const ok = (v: string | undefined, re: RegExp) => (v && re.test(v) ? v : undefined);
+  const prefill = { date: ok(sp.datum, /^\d{4}-\d\d-\d\d$/), start: ok(sp.von, /^\d\d:[0-5]\d$/), end: ok(sp.bis, /^\d\d:[0-5]\d$/), categoryId: ok(sp.art, /^[a-z]{2,20}$/) };
+  const month = (prefill.date ?? berlinYmd(Date.now())).slice(0, 8) + '01';
   const [initial, extras] = await Promise.all([
     getPublicOccupancy(berlinToUtc(addDays(month, -7), '00:00'), berlinToUtc(addDays(month, 45), '00:00')),
     getExtras(),
@@ -24,7 +27,7 @@ export default async function Home() {
           </ul>
         </div>
       </section>
-      <BookingApp initial={initial} initialMonth={month} contactNote={extras.contactNote} />
+      <BookingApp initial={initial} initialMonth={month} contactNote={extras.contactNote} prefill={prefill} />
     </main>
   );
 }

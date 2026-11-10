@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, Ellipsis,
+  AlertTriangle, ArrowLeft, ArrowRight, BellRing, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, Ellipsis,
   GraduationCap, Megaphone, PartyPopper, Shirt, Users, XCircle,
 } from 'lucide-react';
 import { Blackout, Category, CheckResult, Settings, Slot, blackoutWhen, checkBooking, partyWeekendOf } from '@/lib/rules';
@@ -33,14 +33,18 @@ const initials = (n: string) => n.split(' ').map((p) => p[0]).join('').slice(0, 
 
 type Done = { number: string; email: string };
 
-export default function BookingApp({ initial, initialMonth, contactNote }: { initial: Occupancy; initialMonth: string; contactNote: string }) {
+export type Prefill = { date?: string; start?: string; end?: string; categoryId?: string };
+const WAITABLE = new Set(['overlap', 'buffer', 'party-weekend', 'blackout']);
+
+export default function BookingApp({ initial, initialMonth, contactNote, prefill = {} }: { initial: Occupancy; initialMonth: string; contactNote: string; prefill?: Prefill }) {
   const [data, setData] = useState(initial);
   const [month, setMonth] = useState(initialMonth);
   const [now, setNow] = useState(() => Date.now());
   const [step, setStep] = useState(0);
   const [reached, setReached] = useState(0);
-  const [catId, setCatId] = useState<string | null>(null);
-  const [f, setF] = useState({ title: '', guests: '20', note: '', date: '', start: '18:00', end: '22:00', name: '', team: '', email: '', phone: '', website: '' });
+  const [catId, setCatId] = useState<string | null>(prefill.categoryId ?? null);
+  const [f, setF] = useState({ title: '', guests: '20', note: '', date: prefill.date ?? '', start: prefill.start ?? '18:00', end: prefill.end ?? '22:00', name: '', team: '', email: '', phone: '', website: '' });
+  const [wait, setWait] = useState<{ open: boolean; state: 'idle' | 'busy' | 'done' | 'error'; msg: string }>({ open: false, state: 'idle', msg: '' });
   const [equipment, setEquipment] = useState<string[]>([]);
   const [bookerType, setBookerType] = useState<'member' | 'external'>('member');
   const [who, setWho] = useState('');
@@ -71,6 +75,7 @@ export default function BookingApp({ initial, initialMonth, contactNote }: { ini
     const end = toMin(f.end) > toMin(f.start) ? berlinToUtc(f.date, f.end) : berlinToUtc(addDays(f.date, 1), f.end);
     return { start, end, guests: +f.guests || 0 };
   }, [f.date, f.start, f.end, f.guests]);
+  useEffect(() => { setWait({ open: false, state: 'idle', msg: '' }); }, [f.date, f.start, f.end, catId]);
   const result: CheckResult | null = useMemo(() => (draft && catId ? checkBooking({ ...draft, categoryId: catId }, { ...data, now }) : null), [draft, catId, data, now]);
 
   const endOptions = useMemo(() => {
@@ -339,6 +344,32 @@ export default function BookingApp({ initial, initialMonth, contactNote }: { ini
               </div>
             )}
             {err('date') && <p className="field-error">{err('date')}</p>}
+            {result?.level === 'block' && draft && catId && result.messages.some((m) => WAITABLE.has(m.code)) && !result.messages.some((m) => !WAITABLE.has(m.code) && m.level === 'block') && (
+              <div className="card card-body stack-sm" style={{ boxShadow: 'none' }}>
+                {wait.state === 'done' ? (
+                  <p className="free-day"><CircleCheck className="icon-sm" />Du stehst auf der Warteliste. Wir schreiben dir, sobald der Termin frei wird.</p>
+                ) : !wait.open ? (
+                  <div className="between"><span className="small"><b>Genau dieser Termin soll es sein?</b> Wir benachrichtigen dich, wenn er frei wird.</span>
+                    <button type="button" className="btn btn-sm" onClick={() => setWait((w) => ({ ...w, open: true }))}><BellRing className="icon-sm" />Auf die Warteliste</button></div>
+                ) : (
+                  <>
+                    <span className="small"><b>Warteliste</b> für {dayLabel(f.date)}, {f.start}–{f.end} Uhr. Ein frei gewordener Termin ist nicht reserviert: Wer zuerst anfragt, bekommt ihn.</span>
+                    <div className="row">
+                      <div className="field"><label htmlFor="w-name">Name</label><input id="w-name" type="text" value={f.name} onChange={set('name')} autoComplete="name" /></div>
+                      <div className="field"><label htmlFor="w-email">E-Mail</label><input id="w-email" type="email" value={f.email} onChange={set('email')} autoComplete="email" /></div>
+                    </div>
+                    {wait.state === 'error' && <span className="field-error">{wait.msg}</span>}
+                    <div><button type="button" className="btn btn-primary btn-sm" disabled={wait.state === 'busy'} onClick={async () => {
+                      setWait((w) => ({ ...w, state: 'busy' }));
+                      const res = await fetch('/api/warteliste', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ categoryId: catId, date: f.date, start: f.start, end: f.end, name: f.name.trim(), email: f.email.trim(), website: f.website }) }).catch(() => null);
+                      const j = res ? await res.json().catch(() => ({})) : {};
+                      setWait(res?.ok ? { open: true, state: 'done', msg: '' } : { open: true, state: 'error', msg: j.error ?? 'Das hat nicht geklappt. Bitte versuch es noch einmal.' });
+                    }}>{wait.state === 'busy' ? 'Wird eingetragen …' : 'Benachrichtigen, wenn frei'}</button></div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 

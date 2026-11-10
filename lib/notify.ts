@@ -1,6 +1,6 @@
 import 'server-only';
-import { Booking, checkExisting, getCategories, notifyRecipients } from './data';
-import { mails, teamMails } from './mail';
+import { Booking, checkExisting, freeWaitlistFor, getCategories, notifyRecipients } from './data';
+import { bookerMails, mails, teamMails } from './mail';
 
 /** Mails dürfen eine bereits gespeicherte Aktion nie abbrechen: Fehler werden nur protokolliert. */
 async function safe(label: string, fn: () => Promise<unknown>) {
@@ -31,6 +31,7 @@ export async function afterDecision(b: Booking) {
     if (b.status === 'rejected') await mails.rejected(b, cat);
     if (b.status === 'cancelled') await mails.cancelled(b, cat);
   });
+  if (b.status === 'rejected' || b.status === 'cancelled') await notifyWaitlist([b]);
 }
 
 export async function afterBookerCancel(b: Booking) {
@@ -38,5 +39,15 @@ export async function afterBookerCancel(b: Booking) {
     const cat = await categoryOf(b);
     await mails.cancelled(b, cat);
     await teamMails.cancelled(await notifyRecipients(), b, cat);
+  });
+  await notifyWaitlist([b]);
+}
+
+/** Ein Termin ist frei geworden: Wartende benachrichtigen, deren Wunschzeit jetzt wieder anfragbar ist. */
+export async function notifyWaitlist(freed: { start: number; end: number }[]) {
+  await safe('waitlist', async () => {
+    if (!freed.length) return;
+    const start = Math.min(...freed.map((f) => f.start)), end = Math.max(...freed.map((f) => f.end));
+    for (const w of await freeWaitlistFor(start, end)) await bookerMails.waitlistFree(w);
   });
 }

@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, CalendarDays, CalendarOff, ClipboardList, History, LayoutDashboard, MessageSquareText, PlusCircle, Settings, Users } from 'lucide-react';
+import { BarChart3, CalendarDays, CalendarOff, ClipboardList, History, Hourglass, LayoutDashboard, MessageSquareText, PlusCircle, Settings, Users } from 'lucide-react';
 
 const GROUPS = [
   { name: 'Betrieb', items: [
@@ -9,6 +9,7 @@ const GROUPS = [
     { href: '/admin/kalender', label: 'Kalender', icon: CalendarDays },
     { href: '/admin/buchungen', label: 'Buchungen', icon: ClipboardList },
     { href: '/admin/neu', label: 'Termin eintragen', icon: PlusCircle },
+    { href: '/admin/warteliste', label: 'Warteliste', icon: Hourglass },
   ] },
   { name: 'Auswertung', items: [
     { href: '/admin/statistik', label: 'Statistik', icon: BarChart3 },

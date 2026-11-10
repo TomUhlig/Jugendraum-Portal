@@ -1,11 +1,11 @@
-import { ArrowLeft, Mail, MailX, Pencil, Phone, Repeat } from 'lucide-react';
+import { ArrowLeft, Hourglass, Mail, MailX, Pencil, Phone, Printer, Repeat } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Flash } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listSeries } from '@/lib/data';
+import { checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listSeries, listWaitlist } from '@/lib/data';
 import { eur } from '@/lib/labels';
 import { berlinHm, berlinYmd, fmtDay, fmtLong } from '@/lib/time';
 import { cancelSeriesAction, changeAction, decideAction, handoverAction, moneyAction, noteAction, silentAction } from '../../../actions';
@@ -38,6 +38,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
     getFeedback(b.id), b.seriesId ? listSeries(b.seriesId) : Promise.resolve([]),
   ]);
   const c = cats.find((x) => x.id === b.categoryId);
+  const waiting = (await listWaitlist()).filter((w) => !w.notifiedAt && w.start < b.end && w.end > b.start);
   const can = me.role !== 'viewer';
   const active = ['requested', 'confirmed', 'pending_email'].includes(b.status);
   const editing = sp.bearbeiten === '1' && can;
@@ -54,9 +55,15 @@ export default async function Detail({ params, searchParams }: { params: Promise
         <div><Link href="/admin/buchungen" className="inline small muted" style={{ textDecoration: 'none', marginBottom: 6 }}><ArrowLeft className="icon-sm" />Buchungen</Link>
           <span className="eyebrow">Buchung <span className="refno">{b.number}</span>{b.createdBy && ` · eingetragen von ${b.createdBy}`}</span>
           <div className="inline"><h1>{b.title}</h1><StatusBadge status={b.status} />{b.silent && <span className="badge no-dot" title="An den Bucher werden keine automatischen Mails verschickt"><MailX className="icon-sm" />ohne E-Mails</span>}</div></div>
-        {can && !editing && active && <Link className="btn" href={`/admin/buchung/${b.id}?bearbeiten=1`}><Pencil className="icon-sm" />Bearbeiten / verschieben</Link>}
+        <div className="inline">
+          <Link className="btn" href={`/admin/druck/${b.id}`}><Printer className="icon-sm" />Nutzungsvereinbarung</Link>
+          {can && !editing && active && <Link className="btn" href={`/admin/buchung/${b.id}?bearbeiten=1`}><Pencil className="icon-sm" />Bearbeiten / verschieben</Link>}
+        </div>
       </div>
       <Flash sp={sp} />
+      {waiting.length > 0 && ['requested', 'confirmed'].includes(b.status) && (
+        <div className="alert alert-info"><Hourglass className="icon" /><div><strong>{waiting.length} {waiting.length === 1 ? 'Person wartet' : 'Personen warten'} auf diesen Zeitraum.</strong> Wird die Buchung abgelehnt oder storniert, werden sie automatisch benachrichtigt. <Link href="/admin/warteliste">Warteliste ansehen</Link></div></div>
+      )}
       {skipped.length > 0 && (
         <div className="alert alert-warn"><Repeat className="icon" /><div><strong>Diese Termine der Serie wurden nicht angelegt:</strong>
           <ul>{skipped.map(([t, r]) => <li key={t}>{fmtLong(t)}: {r}</li>)}</ul></div></div>
