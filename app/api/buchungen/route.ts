@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createBooking, getCategories } from '@/lib/data';
 import { mails } from '@/lib/mail';
 import { clientIp, rateLimited } from '@/lib/ratelimit';
+import { checkHuman } from '@/lib/antispam';
 import { addDays, berlinToUtc } from '@/lib/time';
 
 const schema = z.object({
@@ -22,7 +23,9 @@ const schema = z.object({
   agreedWith: z.enum(['Michael Grieswelle', 'Sigrid Brodig']),
   agreed: z.literal(true),
   rulesAccepted: z.literal(true),
-  website: z.string().max(0).optional(), // Honeypot: Menschen lassen das Feld leer
+  website: z.string().max(0).optional(),
+  elapsed: z.coerce.number().optional(),
+  turnstile: z.string().max(4000).optional(), // Honeypot: Menschen lassen das Feld leer
 }).refine((v) => v.bookerType === 'external' || v.team.length > 0, { path: ['team'], message: 'Mannschaft/Abteilung fehlt' });
 
 export async function POST(req: Request) {
@@ -34,6 +37,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Bitte prüfe deine Angaben.', fields: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
   const v = parsed.data;
+  const human = await checkHuman({ elapsed: v.elapsed, turnstile: v.turnstile, ip: clientIp(req) });
+  if (human) return NextResponse.json({ error: human }, { status: 400 });
   const start = berlinToUtc(v.date, v.start);
   let end = berlinToUtc(v.date, v.end);
   if (end <= start) end = berlinToUtc(addDays(v.date, 1), v.end);

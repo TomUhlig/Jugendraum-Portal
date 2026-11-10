@@ -124,6 +124,16 @@ Unter **Einstellungen → Ausstattung und Kosten** legst du Entgelt und Kaution 
   4. Unter **Einstellungen → Zahlungsmethoden** in Stripe festlegen, welche Zahlarten angeboten werden.
   5. Redeploy, dann `/status` prüfen.
 
+## Optional: Spam-Schutz mit Cloudflare Turnstile
+
+Eingebaut sind immer: ein verstecktes Fallen-Feld, eine Mindest-Ausfüllzeit, eine Begrenzung der Anfragen pro Stunde und die E-Mail-Bestätigung. Falls trotzdem Spam ankommt:
+
+1. Kostenloses Konto bei [Cloudflare](https://dash.cloudflare.com) anlegen, links **Turnstile → Widget hinzufügen**.
+2. Als Domain deine Adresse eintragen (z. B. `jugendraum-portal.vercel.app`), Modus „Verwaltet“.
+3. **Site-Key** als `TURNSTILE_SITE_KEY` und **Geheimschlüssel** als `TURNSTILE_SECRET_KEY` in Vercel eintragen, Redeploy.
+
+Turnstile setzt keine Cookies und zeigt meist gar kein Rätsel.
+
 ## Später: Updates einspielen
 
 Neue Versionen landen per Pull Request auf `main`. Vercel veröffentlicht sie automatisch (Änderungen auf anderen Zweigen bekommen nur eine Vorschau-Adresse). Wenn sich `db/schema.sql` geändert hat, das Skript wie in Schritt 2.4 einmal erneut im SQL Editor ausführen.

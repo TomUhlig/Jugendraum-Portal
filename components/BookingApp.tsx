@@ -4,6 +4,7 @@ import {
   AlertTriangle, ArrowLeft, ArrowRight, BellRing, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, Ellipsis,
   GraduationCap, Megaphone, PartyPopper, Shirt, Users, XCircle,
 } from 'lucide-react';
+import { Turnstile } from './Turnstile';
 import { Blackout, Category, CheckResult, Settings, Slot, blackoutWhen, checkBooking, partyWeekendOf } from '@/lib/rules';
 import { MIN, addDays, berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong, weekdayOf } from '@/lib/time';
 
@@ -36,7 +37,10 @@ type Done = { number: string; email: string };
 export type Prefill = { date?: string; start?: string; end?: string; categoryId?: string };
 const WAITABLE = new Set(['overlap', 'buffer', 'party-weekend', 'blackout']);
 
-export default function BookingApp({ initial, initialMonth, contactNote, prefill = {} }: { initial: Occupancy; initialMonth: string; contactNote: string; prefill?: Prefill }) {
+export default function BookingApp({ initial, initialMonth, contactNote, prefill = {}, turnstileKey = '' }: { initial: Occupancy; initialMonth: string; contactNote: string; prefill?: Prefill; turnstileKey?: string }) {
+  const [loadedAt] = useState(() => Date.now());
+  const [captcha, setCaptcha] = useState('');
+  const onCaptcha = useCallback((t: string) => setCaptcha(t), []);
   const [data, setData] = useState(initial);
   const [month, setMonth] = useState(initialMonth);
   const [now, setNow] = useState(() => Date.now());
@@ -112,7 +116,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
         body: JSON.stringify({
           categoryId: catId, title: f.title.trim(), note: f.note.trim(), date: f.date, start: f.start, end: f.end, guests: +f.guests,
           equipment, bookerType, team: bookerType === 'member' ? f.team.trim() : '', name: f.name.trim(), email: f.email.trim(),
-          phone: f.phone.trim(), agreedWith: who, agreed: agree, rulesAccepted: rules, website: f.website,
+          phone: f.phone.trim(), agreedWith: who, agreed: agree, rulesAccepted: rules, website: f.website, elapsed: Date.now() - loadedAt, turnstile: captcha,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -362,7 +366,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
                     <div><button type="button" className="btn btn-primary btn-sm" disabled={wait.state === 'busy'} onClick={async () => {
                       setWait((w) => ({ ...w, state: 'busy' }));
                       const res = await fetch('/api/warteliste', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ categoryId: catId, date: f.date, start: f.start, end: f.end, name: f.name.trim(), email: f.email.trim(), website: f.website }) }).catch(() => null);
+                        body: JSON.stringify({ categoryId: catId, date: f.date, start: f.start, end: f.end, name: f.name.trim(), email: f.email.trim(), website: f.website, elapsed: Date.now() - loadedAt, turnstile: captcha }) }).catch(() => null);
                       const j = res ? await res.json().catch(() => ({})) : {};
                       setWait(res?.ok ? { open: true, state: 'done', msg: '' } : { open: true, state: 'error', msg: j.error ?? 'Das hat nicht geklappt. Bitte versuch es noch einmal.' });
                     }}>{wait.state === 'busy' ? 'Wird eingetragen …' : 'Benachrichtigen, wenn frei'}</button></div>
@@ -422,6 +426,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
               </label>
               {err('rules') && <span className="field-error">{err('rules')}</span>}
             </div>
+            <Turnstile siteKey={turnstileKey} onToken={onCaptcha} />
             {serverError && <div className="alert alert-bad"><XCircle className="icon" /><div>{serverError}</div></div>}
           </div>
         )}

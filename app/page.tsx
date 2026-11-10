@@ -1,5 +1,6 @@
 import { CalendarClock, PartyPopper, Users } from 'lucide-react';
 import BookingApp from '@/components/BookingApp';
+import { turnstileEnabled, turnstileSiteKey } from '@/lib/antispam';
 import { getExtras, getPublicOccupancy } from '@/lib/data';
 import { addDays, berlinToUtc, berlinYmd } from '@/lib/time';
 
@@ -27,7 +28,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           </ul>
         </div>
       </section>
-      <BookingApp initial={initial} initialMonth={month} contactNote={extras.contactNote} prefill={prefill} />
+      <BookingApp initial={initial} initialMonth={month} contactNote={extras.contactNote} prefill={prefill} turnstileKey={turnstileEnabled() ? turnstileSiteKey() : ''} />
     </main>
   );
 }
