@@ -561,3 +561,34 @@ export async function unreadMessages() {
   return db()`select m.booking_id, b.title, b.name, count(*)::int as n, max(m.created_at) as last from messages m join bookings b on b.id = m.booking_id
     where m.author_type = 'booker' and m.team_read_at is null group by 1, 2, 3 order by last desc`;
 }
+
+// ---------- Fotos ----------
+export const MAX_PHOTOS = 12;
+export type Photo = { id: string; width: number; height: number; caption: string; sort: number };
+export async function listPhotos(): Promise<Photo[]> {
+  return (await db()`select id, width, height, caption, sort from photos order by sort, created_at`) as unknown as Photo[];
+}
+export async function addPhoto(actor: string, full: Buffer, thumb: Buffer, width: number, height: number, caption: string) {
+  const q = db();
+  const [{ n, maxsort }] = await q`select count(*)::int as n, coalesce(max(sort), 0)::int as maxsort from photos`;
+  if (n >= MAX_PHOTOS) throw new Error(`Es sind höchstens ${MAX_PHOTOS} Fotos möglich.`);
+  await q`insert into photos (full_data, thumb_data, width, height, caption, sort) values (${full}, ${thumb}, ${width}, ${height}, ${caption}, ${maxsort + 1})`;
+  await audit(q, actor, null, 'photo-added');
+}
+export async function getPhotoData(id: string, size: 'full' | 'thumb'): Promise<Buffer | null> {
+  if (!/^[0-9a-f-]{36}$/.test(id)) return null;
+  const [r] = size === 'thumb' ? await db()`select thumb_data as d from photos where id = ${id}` : await db()`select full_data as d from photos where id = ${id}`;
+  return r ? (r.d as Buffer) : null;
+}
+export async function updatePhoto(id: string, caption: string) { await db()`update photos set caption = ${caption} where id = ${id}`; }
+export async function deletePhoto(actor: string, id: string) { await db()`delete from photos where id = ${id}`; await audit(db(), actor, null, 'photo-removed'); }
+export async function movePhoto(id: string, dir: -1 | 1) {
+  await db().begin(async (q) => {
+    const list = await q`select id from photos order by sort, created_at`;
+    const ids = list.map((r) => r.id as string);
+    const i = ids.indexOf(id), j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    for (let k = 0; k < ids.length; k++) await q`update photos set sort = ${k + 1} where id = ${ids[k]}`;
+  });
+}

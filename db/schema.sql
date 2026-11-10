@@ -256,6 +256,18 @@ create table if not exists messages (
 );
 create index if not exists messages_booking on messages (booking_id, created_at);
 
+-- ---------- Version 8: Fotos vom Raum ----------
+create table if not exists photos (
+  id         uuid primary key default gen_random_uuid(),
+  full_data  bytea not null,     -- max. 1600 px, JPEG
+  thumb_data bytea not null,     -- max. 640 px, JPEG
+  width      int not null,
+  height     int not null,
+  caption    text not null default '',
+  sort       int not null default 0,
+  created_at timestamptz not null default now()
+);
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -273,5 +285,6 @@ do $$ begin
     execute 'alter table waitlist enable row level security';
     execute 'alter table payments enable row level security';
     execute 'alter table messages enable row level security';
+    execute 'alter table photos enable row level security';
   end if;
 end $$;

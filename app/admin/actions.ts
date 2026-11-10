@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
-  Admin, MailTextKey, addBlackout, addMessage, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
+  Admin, MailTextKey, addBlackout, deletePhoto, movePhoto, updatePhoto, addMessage, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
   removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin,
 } from '@/lib/data';
 import { mailMode, mails, teamMails } from '@/lib/mail';
@@ -325,6 +325,25 @@ export async function removeWaitAction(fd: FormData) {
   await requireAdmin('manager');
   await removeWaitById(str(fd, 'id', 40));
   go('/admin/warteliste', 'ok', 'Eintrag entfernt.');
+}
+
+export async function photoCaptionAction(fd: FormData) {
+  await requireAdmin('manager');
+  await updatePhoto(str(fd, 'id', 40), str(fd, 'caption', 140));
+  revalidatePath('/'); revalidatePath('/raum');
+  go('/admin/fotos', 'ok', 'Bildunterschrift gespeichert.');
+}
+export async function photoMoveAction(fd: FormData) {
+  await requireAdmin('manager');
+  await movePhoto(str(fd, 'id', 40), fd.get('dir') === '-1' ? -1 : 1);
+  revalidatePath('/'); revalidatePath('/raum');
+  redirect('/admin/fotos');
+}
+export async function photoDeleteAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  await deletePhoto(admin.name, str(fd, 'id', 40));
+  revalidatePath('/'); revalidatePath('/raum');
+  go('/admin/fotos', 'ok', 'Foto gelöscht.');
 }
 
 // ---------- Team ----------

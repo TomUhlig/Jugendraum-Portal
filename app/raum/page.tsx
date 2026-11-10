@@ -1,6 +1,7 @@
 import { CalendarClock, Clock, PartyPopper, ShieldCheck, Users } from 'lucide-react';
 import Link from 'next/link';
-import { getCategories, getExtras, getRecurring, getSettings } from '@/lib/data';
+import { getCategories, getExtras, getRecurring, getSettings, listPhotos } from '@/lib/data';
+import { Gallery } from '@/components/Gallery';
 import { describeRecurring } from '@/lib/rules';
 import { hausordnung } from '@/lib/hausordnung';
 import { eur } from '@/lib/labels';
@@ -12,7 +13,7 @@ const SECTIONS = [['raum', 'Der Raum'], ['ablauf', 'So läuft eine Buchung'], ['
   ['uebergabe', 'Schlüssel, Übergabe, Rückgabe'], ['hausordnung', 'Hausordnung'], ['storno', 'Absagen und Änderungen'], ['datenschutz', 'Datenschutz']];
 
 export default async function Raum() {
-  const [cats, s, x, rec] = await Promise.all([getCategories(), getSettings(), getExtras(), getRecurring()]);
+  const [cats, s, x, rec, photos] = await Promise.all([getCategories(), getSettings(), getExtras(), getRecurring(), listPhotos()]);
   const today = new Date().toISOString().slice(0, 10);
   const fixed = rec.filter((r) => !r.validUntil || r.validUntil >= today);
   const hasFees = x.feesExternal.rent + x.feesExternal.deposit + x.feesMemberParty.rent + x.feesMemberParty.deposit > 0;
@@ -25,6 +26,7 @@ export default async function Raum() {
           <p>Damit der Jugendraum für alle gut nutzbar bleibt, gelten ein paar Regeln. Mit deiner Anfrage erkennst du sie an.</p>
 
           <h2 id="raum">Der Raum</h2>
+          {photos.length > 0 && <Gallery photos={photos} />}
           <div className="facts-grid">
             <div className="card fact"><Users className="icon" /><b>bis {s.capacity} Personen</b><span>zugelassene Höchstzahl</span></div>
             <div className="card fact"><PartyPopper className="icon" /><b>1 Feier pro Wochenende</b><span>Fr {s.weekendFromHour}:00 bis Mo {String(s.weekendUntilHour).padStart(2, '0')}:00</span></div>
