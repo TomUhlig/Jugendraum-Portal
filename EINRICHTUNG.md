@@ -134,6 +134,16 @@ Eingebaut sind immer: ein verstecktes Fallen-Feld, eine Mindest-Ausfüllzeit, ei
 
 Turnstile setzt keine Cookies und zeigt meist gar kein Rätsel.
 
+## Optional: Push-Benachrichtigungen aufs Handy
+
+Keine Einrichtung beim Hosting nötig. Jede Person im Team aktiviert Push selbst unter **Verwaltung → Team → Push-Benachrichtigungen → Auf diesem Gerät aktivieren**.
+
+- **Android:** in Chrome die Verwaltung öffnen und aktivieren. Tipp: über das Menü „Zum Startbildschirm hinzufügen“, dann wirkt sie wie eine App.
+- **iPhone (ab iOS 16.4):** Push geht nur als installierte App. In Safari **Teilen → Zum Home-Bildschirm**, die App vom Home-Bildschirm öffnen, anmelden und dort aktivieren.
+- **Computer:** funktioniert in Chrome, Edge, Firefox und Safari.
+
+Benachrichtigt wird bei neuer Anfrage, Absage, Nachricht eines Buchers und Schadensmeldung, und zwar alle Team-Mitglieder mit aktivierter Benachrichtigung.
+
 ## Später: Updates einspielen
 
 Neue Versionen landen per Pull Request auf `main`. Vercel veröffentlicht sie automatisch (Änderungen auf anderen Zweigen bekommen nur eine Vorschau-Adresse). Wenn sich `db/schema.sql` geändert hat, das Skript wie in Schritt 2.4 einmal erneut im SQL Editor ausführen.

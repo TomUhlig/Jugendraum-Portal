@@ -8,6 +8,7 @@ import { PaySection } from '@/components/PaySection';
 import { MessageThread } from '@/components/MessageThread';
 import { addMessage, countRecentBookerMessages, listMessages, notifyRecipients } from '@/lib/data';
 import { teamMails } from '@/lib/mail';
+import { pushTeam } from '@/lib/push';
 import { amountsDue, createPayment } from '@/lib/data';
 import { createCheckout, stripeEnabled } from '@/lib/stripe';
 
@@ -33,6 +34,7 @@ async function sendMessage(fd: FormData) {
   if (await countRecentBookerMessages(b!.id) >= 10) redirect(`/buchung/${token}?nachricht=viele#nachrichten`);
   await addMessage(b!.id, 'booker', b!.name, body);
   try { await teamMails.message(await notifyRecipients(), b!, body); } catch (e) { console.error(e); }
+  await pushTeam({ title: `Nachricht von ${b!.name}`, body: body.slice(0, 140), url: `/admin/buchung/${b!.id}#nachrichten`, tag: 'msg-' + b!.id });
   redirect(`/buchung/${token}?nachricht=ok#nachrichten`);
 }
 

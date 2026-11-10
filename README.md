@@ -17,6 +17,7 @@ Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen 
 - Persönliche Buchungsseite mit Statusverlauf, Kalenderdatei und Absage
 - Rückmeldung nach dem Termin, inklusive Schadensmeldung (geht sofort ans Team)
 - **Bezahlen** nach der Bestätigung: Überweisung mit GiroCode (QR für die Banking-App), PayPal.me-Link und/oder online über Stripe (Karte, PayPal, Apple/Google Pay, Lastschrift; automatisch verbucht). Frist und offener Betrag stehen in Bestätigungs- und Erinnerungsmail
+- **Spam-Schutz:** verstecktes Fallen-Feld, Mindest-Ausfüllzeit, Begrenzung pro Stunde, E-Mail-Bestätigung, optional Cloudflare Turnstile
 - **Meine Buchungen:** Link zu allen eigenen Buchungen per Mail anfordern (7 Tage gültig)
 - **Warteliste:** Bei belegtem Termin oder vergebenem Feier-Wochenende eintragen; wird der Termin frei (Absage, Ablehnung, Storno, Verfall, Verschieben, aufgehobene Sperre), kommt automatisch eine Mail mit vorausgefülltem Anfrage-Link
 - Mails: Bestätigungslink, Eingang, Bestätigung mit Kalenderdatei (.ics), Ablehnung mit Begründung, Erinnerung 3 Tage und 1 Tag vorher, Nachfrage danach
@@ -39,7 +40,9 @@ Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen 
 - Buchungsliste mit Suche, Filtern und CSV-Export für Excel
 - Statistik (Buchungen pro Monat, nach Art, Mitglieder/Externe, Mannschaften, Ablehnungsquote) und Rückmeldungen
 - E-Mail-Texte, Ausstattung und Kosten in den Einstellungen änderbar
-- Als App aufs Handy installierbar (PWA)
+- Als App aufs Handy installierbar (PWA), mit **Push-Benachrichtigungen** bei neuer Anfrage, Absage, Nachricht und Schadensmeldung (pro Gerät aktivierbar, Schlüssel werden automatisch erzeugt)
+- **Nachrichten** direkt an der Buchung zwischen Bucher und Team
+- **Fotos vom Raum** hochladen (werden automatisch verkleinert), Galerie auf Buchungsseite und „Raum & Regeln“
 
 **Darstellung:** Hell, Dunkel oder automatisch nach Systemeinstellung, umschaltbar oben rechts (wird gespeichert).
 - Regeln einstellen: Puffer pro Kategorie, Freigabepflicht, „Party sperrt das ganze Wochenende“, Vorlauf, Kapazität

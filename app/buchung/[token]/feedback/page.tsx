@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getBookingByToken, getFeedback, notifyRecipients, saveFeedback } from '@/lib/data';
 import { teamMails } from '@/lib/mail';
+import { pushTeam } from '@/lib/push';
 import { fmtLong } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +15,10 @@ async function send(fd: FormData) {
   const damage = fd.get('damage') === 'on';
   const comment = String(fd.get('comment') ?? '').slice(0, 1000).trim();
   const b = await saveFeedback(token, rating, comment, damage);
-  if (b && damage) { try { await teamMails.damage(await notifyRecipients(), b, comment); } catch (e) { console.error(e); } }
+  if (b && damage) {
+    try { await teamMails.damage(await notifyRecipients(), b, comment); } catch (e) { console.error(e); }
+    await pushTeam({ title: `Schaden gemeldet: ${b.title}`, body: comment.slice(0, 140) || 'Ohne Beschreibung', url: `/admin/buchung/${b.id}` });
+  }
   redirect(`/buchung/${token}?danke=1`);
 }
 

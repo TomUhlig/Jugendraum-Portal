@@ -268,6 +268,17 @@ create table if not exists photos (
   created_at timestamptz not null default now()
 );
 
+-- ---------- Version 9: Push-Benachrichtigungen ----------
+create table if not exists push_subscriptions (
+  id         uuid primary key default gen_random_uuid(),
+  admin_id   uuid not null references admins(id) on delete cascade,
+  endpoint   text not null unique,
+  p256dh     text not null,
+  auth       text not null,
+  device     text not null default '',
+  created_at timestamptz not null default now()
+);
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -286,5 +297,6 @@ do $$ begin
     execute 'alter table payments enable row level security';
     execute 'alter table messages enable row level security';
     execute 'alter table photos enable row level security';
+    execute 'alter table push_subscriptions enable row level security';
   end if;
 end $$;

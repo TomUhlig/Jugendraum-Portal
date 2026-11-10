@@ -3,6 +3,8 @@ import { feedToken, requireAdmin } from '@/lib/auth';
 import { listAdmins } from '@/lib/data';
 import { initials } from '@/lib/labels';
 import { appUrl } from '@/lib/url';
+import { PushToggle } from '@/components/PushToggle';
+import { countSubscriptions, vapidKeys } from '@/lib/push';
 import { removeAdminAction, upsertAdminAction } from '../../actions';
 
 const ROLE = { admin: 'Admin', manager: 'Verwalter', viewer: 'Lesezugriff' };
@@ -11,13 +13,18 @@ const ROLE_HINT = { admin: 'alles, inkl. Einstellungen und Team', manager: 'Anfr
 export default async function Team({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin();
   const sp = await searchParams;
-  const admins = await listAdmins();
+  const [admins, keys, devices] = await Promise.all([listAdmins(), vapidKeys(), countSubscriptions(me.id)]);
   const feed = `${appUrl()}/api/ical/${feedToken(me.id)}`;
   const isAdmin = me.role === 'admin';
   return (
     <>
       <PageHead title="Team" />
       <Flash sp={sp} />
+      <section className="card">
+        <div className="card-head"><div><h2>Push-Benachrichtigungen</h2><p>Bei neuer Anfrage, Absage, Nachricht oder Schadensmeldung meldet sich dein Handy. {devices > 0 ? `Aktiv auf ${devices} ${devices === 1 ? 'Gerät' : 'Geräten'}.` : ''}</p></div></div>
+        <div className="card-body"><PushToggle publicKey={keys.publicKey} /></div>
+        {!me.notify && <div className="card-foot small muted">Hinweis: Für dich sind Benachrichtigungen im Team ausgeschaltet. Ein Admin kann das unten bei deinem Eintrag ändern.</div>}
+      </section>
       <section className="card">
         <div className="card-head"><h2>Orga-Team</h2><span className="muted small">{admins.length} Personen</span></div>
         <ul className="list">{admins.map((a) => (

@@ -1,6 +1,8 @@
 import 'server-only';
 import { Booking, checkExisting, freeWaitlistFor, getCategories, markStripePaid, notifyRecipients } from './data';
 import { getCheckout } from './stripe';
+import { pushTeam } from './push';
+import { fmtDay } from './time';
 import { bookerMails, mails, teamMails } from './mail';
 
 /** Mails dürfen eine bereits gespeicherte Aktion nie abbrechen: Fehler werden nur protokolliert. */
@@ -17,7 +19,9 @@ export async function afterVerified(b: Booking) {
     if (b.status === 'confirmed') {
       await mails.confirmed(b, cat);
       await teamMails.autoConfirmed(team, b, cat);
+      await pushTeam({ title: `Neuer Termin: ${b.title}`, body: `${fmtDay(b.start)} · ${b.name} (automatisch eingetragen)`, url: `/admin/buchung/${b.id}` });
     } else {
+      await pushTeam({ title: `Neue Anfrage: ${b.title}`, body: `${fmtDay(b.start)} · ${b.name}${b.bookerType === 'external' ? ' (nicht im Verein)' : ''}`, url: `/admin/buchung/${b.id}`, tag: 'anfrage-' + b.id });
       await mails.received(b, cat);
       const conflicts = (await checkExisting(b)).messages.map((m) => m.text).join(' ');
       await teamMails.newRequest(team, b, cat, conflicts || undefined);
@@ -40,6 +44,7 @@ export async function afterBookerCancel(b: Booking) {
     const cat = await categoryOf(b);
     await mails.cancelled(b, cat);
     await teamMails.cancelled(await notifyRecipients(), b, cat);
+    await pushTeam({ title: `Abgesagt: ${b.title}`, body: `${fmtDay(b.start)} · ${b.name} hat abgesagt. Der Termin ist wieder frei.`, url: `/admin/buchung/${b.id}` });
   });
   await notifyWaitlist([b]);
 }
