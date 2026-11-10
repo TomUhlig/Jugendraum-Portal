@@ -5,6 +5,9 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { cancelByBooker, getBookingByToken, getCategories, getFeedback } from '@/lib/data';
 import { afterBookerCancel } from '@/lib/notify';
 import { PaySection } from '@/components/PaySection';
+import { MessageThread } from '@/components/MessageThread';
+import { addMessage, countRecentBookerMessages, listMessages, notifyRecipients } from '@/lib/data';
+import { teamMails } from '@/lib/mail';
 import { amountsDue, createPayment } from '@/lib/data';
 import { createCheckout, stripeEnabled } from '@/lib/stripe';
 
@@ -18,6 +21,19 @@ async function cancel(formData: FormData) {
   const b = await cancelByBooker(token);
   if (b) await afterBookerCancel(b);
   redirect(`/buchung/${token}?storniert=1`);
+}
+
+async function sendMessage(fd: FormData) {
+  'use server';
+  const token = String(fd.get('token'));
+  const body = String(fd.get('body') ?? '').trim().slice(0, 2000);
+  const b = await getBookingByToken(token);
+  if (!b) redirect('/');
+  if (body.length < 2) redirect(`/buchung/${token}?nachricht=leer#nachrichten`);
+  if (await countRecentBookerMessages(b!.id) >= 10) redirect(`/buchung/${token}?nachricht=viele#nachrichten`);
+  await addMessage(b!.id, 'booker', b!.name, body);
+  try { await teamMails.message(await notifyRecipients(), b!, body); } catch (e) { console.error(e); }
+  redirect(`/buchung/${token}?nachricht=ok#nachrichten`);
 }
 
 async function payOnline(fd: FormData) {
@@ -44,7 +60,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   const { token } = await params; const sp = await searchParams;
   const b = await getBookingByToken(token);
   if (!b) notFound();
-  const [cats, fb] = await Promise.all([getCategories(), getFeedback(b.id)]);
+  const [cats, fb, messages] = await Promise.all([getCategories(), getFeedback(b.id), listMessages(b.id)]);
   const cat = cats.find((c) => c.id === b.categoryId);
   const active = ['pending_email', 'requested', 'confirmed'].includes(b.status);
   const future = b.start > Date.now();
@@ -87,6 +103,24 @@ export default async function Page({ params, searchParams }: { params: Promise<{
             <div className="inline"><MessageSquareText className="icon" style={{ color: 'var(--brand-ink)' }} /><h2 className="section-title">Wie war es?</h2></div>
             {fb ? <p className="muted">Du hast uns {fb.rating} von 5 Punkten gegeben. Danke!</p> : <p className="muted">Hilf uns mit einer kurzen Rückmeldung, auch wenn etwas kaputtgegangen ist.</p>}
             <a className="btn" href={`/buchung/${token}/feedback`} style={{ justifySelf: 'start' }}>{fb ? 'Rückmeldung ändern' : 'Rückmeldung geben'}</a>
+          </section>
+        )}
+
+        {!['expired', 'pending_email'].includes(b.status) && (
+          <section className="card" id="nachrichten">
+            <div className="card-head"><div><h2>Nachrichten</h2><p>Fragen zur Buchung? Schreib dem Orga-Team direkt hier.</p></div></div>
+            <div className="card-body stack">
+              <MessageThread messages={messages} mine="booker" empty="Noch keine Nachrichten." />
+              {sp.nachricht === 'ok' && <div className="alert alert-ok"><CheckCircle2 className="icon" /><div>Nachricht gesendet. Die Antwort bekommst du per Mail.</div></div>}
+              {sp.nachricht === 'viele' && <div className="alert alert-warn"><div>Du hast in der letzten Stunde schon viele Nachrichten geschickt. Bitte warte kurz.</div></div>}
+              <form action={sendMessage} className="stack-sm">
+                <input type="hidden" name="token" value={token} />
+                <label htmlFor="msg" className="hp">Nachricht</label>
+                <textarea id="msg" name="body" required minLength={2} maxLength={2000} placeholder="Deine Nachricht an das Orga-Team" style={{ minHeight: 80 }} />
+                {sp.nachricht === 'leer' && <span className="field-error">Bitte schreib eine Nachricht.</span>}
+                <button className="btn btn-primary" type="submit" style={{ justifySelf: 'start' }}>Senden</button>
+              </form>
+            </div>
           </section>
         )}
 

@@ -5,16 +5,17 @@ import { Flash } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listPayments, listSeries, listWaitlist } from '@/lib/data';
+import { checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
+import { MessageThread } from '@/components/MessageThread';
 import { eur } from '@/lib/labels';
 import { berlinHm, berlinYmd, fmtDay, fmtLong } from '@/lib/time';
-import { cancelSeriesAction, changeAction, decideAction, handoverAction, moneyAction, noteAction, refundAction, silentAction } from '../../../actions';
+import { cancelSeriesAction, changeAction, decideAction, handoverAction, messageAction, moneyAction, noteAction, refundAction, silentAction } from '../../../actions';
 
 const fmtTs = (d: Date | number) => new Date(d).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'medium', timeStyle: 'short' });
 const ACTION: Record<string, string> = {
   created: 'Anfrage gestellt', verified: 'E-Mail-Adresse bestätigt', 'verified+auto-confirmed': 'E-Mail bestätigt, automatisch eingetragen', 'admin-created': 'Vom Orga-Team eingetragen',
   confirm: 'Bestätigt', reject: 'Abgelehnt', cancel: 'Storniert', 'cancelled-by-booker': 'Vom Bucher abgesagt', 'internal-note': 'Interne Notiz geändert', 'mails-off': 'E-Mails an den Bucher ausgeschaltet', 'mails-on': 'E-Mails an den Bucher eingeschaltet',
-  handover: 'Übergabeprotokoll aktualisiert', money: 'Kosten aktualisiert', 'paid-online': 'Online bezahlt', refund: 'Kaution erstattet', changed: 'Termin geändert', expired: 'Verfallen (E-Mail nicht bestätigt)', feedback: 'Rückmeldung erhalten',
+  handover: 'Übergabeprotokoll aktualisiert', money: 'Kosten aktualisiert', 'paid-online': 'Online bezahlt', refund: 'Kaution erstattet', 'message-team': 'Nachricht an den Bucher', 'message-booker': 'Nachricht vom Bucher', changed: 'Termin geändert', expired: 'Verfallen (E-Mail nicht bestätigt)', feedback: 'Rückmeldung erhalten',
 };
 const describe = (a: { action: string; detail: Record<string, unknown> }) => {
   const d = a.detail ?? {};
@@ -38,7 +39,8 @@ export default async function Detail({ params, searchParams }: { params: Promise
     getFeedback(b.id), b.seriesId ? listSeries(b.seriesId) : Promise.resolve([]),
   ]);
   const c = cats.find((x) => x.id === b.categoryId);
-  const payments = await listPayments(b.id);
+  const [payments, messages] = await Promise.all([listPayments(b.id), listMessages(b.id)]);
+  if (messages.some((m) => m.authorType === 'booker' && !m.teamReadAt) && me.role !== 'viewer') await markMessagesRead(b.id);
   const waiting = (await listWaitlist()).filter((w) => !w.notifiedAt && w.start < b.end && w.end > b.start);
   const can = me.role !== 'viewer';
   const active = ['requested', 'confirmed', 'pending_email'].includes(b.status);
@@ -153,6 +155,24 @@ export default async function Detail({ params, searchParams }: { params: Promise
               {can && <div className="card-foot"><button className="btn btn-primary" type="submit">Protokoll speichern</button></div>}
             </form>
           )}
+
+          <section className="card" id="nachrichten">
+            <div className="card-head"><div><h2>Nachrichten</h2><p>Direkt mit {b.name}. Antworten gehen per Mail raus.</p></div></div>
+            <div className="card-body stack">
+              <MessageThread messages={messages} mine="team" empty="Noch keine Nachrichten. Der Bucher kann auf seiner Buchungsseite schreiben." />
+              {can && (
+                <form action={messageAction} className="stack-sm">
+                  <input type="hidden" name="id" value={b.id} />
+                  <label htmlFor="reply" className="hp">Antwort</label>
+                  <textarea id="reply" name="body" required minLength={2} maxLength={2000} placeholder={`Nachricht an ${b.name}`} style={{ minHeight: 70 }} />
+                  <div className="inline">
+                    <button className="btn btn-primary" type="submit">Senden</button>
+                    <label className="check-inline small"><input type="checkbox" name="mail" defaultChecked={!b.silent} /> per Mail an {b.email} schicken</label>
+                  </div>
+                </form>
+              )}
+            </div>
+          </section>
 
           <section className="card">
             <div className="card-head"><h2>Verlauf</h2></div>

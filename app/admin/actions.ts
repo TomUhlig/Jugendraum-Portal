@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
-  Admin, MailTextKey, addBlackout, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
+  Admin, MailTextKey, addBlackout, addMessage, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
   removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin,
 } from '@/lib/data';
 import { mailMode, mails, teamMails } from '@/lib/mail';
@@ -204,6 +204,19 @@ export async function paymentSettingsAction(fd: FormData) {
   } }, []);
   revalidatePath('/', 'layout');
   go('/admin/einstellungen#bezahlung', 'ok', 'Bezahlung gespeichert.');
+}
+
+export async function messageAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  const id = str(fd, 'id', 40);
+  const body = String(fd.get('body') ?? '').trim().slice(0, 2000);
+  if (body.length < 2) go(`/admin/buchung/${id}#nachrichten`, 'fehler', 'Bitte eine Nachricht eingeben.');
+  const b = await getBooking(id);
+  if (!b) go('/admin', 'fehler', 'Buchung nicht gefunden.');
+  await addMessage(id, 'team', admin.name, body);
+  const mail = fd.get('mail') === 'on';
+  if (mail) await mails.message(b!, admin.name, body).catch(() => {});
+  go(`/admin/buchung/${id}#nachrichten`, 'ok', mail ? `Nachricht gesendet, ${b!.name} bekommt sie per Mail.` : 'Nachricht gespeichert (ohne Mail).');
 }
 
 // ---------- Einstellungen ----------

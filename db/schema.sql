@@ -244,6 +244,18 @@ create table if not exists payments (
 create index if not exists payments_booking on payments (booking_id);
 insert into settings (key, value) values ('payment', '{}') on conflict (key) do nothing;
 
+-- ---------- Version 7: Nachrichten an der Buchung ----------
+create table if not exists messages (
+  id           bigserial primary key,
+  booking_id   uuid not null references bookings(id) on delete cascade,
+  author_type  text not null check (author_type in ('booker', 'team')),
+  author_name  text not null,
+  body         text not null,
+  team_read_at timestamptz,
+  created_at   timestamptz not null default now()
+);
+create index if not exists messages_booking on messages (booking_id, created_at);
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -260,5 +272,6 @@ do $$ begin
     execute 'alter table recurring_blocks enable row level security';
     execute 'alter table waitlist enable row level security';
     execute 'alter table payments enable row level security';
+    execute 'alter table messages enable row level security';
   end if;
 end $$;

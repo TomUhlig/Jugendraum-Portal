@@ -461,3 +461,12 @@ a.kpi:hover { border-color: var(--line-strong) }
 .copytext { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap }
 .iconbtn-sm { border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 6px; width: 26px; height: 26px; display: inline-grid; place-items: center; cursor: pointer }
 .iconbtn-sm:hover { color: var(--brand-ink) }
+
+/* Nachrichten */
+.thread { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px }
+.thread li { display: grid; gap: 4px; max-width: 85% }
+.thread li.me { justify-self: end; justify-items: end }
+.thread .bubble { padding: 10px 13px; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .95rem; line-height: 1.5 }
+.thread li.them .bubble { background: var(--surface-2); border: 1px solid var(--line); border-bottom-left-radius: 4px }
+.thread li.me .bubble { background: var(--brand); color: #fff; border-bottom-right-radius: 4px }
+.thread .meta-line { font-size: .76rem; color: var(--muted) }

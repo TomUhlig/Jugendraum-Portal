@@ -345,6 +345,10 @@ export async function listSeries(seriesId: string): Promise<Booking[]> {
 }
 
 /** Prüft eine vorhandene Anfrage gegen alle anderen aktiven Buchungen (für die Konfliktanzeige im Admin). */
+export async function countRecentBookerMessages(bookingId: string): Promise<number> {
+  const [r] = await db()`select count(*)::int as n from messages where booking_id = ${bookingId} and author_type = 'booker' and created_at > now() - interval '1 hour'`;
+  return r.n;
+}
 export async function checkExisting(b: Booking): Promise<CheckResult> {
   const q = db();
   const [categories, settings, slots, blackouts] = await Promise.all([
@@ -534,4 +538,26 @@ export async function recordRefund(paymentId: string, actor: string, amount: num
   const [p] = await q`update payments set refunded_eur = refunded_eur + ${amount},
     status = case when refunded_eur + ${amount} >= amount_eur then 'refunded' else 'partially_refunded' end where id = ${paymentId} returning *`;
   await audit(q, actor, p.booking_id, 'refund', { amount });
+}
+
+// ---------- Nachrichten ----------
+export type ChatMessage = { id: number; bookingId: string; authorType: 'booker' | 'team'; authorName: string; body: string; teamReadAt: number | null; createdAt: number };
+const toMessage = (r: Row): ChatMessage => ({ id: Number(r.id), bookingId: r.booking_id as string, authorType: r.author_type as ChatMessage['authorType'], authorName: r.author_name as string,
+  body: r.body as string, teamReadAt: ts(r.team_read_at), createdAt: +(r.created_at as Date) });
+export async function listMessages(bookingId: string): Promise<ChatMessage[]> {
+  return (await db()`select * from messages where booking_id = ${bookingId} order by created_at`).map(toMessage);
+}
+export async function addMessage(bookingId: string, authorType: ChatMessage['authorType'], authorName: string, body: string): Promise<ChatMessage> {
+  const q = db();
+  const [r] = await q`insert into messages (booking_id, author_type, author_name, body, team_read_at)
+    values (${bookingId}, ${authorType}, ${authorName}, ${body}, ${authorType === 'team' ? new Date() : null}) returning *`;
+  await audit(q, authorName, bookingId, authorType === 'team' ? 'message-team' : 'message-booker');
+  return toMessage(r);
+}
+export async function markMessagesRead(bookingId: string) {
+  await db()`update messages set team_read_at = now() where booking_id = ${bookingId} and author_type = 'booker' and team_read_at is null`;
+}
+export async function unreadMessages() {
+  return db()`select m.booking_id, b.title, b.name, count(*)::int as n, max(m.created_at) as last from messages m join bookings b on b.id = m.booking_id
+    where m.author_type = 'booker' and m.team_read_at is null group by 1, 2, 3 order by last desc`;
 }
