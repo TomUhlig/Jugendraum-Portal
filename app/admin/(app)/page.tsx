@@ -19,7 +19,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const [y, mo] = m.split('-').map(Number);
   const mNext = `${mo === 12 ? y + 1 : y}-${String(mo === 12 ? 1 : mo + 1).padStart(2, '0')}-01`;
   const q = db();
-  const [cats, open, upcoming, monthB, keysOut, deposits, damages, failed, keysDue] = await Promise.all([
+  const [cats, open, upcoming, monthB, keysOut, deposits, damages, failed, keysDue, unpaid] = await Promise.all([
     getCategories(),
     listBookings({ status: ['requested'] }),
     listBookings({ status: ['requested', 'confirmed'], from: now, limit: 8 }),
@@ -29,6 +29,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     q`select b.id, b.number, b.title, f.comment from feedback f join bookings b on b.id = f.booking_id where f.damage and (b.damage_note = '' or b.condition_ok is null) order by f.created_at desc limit 5`,
     q`select count(*)::int as n from mail_log where not ok and created_at > now() - interval '7 days'`,
     q`select id, number, title, name, starts_at from bookings where status = 'confirmed' and not key_handed_out and starts_at between now() and now() + interval '3 days' order by starts_at`,
+    q`select id, title, name, starts_at, (case when rent_paid then 0 else rent_eur end + case when deposit_paid then 0 else deposit_eur end)::float as open from bookings where status = 'confirmed' and starts_at between now() and now() + interval '14 days' and ((not rent_paid and rent_eur > 0) or (not deposit_paid and deposit_eur > 0)) order by starts_at`,
   ]);
   const cat = new Map(cats.map((c) => [c.id, c]));
   const setup = [...(mailMode() === 'console' ? ['Mailversand einrichten'] : []), ...(operatorComplete((await getExtras()).operator) ? [] : ['Impressum ausfüllen'])];
@@ -38,7 +39,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const hours = monthB.reduce((s, b) => s + (b.end - b.start) / 3.6e6, 0);
   const days = Math.round((berlinToUtc(mNext, '00:00') - berlinToUtc(m, '00:00')) / DAY);
   const canDecide = me.role !== 'viewer';
-  const todo = setup.length + keysOut.length + deposits.length + damages.length + keysDue.length + (failed[0].n ? 1 : 0);
+  const todo = setup.length + unpaid.length + keysOut.length + deposits.length + damages.length + keysDue.length + (failed[0].n ? 1 : 0);
 
   return (
     <>
@@ -81,6 +82,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             {todo === 0 ? <div className="empty">Nichts offen. Schlüssel, Kautionen und Schadensmeldungen sind erledigt.</div> : (
               <ul className="list">
                 {setup.map((t) => <li key={t} className="todo"><Settings2 className="icon" style={{ color: 'var(--bad)' }} /><span><Link href={t.startsWith('Mail') ? '/admin/einstellungen#mail' : '/admin/einstellungen#betreiber'}>{t}</Link> <span className="muted">(Einrichtung)</span></span></li>)}
+                {unpaid.map((b) => <li key={'u' + b.id} className="todo"><Wallet className="icon" style={{ color: 'var(--warn)' }} /><span>Zahlung offen ({eur(+b.open)}): <Link href={`/admin/buchung/${b.id}`}>{b.title}</Link> <span className="muted">({fmtDay(+b.starts_at)}, {b.name})</span></span></li>)}
                 {keysDue.map((b) => <li key={'d' + b.id} className="todo"><KeyRound className="icon" style={{ color: 'var(--info)' }} /><span>Schlüssel übergeben für <Link href={`/admin/buchung/${b.id}`}>{b.title}</Link> <span className="muted">({fmtDay(+b.starts_at)})</span></span></li>)}
                 {keysOut.map((b) => <li key={'k' + b.id} className="todo"><KeyRound className="icon" style={{ color: 'var(--warn)' }} /><span>Schlüssel noch nicht zurück: <Link href={`/admin/buchung/${b.id}`}>{b.title}</Link> <span className="muted">({b.name})</span></span></li>)}
                 {deposits.map((b) => <li key={'p' + b.id} className="todo"><Wallet className="icon" style={{ color: 'var(--warn)' }} /><span>Kaution {eur(+b.deposit_eur)} abrechnen: <Link href={`/admin/buchung/${b.id}`}>{b.title}</Link></span></li>)}

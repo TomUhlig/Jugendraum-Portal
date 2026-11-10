@@ -49,6 +49,9 @@ export async function runChecks(): Promise<{ checks: Check[]; dbOk: boolean; has
   checks.push({ label: 'CRON_SECRET eingetragen', ok: env('CRON_SECRET').length >= 16 && env('CRON_SECRET') !== 'bitte-ersetzen', hint: 'Einen weiteren, anderen Zufallswert eintragen (für die täglichen Erinnerungen).' });
   const mode = mailMode();
   checks.push({ label: 'Mailversand eingerichtet', ok: mode !== 'console', hint: mode === 'console' ? 'SMTP_HOST, SMTP_PORT, SMTP_USER und SMTP_PASS eintragen (Schritt 3 der Anleitung).' : undefined });
+  if (env('STRIPE_SECRET_KEY')) {
+    checks.push({ label: 'Stripe: Webhook-Secret eingetragen', ok: env('STRIPE_WEBHOOK_SECRET').startsWith('whsec_'), hint: 'Ohne STRIPE_WEBHOOK_SECRET werden Lastschriften erst verbucht, wenn jemand die Buchungsseite öffnet. Webhook in Stripe anlegen (siehe EINRICHTUNG.md, Bezahlung).' });
+  }
   if (!hasAdmins) checks.push({ label: 'INITIAL_ADMIN_EMAIL für die erste Anmeldung', ok: !!env('INITIAL_ADMIN_EMAIL'), hint: 'Deine E-Mail-Adresse eintragen. Damit meldest du dich als erster Admin an.' });
   for (const c of checks) if (c.ok) delete c.hint;
   return { checks, dbOk: dbOk && schemaOk, hasAdmins };

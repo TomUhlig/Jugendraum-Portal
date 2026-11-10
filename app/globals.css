@@ -451,3 +451,13 @@ a.kpi:hover { border-color: var(--line-strong) }
 .wev.movable { cursor: grab; touch-action: none; user-select: none }
 .wev.dragging { cursor: grabbing; z-index: 5; box-shadow: var(--shadow-lg); opacity: .92 }
 .move-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 30; padding: 12px 16px; display: flex; gap: 12px 20px; align-items: center; flex-wrap: wrap; box-shadow: var(--shadow-lg); width: min(760px, calc(100% - 32px)); justify-content: space-between }
+
+/* Bezahlen */
+.pay-option { border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 8px; justify-items: start }
+.pay-transfer { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px }
+@media (max-width: 560px) { .pay-transfer { grid-template-columns: minmax(0, 1fr) } }
+.girocode { margin: 0; display: grid; justify-items: center; gap: 4px; background: #fff; padding: 8px; border-radius: 8px; border: 1px solid var(--line) }
+.girocode figcaption { font-size: .75rem; color: #3D4260 }
+.copytext { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap }
+.iconbtn-sm { border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 6px; width: 26px; height: 26px; display: inline-grid; place-items: center; cursor: pointer }
+.iconbtn-sm:hover { color: var(--brand-ink) }

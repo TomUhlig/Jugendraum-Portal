@@ -3,8 +3,11 @@ import { Flash, PageHead } from '@/components/Flash';
 import { requireAdmin } from '@/lib/auth';
 import { getCategories, getExtras, getSettings, operatorComplete } from '@/lib/data';
 import { DEFAULT_TEXTS, TEXT_LABELS, mailFrom, mailMode } from '@/lib/mail';
+import { formatIban } from '@/lib/payment';
+import { stripeEnabled } from '@/lib/stripe';
+import { appUrl } from '@/lib/url';
 import type { MailTextKey } from '@/lib/data';
-import { offerAction, operatorAction, settingsAction, testMailAction, textsAction } from '../../actions';
+import { offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
 
 const de = (n: number) => n.toString().replace('.', ',');
 
@@ -90,6 +93,28 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
               </tbody></table></div>
             <span className="muted small">0 bedeutet: wird nicht angezeigt. Vereinstermine sind immer kostenfrei. Übliche Kautionen bei Vereinsheimen liegen zwischen 50 und 300 €.</span>
             <div className="field"><label htmlFor="cn">Hinweis bei den Ansprechpartnern</label><input id="cn" name="contactNote" type="text" maxLength={300} defaultValue={x.contactNote} /></div>
+          </div>
+        </fieldset>
+        {!ro && <div className="card-foot"><button className="btn btn-primary" type="submit">Speichern</button></div>}
+      </form>
+
+      <form action={paymentSettingsAction} className="card" id="bezahlung">
+        <div className="card-head"><div><h2>Bezahlung</h2><p>Wie Entgelt und Kaution bezahlt werden. Die Beträge legst du oben unter „Ausstattung und Kosten“ fest.</p></div></div>
+        <fieldset disabled={ro} className="card-body stack" style={{ border: 0, margin: 0 }}>
+          <label className="choice"><input type="checkbox" name="transfer" defaultChecked={x.payment.transfer} /><span><b>Überweisung mit GiroCode</b><br /><span className="muted small">Bankdaten und ein QR-Code, den man mit der Banking-App scannt. Keine Gebühren. Eingänge hakst du in der Buchung ab.</span></span></label>
+          <div className="row">
+            <div className="field"><label htmlFor="p1">Kontoinhaber</label><input id="p1" name="holder" type="text" maxLength={70} defaultValue={x.payment.holder} placeholder="SV Heepen e. V." /></div>
+            <div className="field"><label htmlFor="p2">IBAN</label><input id="p2" name="iban" type="text" defaultValue={x.payment.iban ? formatIban(x.payment.iban) : ''} placeholder="DE00 0000 0000 0000 0000 00" /></div>
+            <div className="field"><label htmlFor="p3">BIC <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label><input id="p3" name="bic" type="text" maxLength={11} defaultValue={x.payment.bic} /></div>
+          </div>
+          <label className="choice"><input type="checkbox" name="paypal" defaultChecked={x.payment.paypal} /><span><b>PayPal.me-Link</b><br /><span className="muted small">Betrag wird vorausgefüllt. Eingänge hakst du in der Buchung ab.</span></span></label>
+          <div className="field" style={{ maxWidth: 360 }}><label htmlFor="p4">PayPal.me-Name</label><input id="p4" name="paypalMe" type="text" defaultValue={x.payment.paypalMe} placeholder="z. B. svheepen" /><span className="hint">Der Teil hinter paypal.me/</span></div>
+          <label className="choice"><input type="checkbox" name="stripe" defaultChecked={x.payment.stripe} /><span><b>Online bezahlen über Stripe</b> <span className={`badge ${stripeEnabled() ? 'b-ok' : 'no-dot'}`}>{stripeEnabled() ? 'verbunden' : 'nicht eingerichtet'}</span><br />
+            <span className="muted small">Karte, PayPal, Apple/Google Pay, Lastschrift. Wird automatisch verbucht, Kaution per Knopfdruck erstattbar. Stripe nimmt pro Zahlung eine Gebühr. Einrichtung: STRIPE_SECRET_KEY und STRIPE_WEBHOOK_SECRET beim Hosting eintragen (siehe EINRICHTUNG.md).</span></span></label>
+          {stripeEnabled() && <div className="field"><span className="label">Webhook-Adresse für Stripe</span><input type="text" readOnly value={`${appUrl()}/api/stripe/webhook`} aria-label="Webhook-Adresse" /><span className="hint">In Stripe unter Entwickler → Webhooks anlegen, Ereignisse: checkout.session.completed und checkout.session.async_payment_succeeded.</span></div>}
+          <div className="row">
+            <div className="field"><label htmlFor="p5">Zahlungsfrist (Tage vor dem Termin)</label><input id="p5" name="dueDays" type="number" min={0} max={60} defaultValue={x.payment.dueDays} /></div>
+            <div className="field span-2"><label htmlFor="p6">Hinweis zur Bezahlung <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label><input id="p6" name="note" type="text" maxLength={300} defaultValue={x.payment.note} placeholder="z. B. Barzahlung bei der Schlüsselübergabe ist auch möglich." /></div>
           </div>
         </fieldset>
         {!ro && <div className="card-foot"><button className="btn btn-primary" type="submit">Speichern</button></div>}

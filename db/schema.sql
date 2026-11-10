@@ -227,6 +227,23 @@ create table if not exists waitlist (
 );
 create index if not exists waitlist_starts_at on waitlist (starts_at) where notified_at is null;
 
+-- ---------- Version 6: Zahlungen ----------
+create table if not exists payments (
+  id                uuid primary key default gen_random_uuid(),
+  booking_id        uuid not null references bookings(id) on delete cascade,
+  provider          text not null check (provider in ('stripe', 'manual')),
+  amount_eur        numeric(8,2) not null,
+  parts             text[] not null default '{}',   -- 'rent', 'deposit'
+  status            text not null default 'open' check (status in ('open', 'paid', 'failed', 'refunded', 'partially_refunded')),
+  stripe_session_id text unique,
+  stripe_intent_id  text,
+  refunded_eur      numeric(8,2) not null default 0,
+  paid_at           timestamptz,
+  created_at        timestamptz not null default now()
+);
+create index if not exists payments_booking on payments (booking_id);
+insert into settings (key, value) values ('payment', '{}') on conflict (key) do nothing;
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -242,5 +259,6 @@ do $$ begin
     execute 'alter table feedback enable row level security';
     execute 'alter table recurring_blocks enable row level security';
     execute 'alter table waitlist enable row level security';
+    execute 'alter table payments enable row level security';
   end if;
 end $$;

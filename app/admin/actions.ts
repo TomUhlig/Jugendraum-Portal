@@ -4,10 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
-  Admin, MailTextKey, addBlackout, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
+  Admin, MailTextKey, addBlackout, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
   removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin,
 } from '@/lib/data';
 import { mailMode, mails, teamMails } from '@/lib/mail';
+import { isValidIban, normalizeIban } from '@/lib/payment';
+import { refund } from '@/lib/stripe';
 import { afterDecision, notifyWaitlist } from '@/lib/notify';
 import { Freq, describeSeries, seriesDates } from '@/lib/series';
 import { addDays, berlinToUtc } from '@/lib/time';
@@ -169,10 +171,39 @@ export async function moneyAction(fd: FormData) {
   const b = await getBooking(id);
   const withheld = Math.min(money(fd, 'depositWithheld'), money(fd, 'deposit'));
   await updateMoney(id, admin.name, {
-    rent: money(fd, 'rent'), deposit: money(fd, 'deposit'), rentPaid: fd.get('rentPaid') === 'on',
+    rent: money(fd, 'rent'), deposit: money(fd, 'deposit'), rentPaid: fd.get('rentPaid') === 'on', depositPaid: fd.get('depositPaid') === 'on',
     depositReturned: fd.get('depositReturned') === 'on', depositWithheld: withheld,
   });
   go(`/admin/buchung/${id}`, 'ok', b ? 'Kosten gespeichert.' : 'Gespeichert.');
+}
+
+export async function refundAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  const id = str(fd, 'id', 40);
+  const p = await getPayment(str(fd, 'paymentId', 40));
+  const amount = money(fd, 'amount');
+  if (!p || p.bookingId !== id || !p.stripeIntentId) go(`/admin/buchung/${id}`, 'fehler', 'Zahlung nicht gefunden.');
+  if (amount <= 0 || amount > p!.amount - p!.refunded) go(`/admin/buchung/${id}`, 'fehler', `Bitte einen Betrag zwischen 0 und ${(p!.amount - p!.refunded).toFixed(2)} € angeben.`);
+  try { await refund(p!.stripeIntentId!, amount); } catch (e) { go(`/admin/buchung/${id}`, 'fehler', `Stripe hat die Erstattung abgelehnt: ${String((e as Error).message).slice(0, 160)}`); }
+  await recordRefund(p!.id, admin.name, amount);
+  const b = await getBooking(id);
+  if (b) {
+    await updateMoney(id, admin.name, { rent: b.rent, deposit: b.deposit, rentPaid: b.rentPaid, depositPaid: b.depositPaid, depositReturned: true, depositWithheld: Math.max(0, Math.round((b.deposit - amount) * 100) / 100) });
+    await mails.depositRefunded(b, amount).catch(() => {});
+  }
+  go(`/admin/buchung/${id}`, 'ok', `${amount.toFixed(2).replace('.', ',')} € über Stripe erstattet.`);
+}
+export async function paymentSettingsAction(fd: FormData) {
+  const admin = await requireAdmin('admin');
+  const iban = str(fd, 'iban', 40);
+  if (iban && !isValidIban(iban)) go('/admin/einstellungen#bezahlung', 'fehler', 'Die IBAN ist ungültig. Bitte prüfen.');
+  await saveSettings(admin.name, { payment: {
+    holder: str(fd, 'holder', 70), iban: normalizeIban(iban), bic: str(fd, 'bic', 11).toUpperCase(), paypalMe: str(fd, 'paypalMe', 80),
+    dueDays: Math.min(60, Math.max(0, Math.round(Number(fd.get('dueDays')) || 0))), note: str(fd, 'note', 300),
+    transfer: fd.get('transfer') === 'on', paypal: fd.get('paypal') === 'on', stripe: fd.get('stripe') === 'on',
+  } }, []);
+  revalidatePath('/', 'layout');
+  go('/admin/einstellungen#bezahlung', 'ok', 'Bezahlung gespeichert.');
 }
 
 // ---------- Einstellungen ----------

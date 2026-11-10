@@ -5,16 +5,16 @@ import { Flash } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listSeries, listWaitlist } from '@/lib/data';
+import { checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listPayments, listSeries, listWaitlist } from '@/lib/data';
 import { eur } from '@/lib/labels';
 import { berlinHm, berlinYmd, fmtDay, fmtLong } from '@/lib/time';
-import { cancelSeriesAction, changeAction, decideAction, handoverAction, moneyAction, noteAction, silentAction } from '../../../actions';
+import { cancelSeriesAction, changeAction, decideAction, handoverAction, moneyAction, noteAction, refundAction, silentAction } from '../../../actions';
 
 const fmtTs = (d: Date | number) => new Date(d).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'medium', timeStyle: 'short' });
 const ACTION: Record<string, string> = {
   created: 'Anfrage gestellt', verified: 'E-Mail-Adresse bestätigt', 'verified+auto-confirmed': 'E-Mail bestätigt, automatisch eingetragen', 'admin-created': 'Vom Orga-Team eingetragen',
   confirm: 'Bestätigt', reject: 'Abgelehnt', cancel: 'Storniert', 'cancelled-by-booker': 'Vom Bucher abgesagt', 'internal-note': 'Interne Notiz geändert', 'mails-off': 'E-Mails an den Bucher ausgeschaltet', 'mails-on': 'E-Mails an den Bucher eingeschaltet',
-  handover: 'Übergabeprotokoll aktualisiert', money: 'Kosten aktualisiert', changed: 'Termin geändert', expired: 'Verfallen (E-Mail nicht bestätigt)', feedback: 'Rückmeldung erhalten',
+  handover: 'Übergabeprotokoll aktualisiert', money: 'Kosten aktualisiert', 'paid-online': 'Online bezahlt', refund: 'Kaution erstattet', changed: 'Termin geändert', expired: 'Verfallen (E-Mail nicht bestätigt)', feedback: 'Rückmeldung erhalten',
 };
 const describe = (a: { action: string; detail: Record<string, unknown> }) => {
   const d = a.detail ?? {};
@@ -38,6 +38,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
     getFeedback(b.id), b.seriesId ? listSeries(b.seriesId) : Promise.resolve([]),
   ]);
   const c = cats.find((x) => x.id === b.categoryId);
+  const payments = await listPayments(b.id);
   const waiting = (await listWaitlist()).filter((w) => !w.notifiedAt && w.start < b.end && w.end > b.start);
   const can = me.role !== 'viewer';
   const active = ['requested', 'confirmed', 'pending_email'].includes(b.status);
@@ -195,12 +196,34 @@ export default async function Detail({ params, searchParams }: { params: Promise
                   <div className="field"><label htmlFor="m-d">Kaution (€)</label><input id="m-d" name="deposit" type="text" inputMode="decimal" defaultValue={b.deposit.toString().replace('.', ',')} /></div>
                 </div>
                 <label className="check-inline"><input type="checkbox" name="rentPaid" defaultChecked={b.rentPaid} /> Entgelt bezahlt</label>
+                <label className="check-inline"><input type="checkbox" name="depositPaid" defaultChecked={b.depositPaid} /> Kaution erhalten</label>
                 <label className="check-inline"><input type="checkbox" name="depositReturned" defaultChecked={b.depositReturned} /> Kaution abgerechnet</label>
                 <div className="field"><label htmlFor="m-w">Davon einbehalten (€)</label><input id="m-w" name="depositWithheld" type="text" inputMode="decimal" defaultValue={b.depositWithheld.toString().replace('.', ',')} />
                   {b.deposit > 0 && <span className="hint">Auszuzahlen: {eur(b.deposit - b.depositWithheld)}</span>}</div>
               </fieldset>
-              {can && <div className="card-foot"><button className="btn" type="submit">Speichern</button></div>}
+              {can && <div className="card-foot"><button className="btn" type="submit">Speichern</button> <span className="muted small" style={{ marginLeft: 8 }}>Überweisungen und Barzahlungen hier abhaken.</span></div>}
             </form>
+          )}
+
+          {payments.length > 0 && (
+            <section className="card">
+              <div className="card-head"><h2>Online-Zahlungen</h2></div>
+              <ul className="list">{payments.map((p) => (
+                <li key={p.id} className="stack-sm">
+                  <div className="between"><span><b>{eur(p.amount)}</b> <span className="muted small">über Stripe · {p.parts.map((x) => (x === 'rent' ? 'Entgelt' : 'Kaution')).join(' + ')}</span></span>
+                    <span className={`badge ${p.status === 'paid' ? 'b-ok' : p.status === 'open' ? 'b-warn' : 'b-info'}`}>{({ open: 'nicht abgeschlossen', paid: 'bezahlt', failed: 'fehlgeschlagen', refunded: 'erstattet', partially_refunded: 'teilweise erstattet' } as Record<string, string>)[p.status]}</span></div>
+                  <span className="muted small">{p.paidAt ? `bezahlt ${fmtTs(p.paidAt)}` : `gestartet ${fmtTs(p.createdAt)}`}{p.refunded > 0 && ` · erstattet ${eur(p.refunded)}`}</span>
+                  {can && p.parts.includes('deposit') && ['paid', 'partially_refunded'].includes(p.status) && p.stripeIntentId && (
+                    <form action={refundAction} className="inline" style={{ alignItems: 'flex-end' }}>
+                      <input type="hidden" name="paymentId" value={p.id} /><input type="hidden" name="id" value={b.id} />
+                      <div className="field" style={{ maxWidth: 160 }}><label htmlFor={`rf-${p.id}`} className="small">Kaution erstatten (€)</label>
+                        <input id={`rf-${p.id}`} name="amount" type="text" inputMode="decimal" defaultValue={Math.max(0, Math.min(b.deposit - b.depositWithheld, p.amount - p.refunded)).toString().replace('.', ',')} /></div>
+                      <button className="btn btn-sm" type="submit">Über Stripe erstatten</button>
+                    </form>
+                  )}
+                </li>
+              ))}</ul>
+            </section>
           )}
 
           {fb && (

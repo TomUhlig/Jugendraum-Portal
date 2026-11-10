@@ -1,5 +1,6 @@
 import 'server-only';
-import { Booking, checkExisting, freeWaitlistFor, getCategories, notifyRecipients } from './data';
+import { Booking, checkExisting, freeWaitlistFor, getCategories, markStripePaid, notifyRecipients } from './data';
+import { getCheckout } from './stripe';
 import { bookerMails, mails, teamMails } from './mail';
 
 /** Mails dürfen eine bereits gespeicherte Aktion nie abbrechen: Fehler werden nur protokolliert. */
@@ -50,4 +51,14 @@ export async function notifyWaitlist(freed: { start: number; end: number }[]) {
     const start = Math.min(...freed.map((f) => f.start)), end = Math.max(...freed.map((f) => f.end));
     for (const w of await freeWaitlistFor(start, end)) await bookerMails.waitlistFree(w);
   });
+}
+
+/** Stripe-Zahlung prüfen und verbuchen (Rückkehrseite und Webhook). true, wenn bezahlt. */
+export async function confirmStripeSession(sessionId: string, bookingId: string | null): Promise<boolean> {
+  const session = await getCheckout(sessionId);
+  if (bookingId && session.metadata?.booking_id && session.metadata.booking_id !== bookingId) return false;
+  if (session.payment_status !== 'paid') return false;
+  const res = await markStripePaid(session.id, typeof session.payment_intent === 'string' ? session.payment_intent : null);
+  if (res) await safe('paid-mail', () => mails.paid(res.booking, res.payment.amount));
+  return true;
 }

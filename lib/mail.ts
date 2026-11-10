@@ -1,7 +1,8 @@
 import 'server-only';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { db } from './db';
-import { getExtras, type Booking, type MailTextKey } from './data';
+import { amountsDue, getExtras, type Booking, type MailTextKey } from './data';
+import { dueDate } from './payment';
 import type { Category } from './rules';
 import { bookingIcs } from './ics';
 import { eur } from './labels';
@@ -120,6 +121,15 @@ function details(b: Booking, c?: Category, extra: [string, string][] = []): Bloc
 ${rows.map(([k, v], i) => `<tr><td style="padding:9px 14px;font-size:13px;color:#646A85;vertical-align:top;width:120px;${i ? 'border-top:1px solid #E1E4EC' : ''}">${k}</td><td style="padding:9px 14px;font-size:14px;color:#161A33;font-weight:600;${i ? 'border-top:1px solid #E1E4EC' : ''}">${v}</td></tr>`).join('')}
 </table>`;
 }
+/** Bezahlteil für Mails: offener Betrag, Frist und Link zur Bezahlseite. */
+async function payBlock(b: Booking): Promise<Block[]> {
+  const due = amountsDue(b);
+  if (b.status !== 'confirmed' || due.total <= 0) return [];
+  const pay = (await getExtras()).payment;
+  const until = dueDate(b.start, pay.dueDays);
+  const lines = [due.rent > 0 ? `Nutzungsentgelt ${eur(due.rent)}` : '', due.deposit > 0 ? `Kaution ${eur(due.deposit)}` : ''].filter(Boolean).join(' + ');
+  return [P(`<b>Bitte bezahlen:</b> ${lines}${due.rent > 0 && due.deposit > 0 ? ` = <b>${eur(due.total)}</b>` : ''}, ${until <= Date.now() ? 'bitte vor der Schlüsselübergabe' : `bis ${fmtLong(until)}`}. Auf deiner Buchungsseite findest du alle Wege: Überweisung mit QR-Code${pay.paypal && pay.paypalMe ? ', PayPal' : ''}${pay.stripe ? ' oder online' : ''}.`)];
+}
 const manageLink = (b: Booking) => `${appUrl()}/buchung/${b.manageToken}`;
 const ics = (b: Booking, c?: Category): Attachment[] => [{ filename: `jugendraum-${b.number}.ics`, content: Buffer.from(bookingIcs(b, c)).toString('base64') }];
 /** Stille Buchungen (vom Team für andere eingetragen) bekommen keine automatischen Mails. */
@@ -156,7 +166,7 @@ export const mails = {
       ...build({ preheader: 'Wir prüfen deine Anfrage.', heading: 'Deine Anfrage ist eingegangen', blocks, cta: { href: manageLink(b), label: 'Anfrage ansehen' } }) });
   },
   confirmed: async (b: Booking, c?: Category) => {
-    const blocks = [P(hello(b)), paragraphs(await text('confirmed')), details(b, c, [['Ansprechperson', esc(b.agreedWith)]])];
+    const blocks = [P(hello(b)), paragraphs(await text('confirmed')), details(b, c, [['Ansprechperson', esc(b.agreedWith)]]), ...(await payBlock(b))];
     return sendMail({ kind: 'confirmed', to: bookerTo(b), bookingId: b.id, subject: `Bestätigt: ${b.title} am ${fmtDay(b.start)}`, attachments: ics(b, c),
       ...build({ preheader: `Der Jugendraum ist für dich reserviert: ${fmtLong(b.start)}.`, heading: 'Deine Buchung ist bestätigt', blocks, cta: { href: manageLink(b), label: 'Buchung ansehen' } }) });
   },
@@ -177,11 +187,16 @@ export const mails = {
       ...build({ preheader: 'Deine Buchung wurde storniert.', heading: 'Buchung storniert', blocks }) });
   },
   reminder: async (b: Booking, c: Category | undefined, when: '3d' | '1d') => {
-    const blocks = [P(hello(b)), paragraphs(await text('reminder')), details(b, c, [['Ansprechperson', esc(b.agreedWith)]])];
+    const blocks = [P(hello(b)), paragraphs(await text('reminder')), details(b, c, [['Ansprechperson', esc(b.agreedWith)]]), ...(await payBlock(b))];
     const label = when === '1d' ? 'Morgen' : 'In drei Tagen';
     return sendMail({ kind: `reminder-${when}`, to: bookerTo(b), bookingId: b.id, subject: `${label}: ${b.title} im Jugendraum`,
       ...build({ preheader: `${label}, ${berlinHm(b.start)} Uhr.`, heading: `${label} ist es so weit`, blocks, cta: { href: manageLink(b), label: 'Buchung ansehen' } }) });
   },
+  paid: (b: Booking, amount: number) => sendMail({ kind: 'paid', to: bookerTo(b), bookingId: b.id, subject: `Zahlung erhalten: ${eur(amount)} für ${b.number}`,
+    ...build({ preheader: 'Danke, deine Zahlung ist eingegangen.', heading: 'Zahlung erhalten', blocks: [P(hello(b)), P(`wir haben deine Zahlung über <b>${eur(amount)}</b> für „${esc(b.title)}“ am ${fmtLong(b.start)} erhalten. Danke!`),
+      ...(b.depositPaid && b.deposit > 0 ? [SMALL('Die Kaution bekommst du nach der Abnahme des Raums zurück.')] : [])], cta: { href: manageLink(b), label: 'Buchung ansehen' } }) }),
+  depositRefunded: (b: Booking, amount: number) => sendMail({ kind: 'refund', to: bookerTo(b), bookingId: b.id, subject: `Kaution erstattet: ${eur(amount)} für ${b.number}`,
+    ...build({ preheader: 'Die Kaution ist auf dem Weg zurück zu dir.', heading: 'Kaution erstattet', blocks: [P(hello(b)), P(`wir haben dir <b>${eur(amount)}</b> Kaution für „${esc(b.title)}“ erstattet. Je nach Zahlungsart dauert es ein paar Tage, bis der Betrag bei dir ankommt.`)] }) }),
   followup: async (b: Booking) => {
     const blocks = [P(hello(b)), paragraphs(await text('followup'))];
     return sendMail({ kind: 'followup', to: bookerTo(b), bookingId: b.id, subject: `Wie war es? ${b.title}`,

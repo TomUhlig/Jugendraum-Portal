@@ -4,6 +4,9 @@ import { BookingFacts } from '@/components/BookingFacts';
 import { StatusBadge } from '@/components/StatusBadge';
 import { cancelByBooker, getBookingByToken, getCategories, getFeedback } from '@/lib/data';
 import { afterBookerCancel } from '@/lib/notify';
+import { PaySection } from '@/components/PaySection';
+import { amountsDue, createPayment } from '@/lib/data';
+import { createCheckout, stripeEnabled } from '@/lib/stripe';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Deine Buchung', robots: { index: false } };
@@ -15,6 +18,26 @@ async function cancel(formData: FormData) {
   const b = await cancelByBooker(token);
   if (b) await afterBookerCancel(b);
   redirect(`/buchung/${token}?storniert=1`);
+}
+
+async function payOnline(fd: FormData) {
+  'use server';
+  const token = String(fd.get('token'));
+  const b = await getBookingByToken(token);
+  if (!b || b.status !== 'confirmed' || !stripeEnabled()) redirect(`/buchung/${token}#bezahlen`);
+  const due = amountsDue(b!);
+  if (due.total <= 0) redirect(`/buchung/${token}#bezahlen`);
+  let url: string;
+  try {
+    const items = [...(due.rent > 0 ? [{ part: 'rent' as const, amount: due.rent }] : []), ...(due.deposit > 0 ? [{ part: 'deposit' as const, amount: due.deposit }] : [])];
+    const session = await createCheckout(b!, items);
+    await createPayment(b!.id, 'stripe', due.total, due.parts, session.id);
+    url = session.url;
+  } catch (e) {
+    console.error(e);
+    redirect(`/buchung/${token}?zahlung=fehler#bezahlen`);
+  }
+  redirect(url!);
 }
 
 export default async function Page({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<Record<string, string>> }) {
@@ -56,6 +79,9 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           )}
         </section>
 
+        {sp.zahlung === 'bezahlt' && <div className="alert alert-ok"><CheckCircle2 className="icon" /><div><strong>Danke, deine Zahlung ist eingegangen.</strong> Eine Bestätigung kommt per Mail.</div></div>}
+        <PaySection b={b} token={token} payOnline={payOnline}
+          notice={sp.zahlung === 'offen' ? 'Die Zahlung ist noch nicht abgeschlossen. Bei Lastschrift kann die Bestätigung ein paar Tage dauern.' : sp.zahlung === 'fehler' ? 'Die Online-Zahlung konnte gerade nicht gestartet werden. Bitte versuch es später noch einmal oder nutze die Überweisung.' : sp.abgebrochen ? 'Zahlung abgebrochen. Du kannst es jederzeit erneut versuchen.' : undefined} />
         {b.status === 'confirmed' && past && (
           <section className="card card-body stack">
             <div className="inline"><MessageSquareText className="icon" style={{ color: 'var(--brand-ink)' }} /><h2 className="section-title">Wie war es?</h2></div>

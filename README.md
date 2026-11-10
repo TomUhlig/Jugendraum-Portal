@@ -16,6 +16,7 @@ Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen 
 - Ausstattung auswählen (Beamer, Musikanlage, …), Kosten und Kaution werden vorab angezeigt
 - Persönliche Buchungsseite mit Statusverlauf, Kalenderdatei und Absage
 - Rückmeldung nach dem Termin, inklusive Schadensmeldung (geht sofort ans Team)
+- **Bezahlen** nach der Bestätigung: Überweisung mit GiroCode (QR für die Banking-App), PayPal.me-Link und/oder online über Stripe (Karte, PayPal, Apple/Google Pay, Lastschrift; automatisch verbucht). Frist und offener Betrag stehen in Bestätigungs- und Erinnerungsmail
 - **Meine Buchungen:** Link zu allen eigenen Buchungen per Mail anfordern (7 Tage gültig)
 - **Warteliste:** Bei belegtem Termin oder vergebenem Feier-Wochenende eintragen; wird der Termin frei (Absage, Ablehnung, Storno, Verfall, Verschieben, aufgehobene Sperre), kommt automatisch eine Mail mit vorausgefülltem Anfrage-Link
 - Mails: Bestätigungslink, Eingang, Bestätigung mit Kalenderdatei (.ics), Ablehnung mit Begründung, Erinnerung 3 Tage und 1 Tag vorher, Nachfrage danach
@@ -30,7 +31,7 @@ Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen 
 - Übergabe- und Rückgabeprotokoll: Schlüssel, Stromzähler, Zustand, Mängel
 - **Nutzungsvereinbarung zum Ausdrucken** (A4, mit Regeln, Übergabeprotokoll und Unterschriftsfeldern)
 - Warteliste einsehen; auf jeder Buchung steht, wie viele auf diesen Zeitraum warten
-- Nutzungsentgelt und Kaution mit Bezahlt/Abgerechnet/Einbehalten
+- Nutzungsentgelt und Kaution mit Bezahlt/Erhalten/Abgerechnet/Einbehalten; Online-Zahlungen mit Verlauf, Kaution per Knopfdruck über Stripe (teil-)erstatten; offene Zahlungen der nächsten 14 Tage unter „Zu erledigen“
 - „Zu erledigen“: fällige Schlüsselübergaben, offene Rückgaben und Kautionen, Schadensmeldungen, Mailfehler
 - Kalender mit Monats- und Wochenansicht (inkl. Pufferzeiten); in der Wochenansicht **Termine per Drag & Drop verschieben** (15-Minuten-Raster, mit Rückfrage und Regelprüfung); an jedem Tag „Termin eintragen“ und „Tag sperren“, in der Wochenansicht „Woche sperren“
 - **Sperrzeiten** mit Schnellauswahl (heute, dieses/nächstes Wochenende, diese/nächste Woche, Rest des Monats), ganztägig oder nur bestimmte Uhrzeiten, für alle Anfragen oder nur für Feiern. Bestehende Buchungen im Zeitraum werden angezeigt und bleiben gültig
@@ -69,7 +70,7 @@ npm run dev                       # http://localhost:3000
 
 Ohne Mailzugang (SMTP oder Resend) werden Mails nicht verschickt, sondern mit allen Links in der Konsole ausgegeben. Im Dev-Modus zeigt die Login-Seite den Login-Link dann auch direkt an.
 
-Tests: `npm test` (Regel-Engine, Zeitzonen, Serien, iCal). Typprüfung: `npm run lint`.
+Tests: `npm test` (Regel-Engine, Zeitzonen, Serien, iCal, IBAN/GiroCode/Stripe-Signatur). Typprüfung: `npm run lint`.
 
 ## Online stellen
 

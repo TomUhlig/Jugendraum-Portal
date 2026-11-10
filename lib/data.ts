@@ -6,6 +6,7 @@ import {
   ACTIVE_STATUSES, Blackout, Category, CheckResult, DEFAULT_SETTINGS, Message, RecurringBlock, Settings, Slot, checkBooking, expandRecurring, partyWeekendOf,
 } from './rules';
 import { DAY } from './time';
+import { DEFAULT_PAYMENT, type PaymentSettings } from './payment';
 
 export type Status = 'pending_email' | 'requested' | 'confirmed' | 'rejected' | 'cancelled' | 'expired';
 export type Booking = {
@@ -14,7 +15,7 @@ export type Booking = {
   name: string; email: string; phone: string; agreedWith: string; manageToken: string; equipment: string[];
   rejectReason: string | null; internalNote: string; decidedBy: string | null; createdAt: number;
   seriesId: string | null; createdBy: string | null; silent: boolean;
-  rent: number; deposit: number; rentPaid: boolean; depositReturned: boolean; depositWithheld: number;
+  rent: number; deposit: number; rentPaid: boolean; depositPaid: boolean; depositReturned: boolean; depositWithheld: number;
   keyHandedOut: boolean; handoverAt: number | null; handoverBy: string | null; meterStart: number | null;
   returnAt: number | null; returnBy: string | null; meterEnd: number | null; conditionOk: boolean | null; damageNote: string;
 };
@@ -31,7 +32,7 @@ const toBooking = (r: Row): Booking => ({
   manageToken: r.manage_token as string, equipment: (r.equipment as string[]) ?? [], rejectReason: (r.reject_reason as string) ?? null,
   internalNote: r.internal_note as string, decidedBy: (r.decided_by as string) ?? null, createdAt: +(r.created_at as Date),
   seriesId: (r.series_id as string) ?? null, createdBy: (r.created_by as string) ?? null, silent: !!r.silent,
-  rent: num(r.rent_eur), deposit: num(r.deposit_eur), rentPaid: !!r.rent_paid, depositReturned: !!r.deposit_returned, depositWithheld: num(r.deposit_withheld_eur),
+  rent: num(r.rent_eur), deposit: num(r.deposit_eur), rentPaid: !!r.rent_paid, depositPaid: !!r.deposit_paid, depositReturned: !!r.deposit_returned, depositWithheld: num(r.deposit_withheld_eur),
   keyHandedOut: !!r.key_handed_out, handoverAt: ts(r.handover_at), handoverBy: (r.handover_by as string) ?? null, meterStart: numOrNull(r.meter_start),
   returnAt: ts(r.return_at), returnBy: (r.return_by as string) ?? null, meterEnd: numOrNull(r.meter_end),
   conditionOk: (r.condition_ok as boolean | null) ?? null, damageNote: (r.damage_note as string) ?? '',
@@ -67,7 +68,7 @@ export async function getSettings(q: Q = db()): Promise<Settings> {
 export type Fees = { rent: number; deposit: number };
 export type MailTextKey = 'confirmed' | 'rejected' | 'reminder' | 'followup' | 'received';
 export type Operator = { name: string; address: string; email: string; phone: string; responsible: string };
-export type Extras = { equipment: string[]; feesExternal: Fees; feesMemberParty: Fees; mailTexts: Partial<Record<MailTextKey, string>>; contactNote: string; operator: Operator };
+export type Extras = { payment: PaymentSettings; equipment: string[]; feesExternal: Fees; feesMemberParty: Fees; mailTexts: Partial<Record<MailTextKey, string>>; contactNote: string; operator: Operator };
 export const operatorComplete = (o: Operator) => !!(o.name.trim() && o.address.trim() && o.email.trim());
 export async function getExtras(q: Q = db()): Promise<Extras> {
   const r = await settingsRows(q);
@@ -77,6 +78,7 @@ export async function getExtras(q: Q = db()): Promise<Extras> {
     feesMemberParty: (r.feesMemberParty as Fees) ?? { rent: 0, deposit: 0 },
     mailTexts: (r.mailTexts as Extras['mailTexts']) ?? {},
     contactNote: (r.contactNote as string) ?? '',
+    payment: { ...DEFAULT_PAYMENT, ...((r.payment as Partial<PaymentSettings>) ?? {}) },
     operator: { name: '', address: '', email: '', phone: '', responsible: '', ...((r.operator as Partial<Operator>) ?? {}) },
   };
 }
@@ -306,10 +308,10 @@ export async function updateHandover(id: string, actor: string, h: Handover) {
   await audit(q, actor, id, 'handover', h);
 }
 
-export type Money = { rent: number; deposit: number; rentPaid: boolean; depositReturned: boolean; depositWithheld: number };
+export type Money = { rent: number; deposit: number; rentPaid: boolean; depositPaid: boolean; depositReturned: boolean; depositWithheld: number };
 export async function updateMoney(id: string, actor: string, m: Money) {
   const q = db();
-  await q`update bookings set rent_eur = ${m.rent}, deposit_eur = ${m.deposit}, rent_paid = ${m.rentPaid},
+  await q`update bookings set rent_eur = ${m.rent}, deposit_eur = ${m.deposit}, rent_paid = ${m.rentPaid}, deposit_paid = ${m.depositPaid},
     deposit_returned = ${m.depositReturned}, deposit_withheld_eur = ${m.depositWithheld} where id = ${id}`;
   await audit(q, actor, id, 'money', m);
 }
@@ -488,4 +490,48 @@ export async function freeWaitlistFor(freedStart: number, freedEnd: number): Pro
     free.push(e);
   }
   return free;
+}
+
+// ---------- Zahlungen ----------
+export type Part = 'rent' | 'deposit';
+export type Payment = { id: string; bookingId: string; provider: 'stripe' | 'manual'; amount: number; parts: Part[]; status: string;
+  stripeSessionId: string | null; stripeIntentId: string | null; refunded: number; paidAt: number | null; createdAt: number };
+const toPayment = (r: Row): Payment => ({ id: r.id as string, bookingId: r.booking_id as string, provider: r.provider as Payment['provider'], amount: num(r.amount_eur),
+  parts: (r.parts as Part[]) ?? [], status: r.status as string, stripeSessionId: (r.stripe_session_id as string) ?? null, stripeIntentId: (r.stripe_intent_id as string) ?? null,
+  refunded: num(r.refunded_eur), paidAt: ts(r.paid_at), createdAt: +(r.created_at as Date) });
+
+/** Was für eine Buchung noch offen ist (nur bestätigte Buchungen). */
+export function amountsDue(b: Booking) {
+  const rent = b.rentPaid ? 0 : b.rent, deposit = b.depositPaid ? 0 : b.deposit;
+  const parts: Part[] = [...(rent > 0 ? ['rent' as const] : []), ...(deposit > 0 ? ['deposit' as const] : [])];
+  return { rent, deposit, total: Math.round((rent + deposit) * 100) / 100, parts };
+}
+export async function createPayment(bookingId: string, provider: Payment['provider'], amount: number, parts: Part[], stripeSessionId: string | null) {
+  await db()`insert into payments (booking_id, provider, amount_eur, parts, stripe_session_id) values (${bookingId}, ${provider}, ${amount}, ${parts}, ${stripeSessionId})`;
+}
+/** Zahlung als bezahlt verbuchen (idempotent). Gibt die Buchung zurück, wenn sich etwas geändert hat. */
+export async function markStripePaid(sessionId: string, intentId: string | null): Promise<{ booking: Booking; payment: Payment } | null> {
+  return db().begin(async (q) => {
+    const [p] = await q`update payments set status = 'paid', paid_at = now(), stripe_intent_id = coalesce(${intentId}, stripe_intent_id)
+      where stripe_session_id = ${sessionId} and status = 'open' returning *`;
+    if (!p) return null;
+    const parts = p.parts as Part[];
+    const [b] = await q`update bookings set rent_paid = rent_paid or ${parts.includes('rent')}, deposit_paid = deposit_paid or ${parts.includes('deposit')}
+      where id = ${p.booking_id} returning *`;
+    await audit(q, 'Stripe', p.booking_id, 'paid-online', { amount: num(p.amount_eur), parts });
+    return { booking: toBooking(b), payment: toPayment(p) };
+  });
+}
+export async function listPayments(bookingId: string): Promise<Payment[]> {
+  return (await db()`select * from payments where booking_id = ${bookingId} order by created_at desc`).map(toPayment);
+}
+export async function getPayment(id: string): Promise<Payment | null> {
+  const [r] = await db()`select * from payments where id = ${id}`;
+  return r ? toPayment(r) : null;
+}
+export async function recordRefund(paymentId: string, actor: string, amount: number) {
+  const q = db();
+  const [p] = await q`update payments set refunded_eur = refunded_eur + ${amount},
+    status = case when refunded_eur + ${amount} >= amount_eur then 'refunded' else 'partially_refunded' end where id = ${paymentId} returning *`;
+  await audit(q, actor, p.booking_id, 'refund', { amount });
 }

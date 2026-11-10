@@ -111,6 +111,19 @@ Danach kannst du den Link verteilen.
 
 ---
 
+## Optional: Bezahlung einrichten
+
+Unter **Einstellungen → Ausstattung und Kosten** legst du Entgelt und Kaution fest, unter **Einstellungen → Bezahlung** die Wege:
+
+- **Überweisung mit GiroCode** (empfohlen, keine Gebühren): Kontoinhaber und IBAN eintragen. Bucher sehen nach der Bestätigung Bankdaten und einen QR-Code für die Banking-App. Eingänge hakst du in der Buchung unter „Kosten und Kaution“ ab.
+- **PayPal.me**: deinen PayPal.me-Namen eintragen. Auch hier hakst du Eingänge selbst ab.
+- **Stripe** (Karte, PayPal, Apple/Google Pay, Lastschrift; Zahlungen werden automatisch verbucht, Kaution per Knopfdruck erstattbar; Stripe nimmt pro Zahlung eine Gebühr):
+  1. Konto auf [stripe.com](https://stripe.com) anlegen. Für den Verein: Unternehmensart „gemeinnützige Organisation“ bzw. Verein, Vereinskonto als Auszahlungskonto.
+  2. Unter **Entwickler → API-Schlüssel** den **Geheimschlüssel** kopieren und in Vercel als `STRIPE_SECRET_KEY` eintragen. Zum Ausprobieren erst den Testschlüssel (`sk_test_…`) nehmen; Testkarte: 4242 4242 4242 4242, beliebiges Datum in der Zukunft, beliebige Prüfziffer.
+  3. Unter **Entwickler → Webhooks → Endpunkt hinzufügen** die Adresse `https://deine-adresse.vercel.app/api/stripe/webhook` eintragen und die Ereignisse `checkout.session.completed` und `checkout.session.async_payment_succeeded` auswählen. Das **Signing secret** (`whsec_…`) in Vercel als `STRIPE_WEBHOOK_SECRET` eintragen.
+  4. Unter **Einstellungen → Zahlungsmethoden** in Stripe festlegen, welche Zahlarten angeboten werden.
+  5. Redeploy, dann `/status` prüfen.
+
 ## Später: Updates einspielen
 
 Neue Versionen landen per Pull Request auf `main`. Vercel veröffentlicht sie automatisch (Änderungen auf anderen Zweigen bekommen nur eine Vorschau-Adresse). Wenn sich `db/schema.sql` geändert hat, das Skript wie in Schritt 2.4 einmal erneut im SQL Editor ausführen.
