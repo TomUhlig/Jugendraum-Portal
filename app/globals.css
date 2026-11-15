@@ -497,3 +497,17 @@ a.kpi:hover { border-color: var(--line-strong) }
 .photo-admin { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px }
 .photo-admin .card { overflow: hidden }
 .photo-admin img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block }
+
+/* Jahresübersicht */
+.report { display: grid; gap: 20px }
+.print-only { display: none }
+tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
+@media print {
+  .admin { display: block !important; background: none !important }
+  .admin-main { padding: 0 !important }
+  .print-only { display: block; font-size: 11px; color: #646A85; margin-bottom: 8px }
+  .report .card { break-inside: avoid; box-shadow: none }
+  .report .kpis { grid-template-columns: repeat(4, 1fr) }
+  .report .grid-2b { grid-template-columns: 1fr 1fr }
+  .flash, .alert { display: none }
+}

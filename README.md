@@ -38,6 +38,7 @@ Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen 
 - **Sperrzeiten** mit Schnellauswahl (heute, dieses/nächstes Wochenende, diese/nächste Woche, Rest des Monats), ganztägig oder nur bestimmte Uhrzeiten, für alle Anfragen oder nur für Feiern. Bestehende Buchungen im Zeitraum werden angezeigt und bleiben gültig
 - **Regelmäßige Sperren** nach Wochentagen, ganztägig oder stundenweise, optional befristet. Vorlagen: „Montags geschlossen“, „Werktags erst ab 17 Uhr“, „Sonntags keine Feiern“, „Nachts geschlossen“. Erscheinen auch öffentlich unter „Raum & Regeln“
 - Buchungsliste mit Suche, Filtern und CSV-Export für Excel
+- **Jahresübersicht** für Vorstand und Kassenprüfung: Nutzung nach Art, Mannschaft und Monat, Entgelte und Kautionen (erhalten, zurück, einbehalten, offen); druckbar als PDF und als Excel-Liste mit allen Einzelposten
 - Statistik (Buchungen pro Monat, nach Art, Mitglieder/Externe, Mannschaften, Ablehnungsquote) und Rückmeldungen
 - E-Mail-Texte, Ausstattung und Kosten in den Einstellungen änderbar
 - Als App aufs Handy installierbar (PWA), mit **Push-Benachrichtigungen** bei neuer Anfrage, Absage, Nachricht und Schadensmeldung (pro Gerät aktivierbar, Schlüssel werden automatisch erzeugt)

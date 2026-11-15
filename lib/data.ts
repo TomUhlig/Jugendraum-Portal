@@ -592,3 +592,42 @@ export async function movePhoto(id: string, dir: -1 | 1) {
     for (let k = 0; k < ids.length; k++) await q`update photos set sort = ${k + 1} where id = ${ids[k]}`;
   });
 }
+
+// ---------- Jahresbericht ----------
+export async function getYearReport(year: number) {
+  const q = db();
+  const from = new Date(`${year}-01-01T00:00:00+01:00`), to = new Date(`${year + 1}-01-01T00:00:00+01:00`);
+  const inYear = q`starts_at >= ${from} and starts_at < ${to}`;
+  const [[totals], byTeam, byCat, byMonth, [money], [fb], [states]] = await Promise.all([
+    q`select count(*)::int as n, coalesce(round(sum(extract(epoch from ends_at - starts_at)) / 3600), 0)::int as hours,
+        count(*) filter (where party_weekend is not null or category_id = 'party')::int as parties,
+        count(*) filter (where booker_type = 'external')::int as external, count(*) filter (where booker_type = 'member')::int as member,
+        count(distinct nullif(team, ''))::int as teams
+      from bookings where status = 'confirmed' and ${inYear}`,
+    q`select coalesce(nullif(team, ''), case when booker_type = 'external' then 'Nicht im Verein' else 'Mitglieder ohne Angabe' end) as team,
+        count(*)::int as n, round(sum(extract(epoch from ends_at - starts_at)) / 3600)::int as hours
+      from bookings where status = 'confirmed' and ${inYear} group by 1 order by 2 desc, 1`,
+    q`select category_id, count(*)::int as n, round(sum(extract(epoch from ends_at - starts_at)) / 3600)::int as hours
+      from bookings where status = 'confirmed' and ${inYear} group by 1`,
+    q`select extract(month from starts_at at time zone 'Europe/Berlin')::int as m, count(*)::int as n,
+        round(sum(extract(epoch from ends_at - starts_at)) / 3600)::int as hours, coalesce(sum(case when rent_paid then rent_eur else 0 end), 0)::float as rent
+      from bookings where status = 'confirmed' and ${inYear} group by 1 order by 1`,
+    q`select coalesce(sum(case when rent_paid then rent_eur else 0 end), 0)::float as rent_paid,
+        coalesce(sum(case when not rent_paid then rent_eur else 0 end), 0)::float as rent_open,
+        coalesce(sum(case when deposit_paid then deposit_eur else 0 end), 0)::float as deposit_in,
+        coalesce(sum(case when deposit_returned then deposit_eur - deposit_withheld_eur else 0 end), 0)::float as deposit_back,
+        coalesce(sum(case when deposit_returned then deposit_withheld_eur else 0 end), 0)::float as deposit_kept,
+        coalesce(sum(case when deposit_paid and not deposit_returned then deposit_eur else 0 end), 0)::float as deposit_held,
+        coalesce(sum(case when not deposit_paid then deposit_eur else 0 end), 0)::float as deposit_open
+      from bookings where status = 'confirmed' and ${inYear}`,
+    q`select count(*)::int as n, coalesce(avg(rating), 0)::float as avg, count(*) filter (where damage)::int as damages
+      from feedback f join bookings b on b.id = f.booking_id where b.starts_at >= ${from} and b.starts_at < ${to}`,
+    q`select count(*) filter (where status = 'rejected')::int as rejected, count(*) filter (where status = 'cancelled')::int as cancelled,
+        count(*) filter (where status = 'expired')::int as expired from bookings where ${inYear}`,
+  ]);
+  return { totals, byTeam, byCat, byMonth, money, feedback: fb, states };
+}
+export async function bookingsForYear(year: number): Promise<Booking[]> {
+  const from = new Date(`${year}-01-01T00:00:00+01:00`), to = new Date(`${year + 1}-01-01T00:00:00+01:00`);
+  return (await db()`select * from bookings where status = 'confirmed' and starts_at >= ${from} and starts_at < ${to} order by starts_at`).map(toBooking);
+}

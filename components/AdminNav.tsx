@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, CalendarDays, CalendarOff, ClipboardList, History, Hourglass, Image as ImageIcon, LayoutDashboard, MessageSquareText, PlusCircle, Settings, Users } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, CalendarDays, CalendarOff, ClipboardList, History, Hourglass, Image as ImageIcon, LayoutDashboard, MessageSquareText, PlusCircle, Settings, Users } from 'lucide-react';
 
 const GROUPS = [
   { name: 'Betrieb', items: [
@@ -13,6 +13,7 @@ const GROUPS = [
   ] },
   { name: 'Auswertung', items: [
     { href: '/admin/statistik', label: 'Statistik', icon: BarChart3 },
+    { href: '/admin/bericht', label: 'Jahresübersicht', icon: FileSpreadsheet },
     { href: '/admin/rueckmeldungen', label: 'Rückmeldungen', icon: MessageSquareText },
   ] },
   { name: 'Verwaltung', items: [
