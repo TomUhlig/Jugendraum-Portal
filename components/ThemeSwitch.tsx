@@ -18,11 +18,17 @@ export function ThemeSwitch({ initial }: { initial: Theme }) {
     if (t === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
     document.cookie = `theme=${t}; path=/; max-age=31536000; samesite=lax`;
   }
+  const cur = OPTIONS.find((o) => o.value === theme)!;
+  const next = OPTIONS[(OPTIONS.indexOf(cur) + 1) % OPTIONS.length];
   return (
-    <div className="theme-switch" role="group" aria-label="Darstellung">
-      {OPTIONS.map(({ value, label, Icon }) => (
-        <button key={value} type="button" title={label} aria-label={label} aria-pressed={theme === value} onClick={() => choose(value)}><Icon className="icon-sm" /></button>
-      ))}
-    </div>
+    <>
+      <div className="theme-switch" role="group" aria-label="Darstellung">
+        {OPTIONS.map(({ value, label, Icon }) => (
+          <button key={value} type="button" title={label} aria-label={label} aria-pressed={theme === value} onClick={() => choose(value)}><Icon className="icon-sm" /></button>
+        ))}
+      </div>
+      {/* Handy: ein Knopf, der durchschaltet */}
+      <button type="button" className="theme-cycle" title={`Darstellung: ${cur.label} (weiter: ${next.label})`} aria-label={`Darstellung: ${cur.label}. Wechseln zu ${next.label}`} onClick={() => choose(next.value)}><cur.Icon className="icon-sm" /></button>
+    </>
   );
 }

@@ -68,7 +68,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
             <h2>{dLabel(m, { month: 'long', year: 'numeric' })}</h2></div>
           <div className="inline"><Link className="btn btn-sm" href={keep({ m: today.slice(0, 7) })}>Heute</Link><Link className="small" href={`?m=${m.slice(0, 7)}${all ? '' : '&alle=1'}`}>{all ? 'Nur aktive' : 'Auch stornierte'}</Link></div>
         </div>
-        <div className="table-wrap">
+        <div className="table-wrap month-wrap">
           <div className="mgrid">
             {['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'].map((d) => <div className="dow" key={d}>{d}</div>)}
             {cells.map((k) => {
@@ -96,6 +96,30 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
             })}
           </div>
         </div>
+        {/* Handy: Agenda statt Monatsraster */}
+        <ol className="agenda">
+          {cells.filter((k) => k.slice(0, 7) === m.slice(0, 7)).map((k) => {
+            const ds = berlinToUtc(k, '00:00'), de = berlinToUtc(addDays(k, 1), '00:00');
+            const items = list.filter((b) => b.start >= ds && b.start < de);
+            const bo = blackouts.filter((b) => b.start < de && b.end > ds && b.scope !== 'party');
+            if (!items.length && !bo.length && k !== today) return null;
+            return (
+              <li key={k} className={k === today ? 'today' : k < today ? 'past' : ''}>
+                <div className="ag-day"><b>{+k.slice(8)}</b><span>{dLabel(k, { weekday: 'short' })}</span></div>
+                <div className="ag-items">
+                  {!items.length && !bo.length && <span className="muted small">frei</span>}
+                  {bo.map((x) => <Link key={x.id} href="/admin/sperrzeiten" className="ag-item sys"><Lock className="icon-sm" />gesperrt: {x.reason}</Link>)}
+                  {items.map((b) => (
+                    <Link key={b.id} href={`/admin/buchung/${b.id}`} className={`ag-item ${b.status}`} style={{ '--c': cat.get(b.categoryId)?.color } as React.CSSProperties}>
+                      <span className="num">{berlinHm(b.start)}–{berlinHm(b.end)}</span><b>{b.title}</b><span className="muted">{b.name}</span>
+                    </Link>
+                  ))}
+                  {k >= today && <Link className="ag-add" href={`/admin/neu?datum=${k}`} aria-label={`Termin am ${k} eintragen`}><Plus className="icon-sm" /></Link>}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
         <div className="card-foot legend" style={{ marginTop: 0 }}>{cats.map((c) => <span key={c.id}><i style={{ '--c': c.color } as React.CSSProperties} />{c.name}</span>)}<span>gestrichelt: angefragt</span></div>
       </section>
     </>

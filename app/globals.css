@@ -89,6 +89,7 @@ button, input, select, textarea { font: inherit; color: inherit }
 .theme-switch { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); gap: 2px; margin-left: 8px }
 .theme-switch button { width: 30px; height: 28px; display: grid; place-items: center; border: 0; background: transparent; border-radius: 6px; color: var(--muted); cursor: pointer }
 .theme-switch button:hover { color: var(--ink) }
+.theme-cycle { display: none; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--brand-ink); cursor: pointer }
 .theme-switch button[aria-pressed="true"] { background: var(--surface); color: var(--brand-ink); box-shadow: var(--shadow) }
 .site-footer { border-top: 1px solid var(--line); background: var(--surface); margin-top: 48px }
 .site-footer .wrap { display: flex; gap: 8px 24px; flex-wrap: wrap; padding-block: 20px; font-size: .875rem; color: var(--muted); align-items: center }
@@ -637,3 +638,52 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .repeat-list li.taken span:first-child { text-decoration: line-through; text-decoration-thickness: 1px }
 .repeat-list li.unknown { color: var(--muted) }
 .repeat-list li .small { color: var(--muted) } .repeat-list li.taken .small { color: var(--bad) }
+/* ---------- Kalender: Agenda fürs Handy ---------- */
+.agenda { display: none; list-style: none; margin: 0; padding: 0 }
+.agenda li { display: grid; grid-template-columns: 52px 1fr; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--line) }
+.agenda li.past { opacity: .6 }
+.agenda li.today .ag-day b { background: var(--brand); color: #fff; border-radius: 8px }
+.ag-day { display: grid; justify-items: center; align-content: start; line-height: 1.1 }
+.ag-day b { font-family: var(--f-display); font-size: 1.25rem; padding: 2px 8px }
+.ag-day span { font-size: .72rem; color: var(--muted); text-transform: uppercase; font-weight: 600 }
+.ag-items { display: grid; gap: 6px; align-content: start; position: relative; padding-right: 36px; min-height: 34px }
+.ag-item { display: grid; gap: 1px; padding: 7px 10px; border-radius: 8px; background: color-mix(in srgb, var(--c, var(--muted)) 12%, var(--surface)); border-left: 3px solid var(--c, var(--muted)); text-decoration: none; color: var(--ink); font-size: .88rem }
+.ag-item.requested, .ag-item.pending_email { border-left-style: dashed }
+.ag-item.cancelled, .ag-item.rejected, .ag-item.expired { opacity: .55; text-decoration: line-through }
+.ag-item.sys { display: flex; gap: 6px; align-items: center; --c: var(--bad); color: var(--bad) }
+.ag-add { position: absolute; right: 0; top: 0; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; border: 1px dashed var(--line-strong); color: var(--muted) }
+@media (max-width: 700px) {
+  .month-wrap { display: none }
+  .agenda { display: block }
+}
+/* ---------- Verwaltung auf dem Handy ---------- */
+.tabbar { display: none }
+@media (max-width: 900px) {
+  .sidebar { scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); scroll-padding-inline: 24px }
+  .sidebar::-webkit-scrollbar { display: none }
+  .sidebar a { padding: 7px 12px; font-size: .88rem }
+  .tabbar { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--line); padding: 4px 4px calc(4px + env(safe-area-inset-bottom)) }
+  .tabbar a, .tabbar button { all: unset; position: relative; display: grid; justify-items: center; gap: 2px; padding: 6px 0; border-radius: 10px; font-size: .68rem; font-weight: 600; color: var(--muted); cursor: pointer; -webkit-tap-highlight-color: transparent }
+  .tabbar [aria-current="page"] { color: var(--brand-ink) }
+  .tabbar [aria-current="page"] .icon { background: var(--brand-tint); border-radius: 999px; padding: 2px 14px; box-sizing: content-box }
+  .tabbar .count { position: absolute; top: 2px; left: calc(50% + 8px); background: var(--bad); color: #fff; font-size: .62rem; border-radius: 8px; padding: 0 5px; line-height: 1.5 }
+  .admin { padding-bottom: calc(68px + env(safe-area-inset-bottom)) }
+  .admin + footer, .admin ~ .site-footer { padding-bottom: 72px }
+}
+/* ---------- Kompakter Seitenkopf auf dem Handy ---------- */
+@media (max-width: 640px) {
+  .site-header .wrap { gap: 4px 6px; min-height: 0; padding-block: 8px 0 }
+  .site-header .nav { display: contents }
+  .site-header .brand { order: 0 }
+  .site-header .brand img { width: 34px; height: 34px }
+  .site-header .theme-switch, .site-header .lang-switch { order: 1; margin-left: 0 }
+  .site-header .theme-switch { display: none }
+  .site-header .theme-cycle { display: grid; order: 1 }
+  .site-header .lang-switch button { min-width: 26px; height: 26px; font-size: .7rem }
+  .site-header .brand { gap: 8px }
+  .site-header .brand strong { font-size: 1rem }
+  .site-header .wrap::after { content: ""; flex-basis: 100%; order: 2; height: 0 }
+  .site-header .nav > a { order: 3; padding: 8px 10px 10px; font-size: .9rem }
+  .site-header .nav > a:first-of-type { margin-left: -10px }
+  .site-header .nav a[aria-current="page"]::after { bottom: 0 }
+}
