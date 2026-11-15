@@ -2,7 +2,8 @@ import 'server-only';
 import { decisionToken } from './auth';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { db } from './db';
-import { amountsDue, getExtras, type Booking, type MailTextKey } from './data';
+import { hausordnungPdf } from './pdf';
+import { amountsDue, getExtras, getSettings, type Booking, type MailTextKey } from './data';
 import { dueDate } from './payment';
 import type { Category } from './rules';
 import { bookingIcs } from './ics';
@@ -64,7 +65,7 @@ export async function sendMail(m: Mail): Promise<boolean> {
     } else if (mode === 'smtp') {
       await smtp().sendMail({
         from: mailFrom(), to, subject: m.subject, html: m.html, text: m.text, replyTo,
-        attachments: m.attachments?.map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64', contentType: 'text/calendar; charset=utf-8' })),
+        attachments: m.attachments?.map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64', contentType: a.filename.endsWith('.pdf') ? 'application/pdf' : 'text/calendar; charset=utf-8' })),
       });
     } else {
       const links = [...m.html.matchAll(/href="([^"]+)"/g)].map((x) => x[1]).filter((u) => u.startsWith('http'));
@@ -177,7 +178,8 @@ export const mails = {
   confirmed: async (b: Booking, c?: Category) => {
     const M = MAIL_TEXT[b.lang];
     const blocks = [P(hello(b)), paragraphs(await text('confirmed', b.lang)), details(b, c, [[M.labels.contact, esc(b.agreedWith)]], b.lang), ...(await payBlock(b))];
-    return sendMail({ kind: 'confirmed', to: bookerTo(b), bookingId: b.id, subject: M.confirmed.subject(b.title, fmtDay(b.start, b.lang)), attachments: ics(b, c),
+    const pdf = await hausordnungPdf(b, c, (await getSettings()).capacity, (await getExtras()).operator).catch((e) => { console.error('PDF:', e); return null; });
+    return sendMail({ kind: 'confirmed', to: bookerTo(b), bookingId: b.id, subject: M.confirmed.subject(b.title, fmtDay(b.start, b.lang)), attachments: [...(ics(b, c) ?? []), ...(pdf ? [pdf] : [])],
       ...build({ lang: b.lang, preheader: M.confirmed.pre(fmtLong(b.start, b.lang)), heading: M.confirmed.heading, blocks, cta: { href: manageLink(b), label: M.view } }) });
   },
   changed: async (b: Booking, before: Booking, c?: Category, note?: string) => {

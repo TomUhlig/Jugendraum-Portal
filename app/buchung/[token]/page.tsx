@@ -1,4 +1,4 @@
-import { CalendarPlus, CheckCircle2, MessageSquareText, Receipt, RotateCcw } from 'lucide-react';
+import { CalendarPlus, CheckCircle2, FileText, MessageSquareText, Receipt, RotateCcw } from 'lucide-react';
 import { rebookHref } from '@/lib/gcal-link';
 import { berlinHm as hmOf } from '@/lib/time';
 import { notFound, redirect } from 'next/navigation';
@@ -104,6 +104,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           {b.status === 'confirmed' && future && (
             <div className="card-foot inline"><a className="btn" href={`/buchung/${token}/kalender`}><CalendarPlus className="icon-sm" />{B.toCalendar}</a>
               <a className="btn" target="_blank" rel="noopener" href={googleCalendarLink({ title: `Jugendraum: ${b.title}`, start: b.start, end: b.end, details: `${b.number} · ${appUrl()}/buchung/${token}`, location: 'Jugendraum SV Heepen' })}><CalendarPlus className="icon-sm" />{B.toGoogle}</a>
+              <a className="btn" href={`/buchung/${token}/hausordnung`} target="_blank" rel="noopener"><FileText className="icon-sm" />{B.rulesPdf}</a>
               {(b.rentPaid || b.depositPaid) && <a className="btn" href={`/buchung/${token}/quittung`}><Receipt className="icon-sm" />{B.receipt}</a>}</div>
           )}
           {!(b.status === 'confirmed' && future) && (b.status !== 'pending_email' && b.status !== 'requested') && (
