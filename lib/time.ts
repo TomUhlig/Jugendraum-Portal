@@ -67,14 +67,30 @@ export function weekendKey(ts: number, fromHour = 12, untilHour = 6): string | n
   return back === null ? null : addDays(ymd(p), -back);
 }
 
-const dayFmt = new Intl.DateTimeFormat('de-DE', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' });
-const longFmt = new Intl.DateTimeFormat('de-DE', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-export const fmtDay = (ts: number) => dayFmt.format(new Date(ts));
-export const fmtLong = (ts: number) => longFmt.format(new Date(ts));
+type Lng = 'de' | 'en' | 'tr';
+const LOC: Record<Lng, string> = { de: 'de-DE', en: 'en-GB', tr: 'tr-TR' };
+const fmtCache = new Map<string, Intl.DateTimeFormat>();
+function fmt(lang: Lng, kind: 'day' | 'long' | 'short'): Intl.DateTimeFormat {
+  const k = lang + kind;
+  let f = fmtCache.get(k);
+  if (!f) {
+    const o: Intl.DateTimeFormatOptions = kind === 'day' ? { weekday: 'short', day: 'numeric', month: 'short' }
+      : kind === 'long' ? { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' } : { day: 'numeric', month: 'short' };
+    f = new Intl.DateTimeFormat(LOC[lang], { timeZone: TZ, ...o });
+    fmtCache.set(k, f);
+  }
+  return f;
+}
+/** „Sa., 14. Nov.“ (bzw. „Sat 14 Nov“, „14 Kas Cmt“). */
+export const fmtDay = (ts: number, lang: Lng = 'de') => fmt(lang, 'day').format(new Date(ts));
+/** „Samstag, 14. November 2026“. */
+export const fmtLong = (ts: number, lang: Lng = 'de') => fmt(lang, 'long').format(new Date(ts));
 export const fmtRange = (s: number, e: number) => `${fmtDay(s)} · ${berlinHm(s)}–${berlinHm(e)} Uhr`;
+/** Uhrzeit-Spanne mit „Uhr“ nur auf Deutsch. */
+export const hmRange = (s: number, e: number, lang: Lng = 'de') => `${berlinHm(s)}–${berlinHm(e)}${lang === 'de' ? ' Uhr' : ''}`;
 
-export function weekendLabel(key: string): string {
+export function weekendLabel(key: string, lang: Lng = 'de'): string {
   const [y, m, d] = addDays(key, 2).split('-').map(Number);
-  const sun = new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString('de-DE', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-  return `${+key.slice(8)}.–${sun}`;
+  const sun = new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString(LOC[lang], { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return lang === 'de' ? `${+key.slice(8)}.–${sun}` : `${+key.slice(8)}–${sun}`;
 }

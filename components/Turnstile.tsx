@@ -9,7 +9,7 @@ export function Turnstile({ siteKey, onToken }: { siteKey: string; onToken: (t: 
   useEffect(() => {
     if (!siteKey || !ref.current) return;
     let id: string | undefined;
-    const render = () => { if (ref.current && window.turnstile) id = window.turnstile.render(ref.current, { sitekey: siteKey, language: 'de', callback: onToken, 'expired-callback': () => onToken(''), theme: 'auto' }); };
+    const render = () => { if (ref.current && window.turnstile) id = window.turnstile.render(ref.current, { sitekey: siteKey, language: 'auto', callback: onToken, 'expired-callback': () => onToken(''), theme: 'auto' }); };
     if (window.turnstile) render();
     else {
       const s = document.createElement('script');

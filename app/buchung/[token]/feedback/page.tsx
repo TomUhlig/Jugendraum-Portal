@@ -22,26 +22,31 @@ async function send(fd: FormData) {
   redirect(`/buchung/${token}?danke=1`);
 }
 
+import { getLang } from '@/lib/lang';
+import { t } from '@/lib/i18n';
+
 export default async function Feedback({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<Record<string, string>> }) {
   const { token } = await params; const sp = await searchParams;
   const b = await getBookingByToken(token);
   if (!b || b.status !== 'confirmed' || b.start > Date.now()) notFound();
   const fb = await getFeedback(b.id);
+  const lang = await getLang();
+  const F = t(lang).feedback;
   return (
     <main className="wrap narrow" style={{ paddingBlock: 32 }}>
       <form action={send} className="card">
-        <div className="card-head"><div><span className="eyebrow">{b.title} · {fmtLong(b.start)}</span><h1 style={{ fontSize: '1.4rem' }}>Wie war es im Jugendraum?</h1></div></div>
+        <div className="card-head"><div><span className="eyebrow">{b.title} · {fmtLong(b.start, lang)}</span><h1 style={{ fontSize: '1.4rem' }}>{F.title}</h1></div></div>
         <div className="card-body stack">
           <input type="hidden" name="token" value={token} />
           <fieldset style={{ border: 0, padding: 0, margin: 0 }} className="stack-sm">
-            <legend className="field" style={{ fontWeight: 600, marginBottom: 8 }}>Gesamteindruck (1 = schlecht, 5 = sehr gut)</legend>
+            <legend className="field" style={{ fontWeight: 600, marginBottom: 8 }}>{F.scale}</legend>
             <div className="rating">{[1, 2, 3, 4, 5].map((n) => <label key={n}><input type="radio" name="rating" value={n} defaultChecked={fb?.rating === n} required />{n}</label>)}</div>
-            {sp.fehler && <span className="field-error">Bitte wähle eine Bewertung.</span>}
+            {sp.fehler && <span className="field-error">{F.pick}</span>}
           </fieldset>
-          <label className="choice"><input type="checkbox" name="damage" defaultChecked={fb?.damage} /><span><b>Es ist etwas kaputtgegangen oder fehlt.</b><br /><span className="muted small">Das Orga-Team wird sofort informiert. Beschreib bitte kurz, was passiert ist.</span></span></label>
-          <div className="field"><label htmlFor="comment">Was sollen wir wissen? <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label><textarea id="comment" name="comment" maxLength={1000} defaultValue={fb?.comment} placeholder="Lob, Kritik, Verbesserungsvorschläge …" /></div>
+          <label className="choice"><input type="checkbox" name="damage" defaultChecked={fb?.damage} /><span><b>{F.damage}</b><br /><span className="muted small">{F.damageNote}</span></span></label>
+          <div className="field"><label htmlFor="comment">{F.comment} <span className="muted" style={{ fontWeight: 400 }}>{t(lang).app.optional}</span></label><textarea id="comment" name="comment" maxLength={1000} defaultValue={fb?.comment} placeholder={F.commentPh} /></div>
         </div>
-        <div className="card-foot inline"><button className="btn btn-primary" type="submit">Rückmeldung senden</button><a className="btn btn-ghost" href={`/buchung/${token}`}>Abbrechen</a></div>
+        <div className="card-foot inline"><button className="btn btn-primary" type="submit">{F.send}</button><a className="btn btn-ghost" href={`/buchung/${token}`}>{F.cancel}</a></div>
       </form>
     </main>
   );

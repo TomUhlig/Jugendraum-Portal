@@ -46,6 +46,8 @@ Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen 
 - **Fotos vom Raum** hochladen (werden automatisch verkleinert), Galerie auf Buchungsseite und „Raum & Regeln“
 
 **Darstellung:** Hell, Dunkel oder automatisch nach Systemeinstellung, umschaltbar oben rechts (wird gespeichert).
+
+**Sprachen:** Alles, was Buchende sehen (Buchungsseite mit Regelhinweisen, Raum & Regeln, Bucher-, Bezahl- und Wartelistenseiten, alle Mails an Buchende) gibt es auf Deutsch, Englisch und Türkisch. Umschalter in der Kopfzeile, sonst automatisch nach Browsersprache. Mails gehen in der Sprache, in der angefragt wurde. Die Verwaltung bleibt deutsch. Türkische Texte vor der Veröffentlichung bitte gegenlesen lassen (`lib/i18n.ts`, `lib/mail-i18n.ts`, `lib/raum-text.tsx`, `lib/hausordnung.ts`).
 - Regeln einstellen: Puffer pro Kategorie, Freigabepflicht, „Party sperrt das ganze Wochenende“, Vorlauf, Kapazität
 - Team & Rollen (Admin / Verwalter / Lesezugriff), Mail-Benachrichtigung pro Person
 - Persönliches Kalender-Abo (iCal) für Handy oder Outlook

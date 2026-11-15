@@ -1,4 +1,5 @@
 // Buchungsregeln. Läuft identisch im Browser (Live-Prüfung) und auf dem Server (verbindliche Prüfung).
+import { t as tr, type Lang } from './i18n';
 import { DAY, HOUR, MIN, addDays, berlinHm, berlinParts, berlinToUtc, berlinYmd, fmtDay, weekdayOf, weekendKey, weekendLabel } from './time';
 
 export type Category = {
@@ -55,6 +56,8 @@ export type Context = {
   blackouts: Blackout[];
   now: number;
   ignoreId?: string;
+  /** Sprache der Hinweise (Standard Deutsch). */
+  lang?: Lang;
   /** Admins dürfen Vorlauf- und Horizont-Regeln übergehen. */
   asAdmin?: boolean;
 };
@@ -75,21 +78,23 @@ export function checkBooking(d: Draft, ctx: Context): CheckResult {
   const messages: Message[] = [];
   let suggestion: Suggestion | null = null;
   const add = (level: Message['level'], code: string, text: string) => messages.push({ level, code, text });
+  const L = ctx.lang ?? 'de', T = tr(L).rules;
+  const cname = (x: Category) => (L === 'de' ? x.name : tr(L).cats[x.id]?.[0] ?? x.name);
 
-  if (!c) return { level: 'block', messages: [{ level: 'block', code: 'category', text: 'Bitte wähle eine Kategorie.' }], suggestion };
-  if (!(d.end > d.start)) return { level: 'block', messages: [{ level: 'block', code: 'range', text: 'Das Ende muss nach dem Beginn liegen.' }], suggestion };
+  if (!c) return { level: 'block', messages: [{ level: 'block', code: 'category', text: T.category }], suggestion };
+  if (!(d.end > d.start)) return { level: 'block', messages: [{ level: 'block', code: 'range', text: T.range }], suggestion };
 
   const duration = d.end - d.start;
-  if (d.start < now) add('block', 'past', 'Der Zeitpunkt liegt in der Vergangenheit.');
-  if (duration > c.maxDurationMin * MIN) add('block', 'duration', `Für „${c.name}“ geht eine Buchung maximal ${c.maxDurationMin / 60} Stunden.`);
-  if (!ctx.asAdmin && d.start > now + s.horizonDays * DAY) add('block', 'horizon', `Buchungen sind höchstens ${Math.round(s.horizonDays / 30)} Monate im Voraus möglich.`);
+  if (d.start < now) add('block', 'past', T.past);
+  if (duration > c.maxDurationMin * MIN) add('block', 'duration', T.duration(cname(c), c.maxDurationMin / 60));
+  if (!ctx.asAdmin && d.start > now + s.horizonDays * DAY) add('block', 'horizon', T.horizon(Math.round(s.horizonDays / 30)));
 
   // Sperrzeiten
   for (const b of ctx.blackouts) {
     if (b.scope === 'party' && !c.isParty) continue;
     // Sperrzeiten gelten für die gebuchte Zeit selbst ("ab 17 Uhr" heißt: Beginn 17:00 ist möglich)
     if (d.start < b.end && b.start < d.end) {
-      add('block', 'blackout', blackoutText(b));
+      add('block', 'blackout', blackoutText(b, L));
     }
   }
 
@@ -102,13 +107,13 @@ export function checkBooking(d: Draft, ctx: Context): CheckResult {
     const gapBeforeB = requiredGap(c, bc);
     const free = d.start >= b.end + gapAfterB || d.end + gapBeforeB <= b.start;
     if (free) continue;
-    const when = `${fmtDay(b.start)} ${berlinHm(b.start)}–${berlinHm(b.end)}`;
+    const when = `${fmtDay(b.start, L)} ${berlinHm(b.start)}–${berlinHm(b.end)}`;
     const core = d.start < b.end && b.start < d.end;
-    if (core) add('block', 'overlap', `Belegt: ${when} (${b.status === 'confirmed' ? 'gebucht' : 'angefragt'}).`);
-    else add('block', 'buffer', `Zu nah an einem Termin (${when}). Dazwischen braucht es ${Math.max(gapAfterB, gapBeforeB) / MIN} Minuten für Auf- und Abbau.`);
+    if (core) add('block', 'overlap', T.overlap(when, b.status === 'confirmed'));
+    else add('block', 'buffer', T.buffer(when, Math.max(gapAfterB, gapBeforeB) / MIN));
     if (!suggestion && d.start >= b.start) {
       const start = b.end + gapAfterB;
-      suggestion = { label: `Auf ${berlinHm(start)} Uhr verschieben`, start, end: start + duration };
+      suggestion = { label: T.shiftTo(berlinHm(start)), start, end: start + duration };
     }
   }
 
@@ -118,14 +123,13 @@ export function checkBooking(d: Draft, ctx: Context): CheckResult {
     const partyThatWeekend = ctx.slots.find((b) => b.id !== ctx.ignoreId && partyWeekendOf(b.start, cats.get(b.categoryId), s) === key);
     if (partyThatWeekend && (c.isParty || s.partyBlocksWholeWeekend)) {
       add('block', 'party-weekend', c.isParty
-        ? `Am Wochenende ${weekendLabel(key)} ist schon eine Feier eingetragen. Pro Wochenende gibt es nur eine Party.`
-        : `Das Wochenende ${weekendLabel(key)} ist wegen einer Feier komplett gesperrt.`);
+        ? T.partyWeekend(weekendLabel(key, L)) : T.weekendClosed(weekendLabel(key, L)));
       if (c.isParty) {
         const taken = new Set(ctx.slots.filter((b) => b.id !== ctx.ignoreId).map((b) => partyWeekendOf(b.start, cats.get(b.categoryId), s)).filter(Boolean));
         for (let w = 1; w <= 52; w++) {
           if (!taken.has(addDays(key, 7 * w))) {
             const shift = 7 * w * DAY; // Sommerzeit-Wechsel verschiebt höchstens um eine Stunde; wird beim Absenden erneut geprüft
-            suggestion = { label: `Nächstes freies Party-Wochenende: ${weekendLabel(addDays(key, 7 * w))}`, start: d.start + shift, end: d.end + shift };
+            suggestion = { label: T.nextWeekend(weekendLabel(addDays(key, 7 * w), L)), start: d.start + shift, end: d.end + shift };
             break;
           }
         }
@@ -134,13 +138,13 @@ export function checkBooking(d: Draft, ctx: Context): CheckResult {
   }
 
   // Hinweise (blockieren nicht)
-  if (c.isParty && !key) add('warn', 'party-weekday', 'Feiern unter der Woche nur nach besonderer Absprache (Nachbarschaft).');
+  if (c.isParty && !key) add('warn', 'party-weekday', T.partyWeekday);
   if (!ctx.asAdmin && d.start > now) {
-    if (c.isParty && d.start - now < s.partyMinLeadDays * DAY) add('warn', 'lead', `Feiern bitte mindestens ${s.partyMinLeadDays} Tage vorher anfragen. Kurzfristig nur nach Rücksprache.`);
-    else if (!c.isParty && d.start - now < s.minLeadHours * HOUR) add('warn', 'lead', `Bitte mindestens ${s.minLeadHours} Stunden vorher anfragen. Kurzfristig nur nach Rücksprache.`);
+    if (c.isParty && d.start - now < s.partyMinLeadDays * DAY) add('warn', 'lead', T.leadParty(s.partyMinLeadDays));
+    else if (!c.isParty && d.start - now < s.minLeadHours * HOUR) add('warn', 'lead', T.leadOther(s.minLeadHours));
   }
-  if (d.guests > s.capacity) add('warn', 'capacity', `Der Raum ist für höchstens ${s.capacity} Personen zugelassen (angegeben: ${d.guests}).`);
-  if (c.isParty && endsTooLate(d.end, s.partyLatestEnd)) add('warn', 'late', `Partys enden spätestens um ${s.partyLatestEnd} Uhr.`);
+  if (d.guests > s.capacity) add('warn', 'capacity', T.capacity(s.capacity, d.guests));
+  if (c.isParty && endsTooLate(d.end, s.partyLatestEnd)) add('warn', 'late', T.late(s.partyLatestEnd));
 
   const level: Level = messages.some((m) => m.level === 'block') ? 'block' : messages.length ? 'warn' : 'ok';
   return { level, messages, suggestion };
@@ -176,24 +180,31 @@ export function expandRecurring(rules: RecurringBlock[], from: number, to: numbe
 }
 
 /** Kurzbeschreibung einer regelmäßigen Sperre, z. B. „Mo, Di · 00:00–17:00 Uhr“. */
-export function describeRecurring(r: RecurringBlock): string {
-  const order = [1, 2, 3, 4, 5, 6, 0];
+const WD: Record<Lang, string[]> = { de: ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'], en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], tr: ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'] };
+const RW: Record<Lang, { daily: string; workdays: string; weekend: string; allDay: string; uhr: string }> = {
+  de: { daily: 'täglich', workdays: 'Mo–Fr', weekend: 'Sa und So', allDay: 'ganztägig', uhr: ' Uhr' },
+  en: { daily: 'daily', workdays: 'Mon–Fri', weekend: 'Sat and Sun', allDay: 'all day', uhr: '' },
+  tr: { daily: 'her gün', workdays: 'Pt–Cu', weekend: 'Ct ve Pz', allDay: 'tüm gün', uhr: '' },
+};
+export function describeRecurring(r: RecurringBlock, lang: Lang = 'de'): string {
+  const order = [1, 2, 3, 4, 5, 6, 0], w = RW[lang];
   const days = order.filter((d) => r.weekdays.includes(d));
-  const dayText = days.length === 7 ? 'täglich' : days.join(',') === '1,2,3,4,5' ? 'Mo–Fr' : days.join(',') === '6,0' ? 'Sa und So' : days.map((d) => WEEKDAY_SHORT[d]).join(', ');
-  const time = r.fromTime && r.toTime ? `${r.fromTime}–${r.toTime} Uhr` : 'ganztägig';
+  const dayText = days.length === 7 ? w.daily : days.join(',') === '1,2,3,4,5' ? w.workdays : days.join(',') === '6,0' ? w.weekend : days.map((d) => WD[lang][d]).join(', ');
+  const time = r.fromTime && r.toTime ? `${r.fromTime}–${r.toTime}${w.uhr}` : w.allDay;
   return `${dayText} · ${time}`;
 }
 
 /** Zeitraum einer Sperrzeit, z. B. „Mo., 21. Dez.–So., 3. Jan.“ oder „Sa., 5. Dez. 14:00–18:00 Uhr“. */
-export function blackoutWhen(b: Blackout): string {
+export function blackoutWhen(b: Blackout, lang: Lang = 'de'): string {
   const fullDays = berlinHm(b.start) === '00:00' && berlinHm(b.end) === '00:00';
   const sameDay = fmtDay(b.start) === fmtDay(b.end - 1);
-  if (fullDays) return sameDay ? fmtDay(b.start) : `${fmtDay(b.start)}–${fmtDay(b.end - 1)}`;
-  return sameDay ? `${fmtDay(b.start)} ${berlinHm(b.start)}–${berlinHm(b.end)} Uhr` : `${fmtDay(b.start)} ${berlinHm(b.start)} bis ${fmtDay(b.end)} ${berlinHm(b.end)} Uhr`;
+  const uhr = lang === 'de' ? ' Uhr' : '';
+  if (fullDays) return sameDay ? fmtDay(b.start, lang) : `${fmtDay(b.start, lang)}–${fmtDay(b.end - 1, lang)}`;
+  return sameDay ? `${fmtDay(b.start, lang)} ${berlinHm(b.start)}–${berlinHm(b.end)}${uhr}` : `${fmtDay(b.start, lang)} ${berlinHm(b.start)} ${tr(lang).rules.until} ${fmtDay(b.end, lang)} ${berlinHm(b.end)}${uhr}`;
 }
 /** Hinweistext für Buchende. */
-export function blackoutText(b: Blackout): string {
-  return b.scope === 'party' ? `Feiern sind ${blackoutWhen(b)} nicht möglich: ${b.reason}.` : `Der Raum ist ${blackoutWhen(b)} gesperrt: ${b.reason}.`;
+export function blackoutText(b: Blackout, lang: Lang = 'de'): string {
+  return b.scope === 'party' ? tr(lang).rules.blackoutParty(blackoutWhen(b, lang), b.reason) : tr(lang).rules.blackout(blackoutWhen(b, lang), b.reason);
 }
 
 function endsTooLate(end: number, latest: string): boolean {

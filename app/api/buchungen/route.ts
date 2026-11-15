@@ -4,6 +4,7 @@ import { createBooking, getCategories } from '@/lib/data';
 import { mails } from '@/lib/mail';
 import { clientIp, rateLimited } from '@/lib/ratelimit';
 import { checkHuman } from '@/lib/antispam';
+import { isLang, t } from '@/lib/i18n';
 import { addDays, berlinToUtc } from '@/lib/time';
 
 const schema = z.object({
@@ -25,26 +26,29 @@ const schema = z.object({
   rulesAccepted: z.literal(true),
   website: z.string().max(0).optional(),
   elapsed: z.coerce.number().optional(),
-  turnstile: z.string().max(4000).optional(), // Honeypot: Menschen lassen das Feld leer
+  turnstile: z.string().max(4000).optional(),
+  lang: z.enum(['de', 'en', 'tr']).default('de'), // Honeypot: Menschen lassen das Feld leer
 }).refine((v) => v.bookerType === 'external' || v.team.length > 0, { path: ['team'], message: 'Mannschaft/Abteilung fehlt' });
 
 export async function POST(req: Request) {
   if (rateLimited('book:' + clientIp(req), 8, 60 * 60_000)) {
-    return NextResponse.json({ error: 'Zu viele Anfragen in kurzer Zeit. Bitte später noch einmal versuchen.' }, { status: 429 });
+    return NextResponse.json({ error: t('de').api.tooMany + ' / ' + t('en').api.tooMany }, { status: 429 });
   }
-  const parsed = schema.safeParse(await req.json().catch(() => null));
+  const body = await req.json().catch(() => null);
+  const L = t(isLang(body?.lang) ? body.lang : 'de').api;
+  const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Bitte prüfe deine Angaben.', fields: parsed.error.flatten().fieldErrors }, { status: 400 });
+    return NextResponse.json({ error: L.check, fields: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
   const v = parsed.data;
-  const human = await checkHuman({ elapsed: v.elapsed, turnstile: v.turnstile, ip: clientIp(req) });
+  const human = await checkHuman({ elapsed: v.elapsed, turnstile: v.turnstile, ip: clientIp(req), lang: v.lang });
   if (human) return NextResponse.json({ error: human }, { status: 400 });
   const start = berlinToUtc(v.date, v.start);
   let end = berlinToUtc(v.date, v.end);
   if (end <= start) end = berlinToUtc(addDays(v.date, 1), v.end);
 
   const res = await createBooking({ ...v, start, end });
-  if (!res.ok) return NextResponse.json({ error: 'Der Zeitraum ist nicht frei.', check: res.check }, { status: 409 });
+  if (!res.ok) return NextResponse.json({ error: L.notFree, check: res.check }, { status: 409 });
 
   const cat = (await getCategories()).find((c) => c.id === v.categoryId);
   await mails.verify(res.booking, cat, res.verifyToken);

@@ -6,6 +6,7 @@ import {
   ACTIVE_STATUSES, Blackout, Category, CheckResult, DEFAULT_SETTINGS, Message, RecurringBlock, Settings, Slot, checkBooking, expandRecurring, partyWeekendOf,
 } from './rules';
 import { DAY } from './time';
+import { isLang, type Lang } from './i18n';
 import { DEFAULT_PAYMENT, type PaymentSettings } from './payment';
 
 export type Status = 'pending_email' | 'requested' | 'confirmed' | 'rejected' | 'cancelled' | 'expired';
@@ -14,7 +15,7 @@ export type Booking = {
   start: number; end: number; guests: number; bookerType: 'member' | 'external'; team: string;
   name: string; email: string; phone: string; agreedWith: string; manageToken: string; equipment: string[];
   rejectReason: string | null; internalNote: string; decidedBy: string | null; createdAt: number;
-  seriesId: string | null; createdBy: string | null; silent: boolean;
+  seriesId: string | null; createdBy: string | null; silent: boolean; lang: Lang;
   rent: number; deposit: number; rentPaid: boolean; depositPaid: boolean; depositReturned: boolean; depositWithheld: number;
   keyHandedOut: boolean; handoverAt: number | null; handoverBy: string | null; meterStart: number | null;
   returnAt: number | null; returnBy: string | null; meterEnd: number | null; conditionOk: boolean | null; damageNote: string;
@@ -31,7 +32,7 @@ const toBooking = (r: Row): Booking => ({
   name: r.name as string, email: r.email as string, phone: r.phone as string, agreedWith: r.agreed_with as string,
   manageToken: r.manage_token as string, equipment: (r.equipment as string[]) ?? [], rejectReason: (r.reject_reason as string) ?? null,
   internalNote: r.internal_note as string, decidedBy: (r.decided_by as string) ?? null, createdAt: +(r.created_at as Date),
-  seriesId: (r.series_id as string) ?? null, createdBy: (r.created_by as string) ?? null, silent: !!r.silent,
+  seriesId: (r.series_id as string) ?? null, createdBy: (r.created_by as string) ?? null, silent: !!r.silent, lang: isLang(r.lang) ? r.lang : 'de',
   rent: num(r.rent_eur), deposit: num(r.deposit_eur), rentPaid: !!r.rent_paid, depositPaid: !!r.deposit_paid, depositReturned: !!r.deposit_returned, depositWithheld: num(r.deposit_withheld_eur),
   keyHandedOut: !!r.key_handed_out, handoverAt: ts(r.handover_at), handoverBy: (r.handover_by as string) ?? null, meterStart: numOrNull(r.meter_start),
   returnAt: ts(r.return_at), returnBy: (r.return_by as string) ?? null, meterEnd: numOrNull(r.meter_end),
@@ -134,7 +135,7 @@ export async function getPublicOccupancy(from: number, to: number) {
 // ---------- Buchung anlegen (öffentlich) ----------
 export type NewBooking = {
   categoryId: string; title: string; note: string; start: number; end: number; guests: number; equipment: string[];
-  bookerType: 'member' | 'external'; team: string; name: string; email: string; phone: string; agreedWith: string;
+  bookerType: 'member' | 'external'; team: string; name: string; email: string; phone: string; agreedWith: string; lang?: Lang;
 };
 export type CreateResult = { ok: true; booking: Booking; verifyToken: string } | { ok: false; check: CheckResult };
 
@@ -149,7 +150,7 @@ async function lockedContext(q: postgres.TransactionSql, start: number, end: num
 export async function createBooking(b: NewBooking): Promise<CreateResult> {
   return db().begin(async (q) => {
     const ctx = await lockedContext(q, b.start, b.end);
-    const check = checkBooking(b, { ...ctx, now: Date.now() });
+    const check = checkBooking(b, { ...ctx, now: Date.now(), lang: b.lang });
     if (check.level === 'block') return { ok: false as const, check };
     const cat = ctx.categories.find((c) => c.id === b.categoryId)!;
     const fees = feesFor(ctx.extras, b.bookerType, cat.isParty);
@@ -159,7 +160,7 @@ export async function createBooking(b: NewBooking): Promise<CreateResult> {
       category_id: b.categoryId, title: b.title, note: b.note, starts_at: new Date(b.start), ends_at: new Date(b.end),
       guests: b.guests, booker_type: b.bookerType, team: b.team, name: b.name, email: b.email.toLowerCase(), phone: b.phone,
       agreed_with: b.agreedWith, party_weekend: partyWeekendOf(b.start, cat, ctx.settings), manage_token: token(), verify_token: verifyToken,
-      equipment, rent_eur: fees.rent, deposit_eur: fees.deposit,
+      equipment, rent_eur: fees.rent, deposit_eur: fees.deposit, lang: b.lang ?? 'de',
     })} returning *`;
     await audit(q, b.email, row.id, 'created');
     return { ok: true as const, booking: toBooking(row), verifyToken };
@@ -451,16 +452,16 @@ export async function notifyRecipients(): Promise<string[]> {
 }
 
 // ---------- Warteliste ----------
-export type WaitEntry = { id: string; token: string; categoryId: string; start: number; end: number; name: string; email: string; notifiedAt: number | null; createdAt: number };
+export type WaitEntry = { id: string; token: string; categoryId: string; start: number; end: number; name: string; email: string; notifiedAt: number | null; createdAt: number; lang: Lang };
 const toWait = (r: Row): WaitEntry => ({ id: r.id as string, token: r.token as string, categoryId: r.category_id as string, start: +(r.starts_at as Date), end: +(r.ends_at as Date),
-  name: r.name as string, email: r.email as string, notifiedAt: ts(r.notified_at), createdAt: +(r.created_at as Date) });
-export async function addWaitlist(e: { categoryId: string; start: number; end: number; name: string; email: string }): Promise<WaitEntry> {
+  name: r.name as string, email: r.email as string, notifiedAt: ts(r.notified_at), createdAt: +(r.created_at as Date), lang: isLang(r.lang) ? r.lang : 'de' });
+export async function addWaitlist(e: { categoryId: string; start: number; end: number; name: string; email: string; lang?: Lang }): Promise<WaitEntry> {
   const q = db();
   const mail = e.email.trim().toLowerCase();
   // Doppelte Einträge für denselben Zeitraum vermeiden
   const [dup] = await q`select * from waitlist where email = ${mail} and starts_at = ${new Date(e.start)} and ends_at = ${new Date(e.end)} and notified_at is null`;
   if (dup) return toWait(dup);
-  const [row] = await q`insert into waitlist (token, category_id, starts_at, ends_at, name, email) values (${token()}, ${e.categoryId}, ${new Date(e.start)}, ${new Date(e.end)}, ${e.name}, ${mail}) returning *`;
+  const [row] = await q`insert into waitlist (token, category_id, starts_at, ends_at, name, email, lang) values (${token()}, ${e.categoryId}, ${new Date(e.start)}, ${new Date(e.end)}, ${e.name}, ${mail}, ${e.lang ?? 'de'}) returning *`;
   return toWait(row);
 }
 export async function getWaitByToken(t: string): Promise<WaitEntry | null> {

@@ -511,3 +511,9 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
   .report .grid-2b { grid-template-columns: 1fr 1fr }
   .flash, .alert { display: none }
 }
+
+/* Sprachwahl */
+.lang-switch { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); gap: 2px; margin-left: 6px }
+.lang-switch button { min-width: 32px; height: 28px; border: 0; background: transparent; border-radius: 6px; color: var(--muted); cursor: pointer; font-weight: 700; font-size: .75rem; letter-spacing: .04em }
+.lang-switch button:hover { color: var(--ink) }
+.lang-switch button[aria-pressed="true"] { background: var(--surface); color: var(--brand-ink); box-shadow: var(--shadow) }

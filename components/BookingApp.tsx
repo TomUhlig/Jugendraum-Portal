@@ -7,6 +7,7 @@ import {
 import { Turnstile } from './Turnstile';
 import { Blackout, Category, CheckResult, Settings, Slot, blackoutWhen, checkBooking, partyWeekendOf } from '@/lib/rules';
 import { MIN, addDays, berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong, weekdayOf } from '@/lib/time';
+import { LOCALE, catLabel, t, type Lang } from '@/lib/i18n';
 
 type Fees = { rent: number; deposit: number };
 export type Occupancy = {
@@ -18,15 +19,14 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   meet: Users, team: Shirt, event: Megaphone, work: GraduationCap, party: PartyPopper, misc: Ellipsis,
 };
 const PEOPLE = ['Michael Grieswelle', 'Sigrid Brodig'];
-const STEPS = ['Anlass', 'Termin', 'Kontakt', 'Prüfen'];
-const eur = (n: number) => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: n % 1 ? 2 : 0 });
+const eurL = (n: number, lang: Lang) => n.toLocaleString(LOCALE[lang], { style: 'currency', currency: 'EUR', maximumFractionDigits: n % 1 ? 2 : 0 });
 const monthStart = (k: string) => k.slice(0, 8) + '01';
 const shiftMonth = (k: string, n: number) => {
   const [y, m] = k.split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + n, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`;
 };
-const monthLabel = (k: string) => new Date(k + 'T12:00:00Z').toLocaleDateString('de-DE', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-const dayLabel = (k: string) => new Date(k + 'T12:00:00Z').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+const monthLabelL = (k: string, lang: Lang) => new Date(k + 'T12:00:00Z').toLocaleDateString(LOCALE[lang], { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const dayLabelL = (k: string, lang: Lang) => new Date(k + 'T12:00:00Z').toLocaleDateString(LOCALE[lang], { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 const toMin = (hm: string) => +hm.slice(0, 2) * 60 + +hm.slice(3);
 const toHm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 const START_OPTIONS = Array.from({ length: (23 - 7) * 4 + 4 }, (_, i) => toHm(7 * 60 + i * 15));
@@ -37,7 +37,13 @@ type Done = { number: string; email: string };
 export type Prefill = { date?: string; start?: string; end?: string; categoryId?: string };
 const WAITABLE = new Set(['overlap', 'buffer', 'party-weekend', 'blackout']);
 
-export default function BookingApp({ initial, initialMonth, contactNote, prefill = {}, turnstileKey = '' }: { initial: Occupancy; initialMonth: string; contactNote: string; prefill?: Prefill; turnstileKey?: string }) {
+export default function BookingApp({ initial, initialMonth, contactNote, prefill = {}, turnstileKey = '', lang = 'de' }: { initial: Occupancy; initialMonth: string; contactNote: string; prefill?: Prefill; turnstileKey?: string; lang?: Lang }) {
+  const T = t(lang).app, D = t(lang);
+  const eur = (n: number) => eurL(n, lang);
+  const monthLabel = (k: string) => monthLabelL(k, lang);
+  const dayLabel = (k: string) => dayLabelL(k, lang);
+  const uhr = lang === 'de' ? ' Uhr' : '';
+  const cl = (c: Category) => catLabel(lang, c);
   const [loadedAt] = useState(() => Date.now());
   const [captcha, setCaptcha] = useState('');
   const onCaptcha = useCallback((t: string) => setCaptcha(t), []);
@@ -80,7 +86,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
     return { start, end, guests: +f.guests || 0 };
   }, [f.date, f.start, f.end, f.guests]);
   useEffect(() => { setWait({ open: false, state: 'idle', msg: '' }); }, [f.date, f.start, f.end, catId]);
-  const result: CheckResult | null = useMemo(() => (draft && catId ? checkBooking({ ...draft, categoryId: catId }, { ...data, now }) : null), [draft, catId, data, now]);
+  const result: CheckResult | null = useMemo(() => (draft && catId ? checkBooking({ ...draft, categoryId: catId }, { ...data, now, lang }) : null), [draft, catId, data, now, lang]);
 
   const endOptions = useMemo(() => {
     const s = toMin(f.start), max = (cat?.maxDurationMin ?? 16 * 60);
@@ -91,11 +97,11 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   // ---------- Validierung pro Schritt ----------
   const emailOk = /^\S+@\S+\.\S+$/.test(f.email.trim());
   const stepErrors: Record<string, string>[] = [
-    { ...(!catId && { cat: 'Bitte wähle aus, was ihr vorhabt.' }), ...(f.title.trim().length < 2 && { title: 'Bitte gib einen Anlass an.' }), ...(!(+f.guests >= 1) && { guests: 'Bitte schätze die Personenzahl.' }) },
-    { ...(!f.date && { date: 'Bitte wähle einen Tag im Kalender.' }), ...(result?.level === 'block' && { time: 'Der gewählte Zeitraum ist nicht frei.' }) },
-    { ...(f.name.trim().length < 2 && { name: 'Bitte gib deinen Namen an.' }), ...(!emailOk && { email: 'Bitte gib eine gültige E-Mail-Adresse an.' }),
-      ...(f.phone.trim().length < 4 && { phone: 'Bitte gib eine Telefonnummer für Rückfragen an.' }), ...(bookerType === 'member' && !f.team.trim() && { team: 'Bitte gib deine Mannschaft oder Abteilung an.' }) },
-    { ...(!(agree && who) && { agree: 'Bitte bestätige die Absprache und wähle die Person aus.' }), ...(!rules && { rules: 'Bitte akzeptiere Hausordnung und Datenschutz.' }) },
+    { ...(!catId && { cat: T.errCat }), ...(f.title.trim().length < 2 && { title: T.errTitle }), ...(!(+f.guests >= 1) && { guests: T.errGuests }) },
+    { ...(!f.date && { date: T.errDate }), ...(result?.level === 'block' && { time: T.errTime }) },
+    { ...(f.name.trim().length < 2 && { name: T.errName }), ...(!emailOk && { email: T.errEmail }),
+      ...(f.phone.trim().length < 4 && { phone: T.errPhone }), ...(bookerType === 'member' && !f.team.trim() && { team: T.errTeam }) },
+    { ...(!(agree && who) && { agree: T.errAgree }), ...(!rules && { rules: T.errRules }) },
   ];
   const err = (k: string) => (touched ? stepErrors[step][k] : undefined);
 
@@ -116,15 +122,15 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
         body: JSON.stringify({
           categoryId: catId, title: f.title.trim(), note: f.note.trim(), date: f.date, start: f.start, end: f.end, guests: +f.guests,
           equipment, bookerType, team: bookerType === 'member' ? f.team.trim() : '', name: f.name.trim(), email: f.email.trim(),
-          phone: f.phone.trim(), agreedWith: who, agreed: agree, rulesAccepted: rules, website: f.website, elapsed: Date.now() - loadedAt, turnstile: captcha,
+          phone: f.phone.trim(), agreedWith: who, agreed: agree, rulesAccepted: rules, lang, website: f.website, elapsed: Date.now() - loadedAt, turnstile: captcha,
         }),
       });
       const json = await res.json().catch(() => ({}));
       if (res.ok) { setDone({ number: json.number, email: f.email.trim() }); topRef.current?.scrollIntoView({ block: 'start' }); load(month); }
-      else if (res.status === 409) { await load(month); setStep(1); setServerError('Der Zeitraum wurde gerade vergeben: ' + (json.check?.messages?.[0]?.text ?? 'bitte wähle eine andere Zeit.')); }
-      else setServerError(json.error ?? 'Die Anfrage konnte nicht gesendet werden. Bitte versuche es gleich noch einmal.');
+      else if (res.status === 409) { await load(month); setStep(1); setServerError(T.taken + (json.check?.messages?.[0]?.text ?? T.pickOther)); }
+      else setServerError(json.error ?? T.sendFailed);
     } catch {
-      setServerError('Keine Verbindung zum Server. Bitte prüfe deine Internetverbindung.');
+      setServerError(T.offline);
     } finally { setBusy(false); }
   }
 
@@ -158,33 +164,33 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   const Summary = (
     <aside className="aside">
       <section className="card summary" aria-labelledby="sum-h">
-        <div className="card-head"><h2 id="sum-h">Deine Anfrage</h2>
-          {availability && <span className={`badge b-${availability === 'block' ? 'bad' : availability === 'warn' ? 'warn' : 'ok'}`}>{availability === 'block' ? 'nicht verfügbar' : availability === 'warn' ? 'mit Hinweisen' : 'verfügbar'}</span>}
+        <div className="card-head"><h2 id="sum-h">{T.yourRequest}</h2>
+          {availability && <span className={`badge b-${availability === 'block' ? 'bad' : availability === 'warn' ? 'warn' : 'ok'}`}>{availability === 'block' ? T.notAvailable : availability === 'warn' ? T.withHints : T.available}</span>}
         </div>
         <div className="card-body" style={{ paddingBlock: 6 }}>
           <dl>
-            <div className="item"><dt>Anlass</dt><dd className={f.title ? '' : 'tbd'}>{f.title || 'noch offen'}</dd></div>
-            <div className="item"><dt>Art</dt><dd className={cat ? '' : 'tbd'}>{cat ? <span className="catdot" style={{ '--c': cat.color } as React.CSSProperties}>{cat.name}</span> : 'noch offen'}</dd></div>
-            <div className="item"><dt>Datum</dt><dd className={f.date ? '' : 'tbd'}>{f.date ? dayLabel(f.date) : 'noch offen'}</dd></div>
-            <div className="item"><dt>Uhrzeit</dt><dd className={f.date ? 'num' : 'tbd'}>{f.date && draft ? `${f.start}–${f.end} Uhr${berlinYmd(draft.end) !== f.date ? ' (Folgetag)' : ''}` : 'noch offen'}</dd></div>
-            {cat && draft && <div className="item"><dt>Reserviert</dt><dd className="num" style={{ fontWeight: 400 }}>{berlinHm(draft.start - cat.bufferBefore * MIN)}–{berlinHm(draft.end + cat.bufferAfter * MIN)} Uhr<br /><span className="muted small">inkl. Auf- und Abbau</span></dd></div>}
-            <div className="item"><dt>Personen</dt><dd className="num">{f.guests || '–'}</dd></div>
-            {equipment.length > 0 && <div className="item"><dt>Ausstattung</dt><dd style={{ fontWeight: 400 }}>{equipment.join(', ')}</dd></div>}
-            {(fees.rent > 0 || fees.deposit > 0) && <div className="item"><dt>Kosten</dt><dd style={{ fontWeight: 400 }}>{fees.rent > 0 && <>Nutzungsentgelt {eur(fees.rent)}<br /></>}{fees.deposit > 0 && <>Kaution {eur(fees.deposit)} <span className="muted small">(zurück nach Abnahme)</span></>}</dd></div>}
+            <div className="item"><dt>{T.occasion}</dt><dd className={f.title ? '' : 'tbd'}>{f.title || T.open}</dd></div>
+            <div className="item"><dt>{T.kind}</dt><dd className={cat ? '' : 'tbd'}>{cat ? <span className="catdot" style={{ '--c': cat.color } as React.CSSProperties}>{cl(cat).name}</span> : T.open}</dd></div>
+            <div className="item"><dt>{T.date}</dt><dd className={f.date ? '' : 'tbd'}>{f.date ? dayLabel(f.date) : T.open}</dd></div>
+            <div className="item"><dt>{T.time}</dt><dd className={f.date ? 'num' : 'tbd'}>{f.date && draft ? `${f.start}–${f.end}${uhr}${berlinYmd(draft.end) !== f.date ? ' ' + T.nextDay : ''}` : T.open}</dd></div>
+            {cat && draft && <div className="item"><dt>{T.reserved}</dt><dd className="num" style={{ fontWeight: 400 }}>{berlinHm(draft.start - cat.bufferBefore * MIN)}–{berlinHm(draft.end + cat.bufferAfter * MIN)}{uhr}<br /><span className="muted small">{T.inclSetup}</span></dd></div>}
+            <div className="item"><dt>{T.people}</dt><dd className="num">{f.guests || '–'}</dd></div>
+            {equipment.length > 0 && <div className="item"><dt>{T.equipment}</dt><dd style={{ fontWeight: 400 }}>{equipment.join(', ')}</dd></div>}
+            {(fees.rent > 0 || fees.deposit > 0) && <div className="item"><dt>{T.costs}</dt><dd style={{ fontWeight: 400 }}>{fees.rent > 0 && <>{T.rent} {eur(fees.rent)}<br /></>}{fees.deposit > 0 && <>{T.deposit} {eur(fees.deposit)} <span className="muted small">{T.depositBack}</span></>}</dd></div>}
           </dl>
         </div>
       </section>
       <section className="card card-body stack">
-        <h2 className="section-title">Ansprechpartner</h2>
-        {PEOPLE.map((p) => <div className="contact" key={p}><span className="avatar">{initials(p)}</span><div><b>{p}</b><br /><span className="muted small">Vorab-Absprache und Schlüssel</span></div></div>)}
-        {contactNote && <p className="muted small">{contactNote}</p>}
+        <h2 className="section-title">{T.contacts}</h2>
+        {PEOPLE.map((p) => <div className="contact" key={p}><span className="avatar">{initials(p)}</span><div><b>{p}</b><br /><span className="muted small">{T.contactRole}</span></div></div>)}
+        {contactNote && lang === 'de' && <p className="muted small">{contactNote}</p>}
       </section>
       <section className="card card-body stack">
-        <h2 className="section-title">So geht es weiter</h2>
+        <h2 className="section-title">{T.howItGoes}</h2>
         <ol className="next-steps">
-          <li>Du bestätigst deine E-Mail-Adresse über den Link in unserer Mail.</li>
-          <li>Das Orga-Team prüft die Anfrage. Besprechungen von Mitgliedern werden direkt eingetragen.</li>
-          <li>Du bekommst die Bestätigung mit Kalendereintrag und eine Erinnerung vor dem Termin.</li>
+          <li>{T.next1}</li>
+          <li>{T.next2}</li>
+          <li>{T.next3}</li>
         </ol>
       </section>
     </aside>
@@ -196,10 +202,10 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
         <section className="card fade-in">
           <div className="done-view">
             <span className="seal"><CheckCircle2 className="icon" /></span>
-            <div><span className="eyebrow">Anfrage <span className="refno">{done.number}</span></span><h2>Bitte bestätige noch deine E-Mail-Adresse</h2></div>
-            <p>Wir haben eine Mail an <b>{done.email}</b> geschickt. Erst mit deiner Bestätigung geht die Anfrage an das Orga-Team. Ohne Bestätigung verfällt sie nach 24 Stunden.</p>
-            <p className="muted small">Keine Mail bekommen? Schau bitte im Spam-Ordner nach.</p>
-            <button className="btn" onClick={reset}>Weitere Anfrage stellen</button>
+            <div><span className="eyebrow">{T.requestNo} <span className="refno">{done.number}</span></span><h2>{T.confirmEmail}</h2></div>
+            <p>{T.sentTo(done.email)}</p>
+            <p className="muted small">{T.noMail}</p>
+            <button className="btn" onClick={reset}>{T.another}</button>
           </div>
         </section>
         {Summary}
@@ -209,9 +215,9 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
 
   return (
     <div className="wrap booking-layout" ref={topRef} style={{ scrollMarginTop: 90 }}>
-      <section className="card" aria-label="Anfrage stellen">
+      <section className="card" aria-label={T.makeRequest}>
         <ol className="steps">
-          {STEPS.map((s, i) => (
+          {T.steps.map((s, i) => (
             <li key={s}>
               <button type="button" disabled={i > reached} onClick={() => go(i)} aria-current={i === step ? 'step' : undefined} className={i < step ? 'done' : ''}>
                 <span className="n">{i < step ? <Check className="icon-sm" /> : i + 1}</span>{s}
@@ -222,51 +228,51 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
 
         {step === 0 && (
           <div className="step-body fade-in">
-            <div><h2>Was habt ihr vor?</h2><p className="lead">Davon hängen Vorbereitungszeit und Freigabe ab.</p></div>
-            <div className="options" role="group" aria-label="Art der Nutzung">
+            <div><h2>{T.whatTitle}</h2><p className="lead">{T.whatLead}</p></div>
+            <div className="options" role="group" aria-label={T.kindOfUse}>
               {data.categories.map((c) => {
                 const I = ICONS[c.id] ?? Ellipsis;
                 return (
                   <button type="button" key={c.id} className="option" aria-pressed={c.id === catId} onClick={() => setCatId(c.id)} style={{ '--c': c.color } as React.CSSProperties}>
-                    <span className="ico"><I className="icon" /></span><b>{c.name}</b><small>{c.hint}</small>
+                    <span className="ico"><I className="icon" /></span><b>{cl(c).name}</b><small>{cl(c).hint}</small>
                   </button>
                 );
               })}
             </div>
             {err('cat') && <p className="field-error">{err('cat')}</p>}
             <div className="row">
-              <div className="field span-2"><label htmlFor="f-title" className="req">Anlass</label>
-                <input type="text" id="f-title" maxLength={80} value={f.title} onChange={set('title')} className={err('title') ? 'invalid' : ''} placeholder={cat?.isParty ? 'z. B. 40. Geburtstag' : 'z. B. Mannschaftssitzung D2'} />
+              <div className="field span-2"><label htmlFor="f-title" className="req">{T.occasion}</label>
+                <input type="text" id="f-title" maxLength={80} value={f.title} onChange={set('title')} className={err('title') ? 'invalid' : ''} placeholder={cat?.isParty ? T.titlePhParty : T.titlePh} />
                 {err('title') && <span className="field-error">{err('title')}</span>}</div>
-              <div className="field"><label htmlFor="f-guests" className="req">Personen (ca.)</label>
+              <div className="field"><label htmlFor="f-guests" className="req">{T.guests}</label>
                 <input type="number" id="f-guests" min={1} max={200} value={f.guests} onChange={set('guests')} className={err('guests') ? 'invalid' : ''} />
-                {+f.guests > data.settings.capacity && <span className="hint" style={{ color: 'var(--warn)' }}>Zugelassen sind höchstens {data.settings.capacity} Personen.</span>}</div>
+                {+f.guests > data.settings.capacity && <span className="hint" style={{ color: 'var(--warn)' }}>{T.maxPeople(data.settings.capacity)}</span>}</div>
             </div>
             {data.equipment.length > 0 && (
-              <div className="field"><span className="label">Was braucht ihr? <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></span>
+              <div className="field"><span className="label">{T.needs} <span className="muted" style={{ fontWeight: 400 }}>{T.optional}</span></span>
                 <div className="chips">{data.equipment.map((e) => (
                   <button type="button" key={e} className="chip" aria-pressed={equipment.includes(e)} onClick={() => setEquipment((l) => (l.includes(e) ? l.filter((x) => x !== e) : [...l, e]))}>{e}</button>
                 ))}</div></div>
             )}
-            <div className="field"><label htmlFor="f-note">Nachricht ans Orga-Team <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
-              <textarea id="f-note" maxLength={500} value={f.note} onChange={set('note')} placeholder="Was ist geplant? Gibt es etwas, das wir wissen sollten?" />
+            <div className="field"><label htmlFor="f-note">{T.noteLabel} <span className="muted" style={{ fontWeight: 400 }}>{T.optional}</span></label>
+              <textarea id="f-note" maxLength={500} value={f.note} onChange={set('note')} placeholder={T.notePh} />
               <span className="hint">{f.note.length}/500</span></div>
           </div>
         )}
 
         {step === 1 && (
           <div className="step-body fade-in">
-            <div><h2>Wann braucht ihr den Raum?</h2><p className="lead">Wähle einen Tag. Belegte Zeiten siehst du rechts, Puffer für Auf- und Abbau rechnen wir automatisch ein.</p></div>
+            <div><h2>{T.whenTitle}</h2><p className="lead">{T.whenLead}</p></div>
             {serverError && <div className="alert alert-bad"><XCircle className="icon" /><div>{serverError}</div></div>}
             <div className="when">
               <div>
                 <div className="cal-nav">
-                  <button type="button" className="iconbtn" onClick={() => setMonth(shiftMonth(month, -1))} disabled={month <= monthStart(todayKey)} aria-label="Vorheriger Monat"><ChevronLeft className="icon" /></button>
+                  <button type="button" className="iconbtn" onClick={() => setMonth(shiftMonth(month, -1))} disabled={month <= monthStart(todayKey)} aria-label={T.prevMonth}><ChevronLeft className="icon" /></button>
                   <h3>{monthLabel(month)}</h3>
-                  <button type="button" className="iconbtn" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Nächster Monat"><ChevronRight className="icon" /></button>
+                  <button type="button" className="iconbtn" onClick={() => setMonth(shiftMonth(month, 1))} aria-label={T.nextMonth}><ChevronRight className="icon" /></button>
                 </div>
                 <div className="month" role="grid" aria-label={monthLabel(month)}>
-                  {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => <div className="dow" key={d}>{d}</div>)}
+                  {D.dow.map((d) => <div className="dow" key={d}>{d}</div>)}
                   {cells.map((k) => {
                     const list = daySlots(k);
                     const ds = berlinToUtc(k, '00:00'), de = berlinToUtc(addDays(k, 1), '00:00');
@@ -276,8 +282,8 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
                     const cls = ['dcell', k.slice(0, 7) !== month.slice(0, 7) && 'out', k === todayKey && 'today', k === f.date && 'sel', blocked && 'blocked'].filter(Boolean).join(' ');
                     return (
                       <button type="button" key={k} className={cls} disabled={k < todayKey || blocked} onClick={() => { setF((s) => ({ ...s, date: k })); if (monthStart(k) !== month) setMonth(monthStart(k)); }}
-                        aria-label={`${dayLabel(k)}: ${blocked ? 'gesperrt' : list.length ? `${list.length} Termin(e)` : 'frei'}`} aria-pressed={k === f.date}>
-                        {fri && partyWeekends.has(fri) && <span className="pw-flag" title="Feier am Wochenende eingetragen" />}
+                        aria-label={`${dayLabel(k)}: ${blocked ? T.blocked : list.length ? T.bookingsN(list.length) : T.free}`} aria-pressed={k === f.date}>
+                        {fri && partyWeekends.has(fri) && <span className="pw-flag" title={T.partyFlag} />}
                         <span className="d">{+k.slice(8)}</span>
                         <span className="dots">{list.slice(0, 3).map((s) => <i key={s.id} className={s.status !== 'confirmed' ? 'open' : ''} style={{ '--c': cats.get(s.categoryId)?.color } as React.CSSProperties} />)}</span>
                       </button>
@@ -285,29 +291,29 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
                   })}
                 </div>
                 <div className="legend">
-                  <span><i style={{ '--c': 'var(--muted)' } as React.CSSProperties} />Termin eingetragen</span>
-                  <span><i style={{ background: 'transparent', boxShadow: 'inset 0 0 0 1.5px var(--muted)' }} />angefragt</span>
-                  <span><i style={{ background: 'var(--gelb)' }} />Feier am Wochenende</span>
-                  {data.blackouts.length > 0 && <span><i style={{ background: 'repeating-linear-gradient(135deg, transparent 0 2px, var(--bad) 2px 3px)' }} />gesperrt</span>}
+                  <span><i style={{ '--c': 'var(--muted)' } as React.CSSProperties} />{T.legendBooked}</span>
+                  <span><i style={{ background: 'transparent', boxShadow: 'inset 0 0 0 1.5px var(--muted)' }} />{T.legendRequested}</span>
+                  <span><i style={{ background: 'var(--gelb)' }} />{T.legendParty}</span>
+                  {data.blackouts.length > 0 && <span><i style={{ background: 'repeating-linear-gradient(135deg, transparent 0 2px, var(--bad) 2px 3px)' }} />{T.legendBlocked}</span>}
                 </div>
               </div>
 
               <div className="dayplan">
-                {!f.date ? <p className="muted small" style={{ paddingTop: 6 }}>Wähle links einen Tag aus.</p> : (
+                {!f.date ? <p className="muted small" style={{ paddingTop: 6 }}>{T.pickDay}</p> : (
                   <>
                     <h3>{dayLabel(f.date)}</h3>
                     {dayBlocks(f.date).map((b) => (
-                      <div key={b.id} className="alert alert-bad" style={{ padding: '8px 10px' }}><div className="small"><strong>{b.scope === 'party' ? 'Keine Feiern' : 'Gesperrt'}</strong> {blackoutWhen(b)}: {b.reason}</div></div>
+                      <div key={b.id} className="alert alert-bad" style={{ padding: '8px 10px' }}><div className="small"><strong>{b.scope === 'party' ? T.noParties : T.closed}</strong> {blackoutWhen(b, lang)}: {b.reason}</div></div>
                     ))}
                     {daySlots(f.date).length ? (
                       <ul className="busy">{daySlots(f.date).map((s) => (
-                        <li key={s.id} style={{ '--c': cats.get(s.categoryId)?.color } as React.CSSProperties}><span className="t">{berlinHm(s.start)}–{berlinHm(s.end)}</span><span>{s.status === 'confirmed' ? 'belegt' : 'angefragt'}</span></li>
+                        <li key={s.id} style={{ '--c': cats.get(s.categoryId)?.color } as React.CSSProperties}><span className="t">{berlinHm(s.start)}–{berlinHm(s.end)}</span><span>{s.status === 'confirmed' ? T.booked : T.requested}</span></li>
                       ))}</ul>
-                    ) : <p className="free-day"><CircleCheck className="icon-sm" />Noch keine Termine an diesem Tag</p>}
+                    ) : <p className="free-day"><CircleCheck className="icon-sm" />{T.noBookings}</p>}
                     <div className="row" style={{ gridTemplateColumns: '1fr 1fr', marginTop: 6 }}>
-                      <div className="field"><label htmlFor="f-start">Von</label>
+                      <div className="field"><label htmlFor="f-start">{T.from}</label>
                         <select id="f-start" value={f.start} onChange={set('start')}>{START_OPTIONS.map((t) => <option key={t}>{t}</option>)}</select></div>
-                      <div className="field"><label htmlFor="f-end">Bis</label>
+                      <div className="field"><label htmlFor="f-end">{T.to}</label>
                         <select id="f-end" value={f.end} onChange={set('end')}>{endOptions.map((o) => <option key={o.v + o.next} value={o.v}>{o.v}{o.next ? ' (+1)' : ''}</option>)}</select></div>
                     </div>
                   </>
@@ -338,7 +344,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
               <div className={`alert alert-${result.level === 'block' ? 'bad' : result.level === 'warn' ? 'warn' : 'ok'}`} aria-live="polite">
                 {result.level === 'ok' ? <CheckCircle2 className="icon" /> : result.level === 'warn' ? <AlertTriangle className="icon" /> : <XCircle className="icon" />}
                 <div>
-                  <strong>{result.level === 'ok' ? 'Der Raum ist frei.' : result.level === 'warn' ? 'Möglich, bitte beachte:' : 'Zu dieser Zeit leider nicht möglich.'}</strong>
+                  <strong>{result.level === 'ok' ? T.roomFree : result.level === 'warn' ? T.possible : T.notPossible}</strong>
                   {result.messages.length > 0 && <ul>{result.messages.map((m, i) => <li key={i}>{m.text}</li>)}</ul>}
                   {result.suggestion && <div><button type="button" className="btn btn-sm" onClick={() => {
                     const s = result.suggestion!; const d = berlinYmd(s.start);
@@ -351,25 +357,25 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
             {result?.level === 'block' && draft && catId && result.messages.some((m) => WAITABLE.has(m.code)) && !result.messages.some((m) => !WAITABLE.has(m.code) && m.level === 'block') && (
               <div className="card card-body stack-sm" style={{ boxShadow: 'none' }}>
                 {wait.state === 'done' ? (
-                  <p className="free-day"><CircleCheck className="icon-sm" />Du stehst auf der Warteliste. Wir schreiben dir, sobald der Termin frei wird.</p>
+                  <p className="free-day"><CircleCheck className="icon-sm" />{T.waitDone}</p>
                 ) : !wait.open ? (
-                  <div className="between"><span className="small"><b>Genau dieser Termin soll es sein?</b> Wir benachrichtigen dich, wenn er frei wird.</span>
-                    <button type="button" className="btn btn-sm" onClick={() => setWait((w) => ({ ...w, open: true }))}><BellRing className="icon-sm" />Auf die Warteliste</button></div>
+                  <div className="between"><span className="small"><b>{T.waitAsk}</b> {T.waitAskText}</span>
+                    <button type="button" className="btn btn-sm" onClick={() => setWait((w) => ({ ...w, open: true }))}><BellRing className="icon-sm" />{T.waitJoin}</button></div>
                 ) : (
                   <>
-                    <span className="small"><b>Warteliste</b> für {dayLabel(f.date)}, {f.start}–{f.end} Uhr. Ein frei gewordener Termin ist nicht reserviert: Wer zuerst anfragt, bekommt ihn.</span>
+                    <span className="small"><b>{T.waitlist}</b> {T.waitFor(dayLabel(f.date), `${f.start}–${f.end}${uhr}`)} {T.waitNote}</span>
                     <div className="row">
-                      <div className="field"><label htmlFor="w-name">Name</label><input id="w-name" type="text" value={f.name} onChange={set('name')} autoComplete="name" /></div>
-                      <div className="field"><label htmlFor="w-email">E-Mail</label><input id="w-email" type="email" value={f.email} onChange={set('email')} autoComplete="email" /></div>
+                      <div className="field"><label htmlFor="w-name">{T.name}</label><input id="w-name" type="text" value={f.name} onChange={set('name')} autoComplete="name" /></div>
+                      <div className="field"><label htmlFor="w-email">{T.email}</label><input id="w-email" type="email" value={f.email} onChange={set('email')} autoComplete="email" /></div>
                     </div>
                     {wait.state === 'error' && <span className="field-error">{wait.msg}</span>}
                     <div><button type="button" className="btn btn-primary btn-sm" disabled={wait.state === 'busy'} onClick={async () => {
                       setWait((w) => ({ ...w, state: 'busy' }));
                       const res = await fetch('/api/warteliste', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ categoryId: catId, date: f.date, start: f.start, end: f.end, name: f.name.trim(), email: f.email.trim(), website: f.website, elapsed: Date.now() - loadedAt, turnstile: captcha }) }).catch(() => null);
+                        body: JSON.stringify({ categoryId: catId, date: f.date, start: f.start, end: f.end, name: f.name.trim(), email: f.email.trim(), website: f.website, elapsed: Date.now() - loadedAt, turnstile: captcha, lang }) }).catch(() => null);
                       const j = res ? await res.json().catch(() => ({})) : {};
-                      setWait(res?.ok ? { open: true, state: 'done', msg: '' } : { open: true, state: 'error', msg: j.error ?? 'Das hat nicht geklappt. Bitte versuch es noch einmal.' });
-                    }}>{wait.state === 'busy' ? 'Wird eingetragen …' : 'Benachrichtigen, wenn frei'}</button></div>
+                      setWait(res?.ok ? { open: true, state: 'done', msg: '' } : { open: true, state: 'error', msg: j.error ?? T.waitFailed });
+                    }}>{wait.state === 'busy' ? T.waitBusy : T.waitSubmit}</button></div>
                   </>
                 )}
               </div>
@@ -379,42 +385,42 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
 
         {step === 2 && (
           <div className="step-body fade-in">
-            <div><h2>Wer fragt an?</h2><p className="lead">Wir nutzen die Angaben nur für diese Buchung.</p></div>
-            <div className="segmented" role="group" aria-label="Mitglied oder extern">
-              <button type="button" aria-pressed={bookerType === 'member'} onClick={() => setBookerType('member')}>Vereinsmitglied</button>
-              <button type="button" aria-pressed={bookerType === 'external'} onClick={() => setBookerType('external')}>Nicht im Verein</button>
+            <div><h2>{T.whoTitle}</h2><p className="lead">{T.whoLead}</p></div>
+            <div className="segmented" role="group" aria-label={T.memberOrExt}>
+              <button type="button" aria-pressed={bookerType === 'member'} onClick={() => setBookerType('member')}>{T.member}</button>
+              <button type="button" aria-pressed={bookerType === 'external'} onClick={() => setBookerType('external')}>{T.external}</button>
             </div>
             <div className="row">
-              <div className="field"><label htmlFor="f-name" className="req">Vor- und Nachname</label><input type="text" id="f-name" autoComplete="name" value={f.name} onChange={set('name')} className={err('name') ? 'invalid' : ''} />{err('name') && <span className="field-error">{err('name')}</span>}</div>
-              {bookerType === 'member' && <div className="field"><label htmlFor="f-team" className="req">Mannschaft oder Abteilung</label><input type="text" id="f-team" value={f.team} onChange={set('team')} placeholder="z. B. D2-Jugend" className={err('team') ? 'invalid' : ''} />{err('team') && <span className="field-error">{err('team')}</span>}</div>}
+              <div className="field"><label htmlFor="f-name" className="req">{T.fullName}</label><input type="text" id="f-name" autoComplete="name" value={f.name} onChange={set('name')} className={err('name') ? 'invalid' : ''} />{err('name') && <span className="field-error">{err('name')}</span>}</div>
+              {bookerType === 'member' && <div className="field"><label htmlFor="f-team" className="req">{T.team}</label><input type="text" id="f-team" value={f.team} onChange={set('team')} placeholder={T.teamPh} className={err('team') ? 'invalid' : ''} />{err('team') && <span className="field-error">{err('team')}</span>}</div>}
             </div>
             <div className="row">
-              <div className="field"><label htmlFor="f-email" className="req">E-Mail</label><input type="email" id="f-email" autoComplete="email" value={f.email} onChange={set('email')} className={err('email') ? 'invalid' : ''} />{err('email') && <span className="field-error">{err('email')}</span>}</div>
-              <div className="field"><label htmlFor="f-phone" className="req">Telefon</label><input type="tel" id="f-phone" autoComplete="tel" value={f.phone} onChange={set('phone')} className={err('phone') ? 'invalid' : ''} />{err('phone') && <span className="field-error">{err('phone')}</span>}</div>
+              <div className="field"><label htmlFor="f-email" className="req">{T.email}</label><input type="email" id="f-email" autoComplete="email" value={f.email} onChange={set('email')} className={err('email') ? 'invalid' : ''} />{err('email') && <span className="field-error">{err('email')}</span>}</div>
+              <div className="field"><label htmlFor="f-phone" className="req">{T.phone}</label><input type="tel" id="f-phone" autoComplete="tel" value={f.phone} onChange={set('phone')} className={err('phone') ? 'invalid' : ''} />{err('phone') && <span className="field-error">{err('phone')}</span>}</div>
             </div>
             <div className="hp" aria-hidden="true"><label htmlFor="f-website">Website</label><input type="text" id="f-website" tabIndex={-1} autoComplete="off" value={f.website} onChange={set('website')} /></div>
-            {(fees.rent > 0 || fees.deposit > 0) && <div className="alert alert-info"><CalendarCheck className="icon" /><div>Für diese Nutzung fallen {fees.rent > 0 && <>ein Nutzungsentgelt von <b>{eur(fees.rent)}</b></>}{fees.rent > 0 && fees.deposit > 0 && ' und '}{fees.deposit > 0 && <>eine Kaution von <b>{eur(fees.deposit)}</b></>} an. Die Kaution bekommst du nach der Abnahme zurück.</div></div>}
+            {(fees.rent > 0 || fees.deposit > 0) && <div className="alert alert-info"><CalendarCheck className="icon" /><div>{T.feeInfo(fees.rent > 0 ? eur(fees.rent) : '', fees.deposit > 0 ? eur(fees.deposit) : '')}</div></div>}
           </div>
         )}
 
         {step === 3 && (
           <div className="step-body fade-in">
-            <div><h2>Prüfen und absenden</h2><p className="lead">Kontrolliere deine Angaben in der Übersicht. Mit dem Absenden stellst du eine verbindliche Anfrage.</p></div>
+            <div><h2>{T.checkTitle}</h2><p className="lead">{T.checkLead}</p></div>
             {cat && draft && (
               <dl className="kv">
-                <dt>Anlass</dt><dd><b>{f.title}</b> · {cat.name}</dd>
-                <dt>Termin</dt><dd>{fmtLong(draft.start)}, {f.start}–{f.end} Uhr{berlinYmd(draft.end) !== f.date ? ` (bis ${fmtDay(draft.end)})` : ''}</dd>
-                <dt>Personen</dt><dd>{f.guests}</dd>
-                <dt>Kontakt</dt><dd>{f.name}{bookerType === 'member' ? `, ${f.team}` : ' (nicht im Verein)'}<br />{f.email} · {f.phone}</dd>
-                {f.note && <><dt>Nachricht</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{f.note}</dd></>}
+                <dt>{T.occasion}</dt><dd><b>{f.title}</b> · {cl(cat).name}</dd>
+                <dt>{T.appointment}</dt><dd>{fmtLong(draft.start, lang)}, {f.start}–{f.end}{uhr}{berlinYmd(draft.end) !== f.date ? ` (${T.until} ${fmtDay(draft.end, lang)})` : ''}</dd>
+                <dt>{T.people}</dt><dd>{f.guests}</dd>
+                <dt>{T.contact}</dt><dd>{f.name}{bookerType === 'member' ? `, ${f.team}` : ' ' + T.notMember}<br />{f.email} · {f.phone}</dd>
+                {f.note && <><dt>{T.message}</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{f.note}</dd></>}
               </dl>
             )}
             <div className="stack-sm">
               <div className={`choice important${err('agree') ? ' invalid' : ''}`}>
                 <input type="checkbox" id="f-agree" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
                 <div className="stack-sm">
-                  <label htmlFor="f-agree"><b>Ich habe die Nutzung vorab mit Michael Grieswelle oder Sigrid Brodig abgesprochen.</b> Ohne vorherige Absprache ist die Buchung ungültig.</label>
-                  <div className="chips" role="radiogroup" aria-label="Abgesprochen mit">
+                  <label htmlFor="f-agree"><b>{T.agree}</b> {T.agreeNote}</label>
+                  <div className="chips" role="radiogroup" aria-label={T.agreedWith}>
                     {PEOPLE.map((p) => <label key={p} className="chip"><input type="radio" name="who" checked={who === p} onChange={() => { setWho(p); setAgree(true); }} />{p}</label>)}
                   </div>
                 </div>
@@ -422,7 +428,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
               {err('agree') && <span className="field-error">{err('agree')}</span>}
               <label className={`choice${err('rules') ? ' invalid' : ''}`} htmlFor="f-rules">
                 <input type="checkbox" id="f-rules" checked={rules} onChange={(e) => setRules(e.target.checked)} />
-                <span>Ich habe die <a href="/raum#hausordnung" target="_blank">Hausordnung</a> gelesen und akzeptiere sie. Die <a href="/raum#datenschutz" target="_blank">Datenschutzhinweise</a> habe ich zur Kenntnis genommen.</span>
+                <span>{T.rulesA}<a href="/raum#hausordnung" target="_blank">{T.rulesLink}</a>{T.rulesB}<a href="/raum#datenschutz" target="_blank">{T.privacyLink}</a>{T.rulesC}</span>
               </label>
               {err('rules') && <span className="field-error">{err('rules')}</span>}
             </div>
@@ -432,10 +438,10 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
         )}
 
         <div className="step-actions">
-          {step > 0 ? <button type="button" className="btn" onClick={() => go(step - 1)}><ArrowLeft className="icon-sm" />Zurück</button> : <span />}
+          {step > 0 ? <button type="button" className="btn" onClick={() => go(step - 1)}><ArrowLeft className="icon-sm" />{T.back}</button> : <span />}
           {step < 3
-            ? <button type="button" className="btn btn-primary" onClick={() => go(step + 1)} disabled={step === 1 && result?.level === 'block'}>Weiter<ArrowRight className="icon-sm" /></button>
-            : <button type="button" className="btn btn-primary btn-lg" onClick={submit} disabled={busy}>{busy ? 'Wird gesendet …' : 'Anfrage verbindlich senden'}</button>}
+            ? <button type="button" className="btn btn-primary" onClick={() => go(step + 1)} disabled={step === 1 && result?.level === 'block'}>{T.next}<ArrowRight className="icon-sm" /></button>
+            : <button type="button" className="btn btn-primary btn-lg" onClick={submit} disabled={busy}>{busy ? T.sending : T.submit}</button>}
         </div>
       </section>
       {Summary}

@@ -126,3 +126,18 @@ describe('Regelmäßige Sperren', () => {
     expect(describeRecurring(weekdayMornings)).toBe('Mo–Fr · 00:00–17:00 Uhr');
   });
 });
+
+describe('Hinweise in anderen Sprachen', () => {
+  const party = slot('p', 'party', '2026-11-28', '18:00', '2026-11-29', '01:00');
+  it('Englisch', () => {
+    const r = checkBooking({ categoryId: 'party', start: t('2026-11-27', '13:00'), end: t('2026-11-27', '15:00'), guests: 20 }, ctx([party], { lang: 'en' }));
+    expect(r.messages[0].text).toBe('A party is already booked for the weekend of 27–29 Nov. There is only one party per weekend.');
+    expect(r.suggestion?.label).toBe('Next free party weekend: 4–6 Dec');
+  });
+  it('Türkisch', () => {
+    const r = checkBooking({ categoryId: 'meet', start: t('2026-11-10', '19:45'), end: t('2026-11-10', '21:00'), guests: 8 },
+      ctx([slot('a', 'team', '2026-11-10', '18:00', '2026-11-10', '19:30')], { lang: 'tr' }));
+    expect(r.messages[0].text).toContain('Başka bir rezervasyona çok yakın');
+    expect(r.suggestion?.label).toBe('20:00 saatine kaydır');
+  });
+});
