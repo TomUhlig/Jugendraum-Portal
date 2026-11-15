@@ -19,18 +19,21 @@ export function icsFold(line: string): string {
 }
 export const icsJoin = (lines: string[]) => lines.map(icsFold).join('\r\n') + '\r\n';
 
-export function bookingIcs(b: Booking, c?: Category): string {
-  return icsJoin([
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//SV Heepen//Jugendraum//DE', 'METHOD:PUBLISH',
-    'BEGIN:VEVENT',
-    `UID:${b.id}@${new URL(appUrl()).hostname}`,
-    `DTSTAMP:${icsStamp(Date.now())}`,
-    `DTSTART:${icsStamp(b.start)}`,
-    `DTEND:${icsStamp(b.end)}`,
-    `SUMMARY:${icsText(`Jugendraum: ${b.title}`)}`,
-    `DESCRIPTION:${icsText(`${c?.name ?? ''} · Buchung ${b.number}\nVerwalten: ${appUrl()}/buchung/${b.manageToken}`)}`,
-    `LOCATION:${icsText('Jugendraum SV Heepen')}`,
-    'STATUS:CONFIRMED',
-    'END:VEVENT', 'END:VCALENDAR',
-  ]);
+const vevent = (b: Booking, c?: Category) => [
+  'BEGIN:VEVENT',
+  `UID:${b.id}@${new URL(appUrl()).hostname}`,
+  `DTSTAMP:${icsStamp(Date.now())}`,
+  `DTSTART:${icsStamp(b.start)}`,
+  `DTEND:${icsStamp(b.end)}`,
+  `SUMMARY:${icsText(`Jugendraum: ${b.title}`)}`,
+  `DESCRIPTION:${icsText(`${c?.name ?? ''} · Buchung ${b.number}\nVerwalten: ${appUrl()}/buchung/${b.manageToken}`)}`,
+  `LOCATION:${icsText('Jugendraum SV Heepen')}`,
+  'STATUS:CONFIRMED',
+  'END:VEVENT',
+];
+
+/** Kalenderdatei für eine oder mehrere Buchungen (Serie). */
+export function bookingIcs(b: Booking | Booking[], c?: Category): string {
+  const list = Array.isArray(b) ? b : [b];
+  return icsJoin(['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//SV Heepen//Jugendraum//DE', 'METHOD:PUBLISH', ...list.flatMap((x) => vevent(x, c)), 'END:VCALENDAR']);
 }

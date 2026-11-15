@@ -5,12 +5,12 @@ import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
   Admin, MailTextKey, addBlackout, deletePhoto, movePhoto, updatePhoto, addMessage, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
-  removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
+  decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
 } from '@/lib/data';
 import { mailMode, mails, teamMails } from '@/lib/mail';
 import { isValidIban, normalizeIban } from '@/lib/payment';
 import { refund } from '@/lib/stripe';
-import { afterDecision, notifyWaitlist } from '@/lib/notify';
+import { afterDecision, afterSeriesDecision, notifyWaitlist } from '@/lib/notify';
 import { Freq, describeSeries, seriesDates } from '@/lib/series';
 import { addDays, berlinToUtc } from '@/lib/time';
 import { pollInbox } from '@/lib/inbox';
@@ -402,4 +402,15 @@ export async function inboxAction() {
   const r = await pollInbox();
   if (r.error) go('/admin/einstellungen#mail', 'fehler', `Postfach-Abruf fehlgeschlagen: ${r.error}`);
   go('/admin/einstellungen#mail', 'ok', r.added ? `${r.added} Antwort(en) in die Nachrichten übernommen.` : 'Keine neuen Antworten im Postfach.');
+}
+
+export async function decideSeriesAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  const seriesId = str(fd, 'seriesId', 40), id = str(fd, 'id', 40);
+  const action = fd.get('action') === 'reject' ? 'reject' : 'confirm';
+  const reason = str(fd, 'reason', 500);
+  if (action === 'reject' && reason.length < 3) go(`/admin/buchung/${id}`, 'fehler', 'Bitte gib eine kurze Begründung an.');
+  const list = await decideSeries(seriesId, action, admin.name, action === 'reject' ? reason : undefined);
+  await afterSeriesDecision(list);
+  go(`/admin/buchung/${id}`, 'ok', list.length ? `${list.length} Termine ${action === 'confirm' ? 'bestätigt' : 'abgelehnt'}.${list[0].silent ? '' : ' Der Bucher bekommt eine Mail mit allen Terminen.'}` : 'Keine offenen Termine mehr in der Serie.');
 }

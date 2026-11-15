@@ -9,7 +9,7 @@ import { checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedb
 import { MessageThread } from '@/components/MessageThread';
 import { eur } from '@/lib/labels';
 import { berlinHm, berlinYmd, fmtDay, fmtLong } from '@/lib/time';
-import { cancelSeriesAction, changeAction, decideAction, handoverAction, messageAction, moneyAction, noteAction, refundAction, silentAction } from '../../../actions';
+import { decideSeriesAction, cancelSeriesAction, changeAction, decideAction, handoverAction, messageAction, moneyAction, noteAction, refundAction, silentAction } from '../../../actions';
 
 const fmtTs = (d: Date | number) => new Date(d).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'medium', timeStyle: 'short' });
 const ACTION: Record<string, string> = {
@@ -259,6 +259,18 @@ export default async function Detail({ params, searchParams }: { params: Promise
               <ul className="list" style={{ maxHeight: 280, overflowY: 'auto' }}>{series.map((s) => (
                 <li key={s.id} className="between" style={{ paddingBlock: 8 }}><Link href={`/admin/buchung/${s.id}`} style={{ fontWeight: s.id === b.id ? 700 : 400 }} className="num">{fmtDay(s.start)}, {berlinHm(s.start)}</Link><StatusBadge status={s.status} /></li>
               ))}</ul>
+              {can && series.some((s) => s.status === 'requested') && (
+                <div className="card-foot stack-sm">
+                  <span className="small"><b>{series.filter((s) => s.status === 'requested').length} offene Anfragen</b> in dieser Serie</span>
+                  <div className="inline" style={{ flexWrap: 'wrap' }}>
+                    <form action={decideSeriesAction}><input type="hidden" name="seriesId" value={b.seriesId!} /><input type="hidden" name="id" value={b.id} /><input type="hidden" name="action" value="confirm" />
+                      <button className="btn btn-sm btn-ok" type="submit">Alle bestätigen</button></form>
+                    <details><summary className="btn btn-sm btn-danger">Alle ablehnen …</summary>
+                      <form action={decideSeriesAction} className="stack-sm" style={{ marginTop: 8 }}><input type="hidden" name="seriesId" value={b.seriesId!} /><input type="hidden" name="id" value={b.id} /><input type="hidden" name="action" value="reject" />
+                        <input name="reason" type="text" placeholder="Begründung für den Bucher" required minLength={3} /><button className="btn btn-sm btn-danger" type="submit">Ablehnen</button></form></details>
+                  </div>
+                </div>
+              )}
               {can && (
                 <form action={cancelSeriesAction} className="card-foot stack-sm">
                   <input type="hidden" name="seriesId" value={b.seriesId!} /><input type="hidden" name="id" value={b.id} /><input type="hidden" name="from" value={b.start} />

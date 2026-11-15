@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createBooking, getCategories } from '@/lib/data';
+import { createBooking, createSeriesRequest, getCategories } from '@/lib/data';
+import { describeSeries, seriesDates } from '@/lib/series';
 import { mails } from '@/lib/mail';
 import { clientIp, rateLimited } from '@/lib/ratelimit';
 import { checkHuman } from '@/lib/antispam';
@@ -27,7 +28,8 @@ const schema = z.object({
   website: z.string().max(0).optional(),
   elapsed: z.coerce.number().optional(),
   turnstile: z.string().max(4000).optional(),
-  lang: z.enum(['de', 'en', 'tr']).default('de'), // Honeypot: Menschen lassen das Feld leer
+  lang: z.enum(['de', 'en', 'tr']).default('de'),
+  repeat: z.object({ freq: z.enum(['weekly', 'biweekly']), count: z.coerce.number().int().min(2).max(12) }).optional(), // Honeypot: Menschen lassen das Feld leer
 }).refine((v) => v.bookerType === 'external' || v.team.length > 0, { path: ['team'], message: 'Mannschaft/Abteilung fehlt' });
 
 export async function POST(req: Request) {
@@ -47,10 +49,21 @@ export async function POST(req: Request) {
   let end = berlinToUtc(v.date, v.end);
   if (end <= start) end = berlinToUtc(addDays(v.date, 1), v.end);
 
+  const cat = (await getCategories()).find((c) => c.id === v.categoryId);
+  if (v.repeat && cat && !cat.isParty) {
+    // Serie: gleiche Uhrzeit an jedem Termin
+    const days = seriesDates(v.date, v.repeat.freq, { count: v.repeat.count });
+    const len = end - start;
+    const slots = days.map((d) => { const s = berlinToUtc(d, v.start); return { start: s, end: s + len }; });
+    const rule = describeSeries(v.date, v.repeat.freq, days[0], days[days.length - 1], days.length);
+    const res = await createSeriesRequest({ ...v, start, end }, slots, rule);
+    if (!res.ok) return NextResponse.json({ error: L.notFree, check: res.check }, { status: 409 });
+    await mails.verify(res.booking, cat, res.verifyToken, { dates: res.dates, skipped: res.skipped });
+    return NextResponse.json({ number: res.booking.number, count: res.dates.length, skipped: res.skipped }, { status: 201 });
+  }
+
   const res = await createBooking({ ...v, start, end });
   if (!res.ok) return NextResponse.json({ error: L.notFree, check: res.check }, { status: 409 });
-
-  const cat = (await getCategories()).find((c) => c.id === v.categoryId);
   await mails.verify(res.booking, cat, res.verifyToken);
   return NextResponse.json({ number: res.booking.number }, { status: 201 });
 }

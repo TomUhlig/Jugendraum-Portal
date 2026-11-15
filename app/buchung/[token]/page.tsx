@@ -1,10 +1,10 @@
 import { CalendarPlus, CheckCircle2, FileText, MessageSquareText, Receipt, RotateCcw } from 'lucide-react';
 import { rebookHref } from '@/lib/gcal-link';
-import { berlinHm as hmOf } from '@/lib/time';
+import { berlinHm as hmOf, berlinHm, fmtDay } from '@/lib/time';
 import { notFound, redirect } from 'next/navigation';
 import { BookingFacts } from '@/components/BookingFacts';
 import { StatusBadge } from '@/components/StatusBadge';
-import { cancelByBooker, getBookingByToken, getCategories, getFeedback } from '@/lib/data';
+import { cancelByBooker, getBookingByToken, getCategories, getFeedback, listSeries } from '@/lib/data';
 import { afterBookerCancel } from '@/lib/notify';
 import { PaySection } from '@/components/PaySection';
 import { MessageThread } from '@/components/MessageThread';
@@ -69,7 +69,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   const { token } = await params; const sp = await searchParams;
   const b = await getBookingByToken(token);
   if (!b) notFound();
-  const [cats, fb, messages] = await Promise.all([getCategories(), getFeedback(b.id), listMessages(b.id)]);
+  const [cats, fb, messages, series] = await Promise.all([getCategories(), getFeedback(b.id), listMessages(b.id), b.seriesId ? listSeries(b.seriesId) : Promise.resolve([])]);
   const cat = cats.find((c) => c.id === b.categoryId);
   const lang = await getLang();
   const B = t(lang).booker, P = t(lang).pay;
@@ -115,6 +115,17 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           )}
         </section>
 
+        {series.length > 1 && (
+          <section className="card">
+            <div className="card-head"><h2>{({ de: 'Alle Termine dieser Serie', en: 'All dates in this series', tr: 'Bu serinin tüm tarihleri' } as const)[lang]}</h2><span className="muted small">{series.length}</span></div>
+            <ul className="list">{series.map((x) => (
+              <li key={x.id} className="between" style={{ paddingBlock: 8 }}>
+                <a href={`/buchung/${x.manageToken}`} className="num" style={{ fontWeight: x.id === b.id ? 700 : 400 }}>{fmtDay(x.start, lang)}, {berlinHm(x.start)}–{berlinHm(x.end)}</a>
+                <StatusBadge status={x.status} lang={lang} />
+              </li>
+            ))}</ul>
+          </section>
+        )}
         {sp.zahlung === 'bezahlt' && <div className="alert alert-ok"><CheckCircle2 className="icon" /><div>{B.paidMsg}</div></div>}
         <PaySection b={b} token={token} payOnline={payOnline} lang={lang}
           notice={sp.zahlung === 'offen' ? P.notDone : sp.zahlung === 'fehler' ? P.failed : sp.abgebrochen ? P.aborted : undefined} />

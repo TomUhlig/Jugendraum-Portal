@@ -626,3 +626,14 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .heat-legend { display: flex; align-items: center; gap: 4px; margin-top: 10px; font-size: .75rem; color: var(--muted) }
 .heat-legend i { width: 22px; height: 10px; border-radius: 2px }
 .heat-legend span:first-child { margin-right: 4px } .heat-legend span:nth-last-child(2) { margin-left: 4px }
+/* ---------- Serienanfrage ---------- */
+.repeat-box { border: 1px solid var(--line-strong); border-radius: 10px; padding: 12px 14px; display: grid; gap: 12px; background: var(--surface) }
+.repeat-box.on { border-color: var(--brand-ink); background: var(--brand-tint) }
+.repeat-box select { min-height: 36px }
+.repeat-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px }
+.repeat-list li { display: grid; gap: 1px; padding: 6px 10px; border-radius: 7px; background: var(--surface); border: 1px solid var(--line); font-size: .88rem; font-variant-numeric: tabular-nums }
+.repeat-list li.ok span:first-child::before { content: "✓ "; color: var(--ok); font-weight: 700 }
+.repeat-list li.taken { color: var(--bad); background: var(--bad-bg); border-color: transparent }
+.repeat-list li.taken span:first-child { text-decoration: line-through; text-decoration-thickness: 1px }
+.repeat-list li.unknown { color: var(--muted) }
+.repeat-list li .small { color: var(--muted) } .repeat-list li.taken .small { color: var(--bad) }

@@ -168,6 +168,38 @@ export async function createBooking(b: NewBooking): Promise<CreateResult> {
   });
 }
 
+/** Serienanfrage eines Buchers (z. B. jeden Dienstag). Der erste Termin muss frei sein, belegte Folgetermine werden übersprungen. */
+export type SeriesCreateResult = { ok: true; booking: Booking; verifyToken: string; dates: { start: number; end: number }[]; skipped: number[] } | { ok: false; check: CheckResult };
+export async function createSeriesRequest(b: NewBooking, slots: { start: number; end: number }[], rule: string): Promise<SeriesCreateResult> {
+  return db().begin(async (q) => {
+    const ctx = await lockedContext(q, slots[0].start, slots[slots.length - 1].end);
+    const cat = ctx.categories.find((c) => c.id === b.categoryId)!;
+    const fees = feesFor(ctx.extras, b.bookerType, cat.isParty);
+    const equipment = b.equipment.filter((e) => ctx.extras.equipment.includes(e));
+    const first = checkBooking({ ...b, ...slots[0] }, { ...ctx, now: Date.now(), lang: b.lang });
+    if (first.level === 'block') return { ok: false as const, check: first };
+    const [{ id: seriesId }] = await q`insert into series (rule, created_by) values (${rule}, ${b.email.toLowerCase()}) returning id`;
+    const dates: { start: number; end: number }[] = [], skipped: number[] = [];
+    let firstRow: Row | null = null, verifyToken = '';
+    for (const sl of slots) {
+      const check = sl === slots[0] ? first : checkBooking({ ...b, ...sl }, { ...ctx, now: Date.now(), lang: b.lang });
+      if (check.level === 'block') { skipped.push(sl.start); continue; }
+      const vt = token();
+      const [row] = await q`insert into bookings ${q({
+        category_id: b.categoryId, title: b.title, note: b.note, starts_at: new Date(sl.start), ends_at: new Date(sl.end),
+        guests: b.guests, booker_type: b.bookerType, team: b.team, name: b.name, email: b.email.toLowerCase(), phone: b.phone,
+        agreed_with: b.agreedWith, party_weekend: null, manage_token: token(), verify_token: vt, series_id: seriesId,
+        equipment, rent_eur: fees.rent, deposit_eur: fees.deposit, lang: b.lang ?? 'de',
+      })} returning *`;
+      if (!firstRow) { firstRow = row; verifyToken = vt; }
+      dates.push(sl);
+      ctx.slots.push({ id: row.id, categoryId: b.categoryId, start: sl.start, end: sl.end, status: 'pending_email' });
+    }
+    await audit(q, b.email, firstRow!.id as string, 'created', { series: seriesId, count: dates.length, skipped: skipped.length });
+    return { ok: true as const, booking: toBooking(firstRow!), verifyToken, dates, skipped };
+  });
+}
+
 /** E-Mail bestätigt: Anfrage wird aktiv. Mitglieder-Termine ohne Freigabepflicht werden direkt bestätigt. */
 export async function verifyBooking(verifyToken: string): Promise<{ booking: Booking; fresh: boolean } | null> {
   const q = db();
@@ -175,7 +207,12 @@ export async function verifyBooking(verifyToken: string): Promise<{ booking: Boo
   if (!row) return null;
   if (row.status !== 'pending_email') return { booking: toBooking(row), fresh: false };
   const [cat] = await q`select requires_approval from categories where id = ${row.category_id}`;
-  const auto = !cat.requires_approval && row.booker_type === 'member';
+  // Serien prüft immer das Orga-Team
+  const auto = !cat.requires_approval && row.booker_type === 'member' && !row.series_id;
+  if (row.series_id) {
+    const rest = await q`update bookings set status = 'requested', verified_at = now() where series_id = ${row.series_id} and status = 'pending_email' and id <> ${row.id} returning *`;
+    queueGoogle(rest.map(toBooking));
+  }
   const [upd] = await q`update bookings set status = ${auto ? 'confirmed' : 'requested'}, verified_at = now(),
     decided_by = ${auto ? 'automatisch' : null}, decided_at = ${auto ? new Date() : null}
     where id = ${row.id} and status = 'pending_email' returning *`;
@@ -277,6 +314,17 @@ export async function decide(id: string, action: 'confirm' | 'reject' | 'cancel'
     reject_reason = ${reason ?? null} where id = ${id} and status in ${q(allowed)} returning *`;
   if (row) { await audit(q, actor, id, action, { reason: reason ?? null }); queueGoogle([toBooking(row)]); }
   return row ? toBooking(row) : null;
+}
+
+/** Alle offenen Anfragen einer Serie bestätigen oder ablehnen. */
+export async function decideSeries(seriesId: string, action: 'confirm' | 'reject', actor: string, reason?: string): Promise<Booking[]> {
+  const q = db();
+  const rows = await q`update bookings set status = ${action === 'confirm' ? 'confirmed' : 'rejected'}, decided_by = ${actor}, decided_at = now(), reject_reason = ${reason ?? null}
+    where series_id = ${seriesId} and status = 'requested' returning *`;
+  for (const r of rows) await audit(q, actor, r.id, action, { series: true, reason: reason ?? null });
+  const list = rows.map(toBooking).sort((a, b) => a.start - b.start);
+  queueGoogle(list);
+  return list;
 }
 
 export async function cancelSeries(seriesId: string, actor: string, reason: string, fromTs: number): Promise<Booking[]> {

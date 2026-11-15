@@ -119,6 +119,22 @@ function build(o: Mailout) {
   return { html: layout(o), text: toText(o) };
 }
 
+
+const SERIES_TX = {
+  de: { title: (n: number) => `Alle ${n} Termine der Serie`, skipped: 'Diese Termine waren schon belegt und wurden nicht angefragt:' },
+  en: { title: (n: number) => `All ${n} dates of the series`, skipped: 'These dates were already taken and were not requested:' },
+  tr: { title: (n: number) => `Serinin ${n} tarihinin tümü`, skipped: 'Bu tarihler zaten doluydu ve talep edilmedi:' },
+};
+/** Terminliste einer Serie als Mail-Block. */
+function seriesBlock(dates: { start: number; end: number }[], lang: Lang, skipped: number[] = []): Block[] {
+  if (dates.length < 2 && !skipped.length) return [];
+  const T = SERIES_TX[lang];
+  const li = (s: string) => `<li style="margin:0 0 2px">${s}</li>`;
+  const out = [`<div style="margin:0 0 18px;padding:12px 16px;background:#F8F9FB;border-radius:8px"><div style="font-weight:600;margin-bottom:6px;color:#161A33">${T.title(dates.length)}</div><ul style="margin:0;padding-left:18px;color:#3D4260;font-size:14px;line-height:1.5">${dates.map((d) => li(`${fmtDay(d.start, lang)}, ${berlinHm(d.start)}–${berlinHm(d.end)}`)).join('')}</ul></div>`];
+  if (skipped.length) out.push(SMALL(`${T.skipped} ${skipped.map((s) => fmtDay(s, lang)).join(', ')}`));
+  return out;
+}
+
 function details(b: Booking, c?: Category, extra: [string, string][] = [], lang: Lang = 'de'): Block {
   const L = MAIL_TEXT[lang].labels;
   const eur = (n: number) => eurL(n, lang);
@@ -168,21 +184,21 @@ const when = (s: number, e: number, lang: Lang) => `${fmtLong(s, lang)}, ${berli
 
 // ---------- Mails an Bucher (in der Sprache der Anfrage) ----------
 export const mails = {
-  verify: (b: Booking, c: Category | undefined, verifyToken: string) => {
+  verify: (b: Booking, c: Category | undefined, verifyToken: string, series?: { dates: { start: number; end: number }[]; skipped: number[] }) => {
     const M = MAIL_TEXT[b.lang], V = M.verify;
     return sendMail({ kind: 'verify', to: bookerTo(b), bookingId: b.id, number: b.number, subject: V.subject(b.number),
-      ...build({ lang: b.lang, preheader: V.pre, heading: V.heading, blocks: [P(hello(b)), P(V.text), details(b, c, [], b.lang), SMALL(V.small)], cta: { href: `${appUrl()}/bestaetigen/${verifyToken}`, label: V.cta } }) });
+      ...build({ lang: b.lang, preheader: V.pre, heading: V.heading, blocks: [P(hello(b)), P(V.text), details(b, c, [], b.lang), ...(series ? seriesBlock(series.dates, b.lang, series.skipped) : []), SMALL(V.small)], cta: { href: `${appUrl()}/bestaetigen/${verifyToken}`, label: V.cta } }) });
   },
-  received: async (b: Booking, c?: Category) => {
+  received: async (b: Booking, c?: Category, series: Booking[] = []) => {
     const M = MAIL_TEXT[b.lang];
     return sendMail({ kind: 'received', to: bookerTo(b), bookingId: b.id, number: b.number, subject: M.received.subject(b.title, fmtDay(b.start, b.lang)),
-      ...build({ lang: b.lang, preheader: M.received.pre, heading: M.received.heading, blocks: [P(hello(b)), paragraphs(await text('received', b.lang)), details(b, c, [], b.lang)], cta: { href: manageLink(b), label: M.viewRequest } }) });
+      ...build({ lang: b.lang, preheader: M.received.pre, heading: M.received.heading, blocks: [P(hello(b)), paragraphs(await text('received', b.lang)), details(b, c, [], b.lang), ...seriesBlock(series, b.lang)], cta: { href: manageLink(b), label: M.viewRequest } }) });
   },
-  confirmed: async (b: Booking, c?: Category) => {
+  confirmed: async (b: Booking, c?: Category, series: Booking[] = []) => {
     const M = MAIL_TEXT[b.lang];
-    const blocks = [P(hello(b)), paragraphs(await text('confirmed', b.lang)), details(b, c, [[M.labels.contact, esc(b.agreedWith)]], b.lang), ...(await payBlock(b))];
+    const blocks = [P(hello(b)), paragraphs(await text('confirmed', b.lang)), details(b, c, [[M.labels.contact, esc(b.agreedWith)]], b.lang), ...seriesBlock(series, b.lang), ...(await payBlock(b))];
     const pdf = await hausordnungPdf(b, c, (await getSettings()).capacity, (await getExtras()).operator).catch((e) => { console.error('PDF:', e); return null; });
-    return sendMail({ kind: 'confirmed', to: bookerTo(b), bookingId: b.id, number: b.number, subject: M.confirmed.subject(b.title, fmtDay(b.start, b.lang)), attachments: [...(ics(b, c) ?? []), ...(pdf ? [pdf] : [])],
+    return sendMail({ kind: 'confirmed', to: bookerTo(b), bookingId: b.id, number: b.number, subject: M.confirmed.subject(b.title, fmtDay(b.start, b.lang)), attachments: [...(series.length > 1 ? [{ filename: `jugendraum-${b.number}-serie.ics`, content: Buffer.from(bookingIcs(series, c)).toString('base64') }] : ics(b, c)), ...(pdf ? [pdf] : [])],
       ...build({ lang: b.lang, preheader: M.confirmed.pre(fmtLong(b.start, b.lang)), heading: M.confirmed.heading, blocks, cta: { href: manageLink(b), label: M.view } }) });
   },
   changed: async (b: Booking, before: Booking, c?: Category, note?: string) => {
@@ -191,9 +207,9 @@ export const mails = {
     return sendMail({ kind: 'changed', to: bookerTo(b), bookingId: b.id, number: b.number, subject: C.subject(b.title, fmtDay(b.start, b.lang)), attachments: b.status === 'confirmed' ? ics(b, c) : undefined,
       ...build({ lang: b.lang, preheader: C.pre(when(b.start, b.end, b.lang)), heading: C.heading, blocks, cta: { href: manageLink(b), label: M.view } }) });
   },
-  rejected: async (b: Booking, c?: Category) => {
+  rejected: async (b: Booking, c?: Category, series: Booking[] = []) => {
     const R = MAIL_TEXT[b.lang].rejected;
-    const blocks = [P(hello(b)), paragraphs(await text('rejected', b.lang)), ...(b.rejectReason ? [P(`<b>${R.reason}</b> ${esc(b.rejectReason)}`)] : []), details(b, c, [], b.lang), P(R.other)];
+    const blocks = [P(hello(b)), paragraphs(await text('rejected', b.lang)), ...(b.rejectReason ? [P(`<b>${R.reason}</b> ${esc(b.rejectReason)}`)] : []), details(b, c, [], b.lang), ...seriesBlock(series, b.lang), P(R.other)];
     return sendMail({ kind: 'rejected', to: bookerTo(b), bookingId: b.id, number: b.number, subject: R.subject(b.title, fmtDay(b.start, b.lang)),
       ...build({ lang: b.lang, preheader: R.pre, heading: R.heading, blocks, cta: { href: appUrl(), label: R.cta } }) });
   },
@@ -258,12 +274,12 @@ export const bookerMails = {
 const adminLink = (b: Booking) => `${appUrl()}/admin/buchung/${b.id}`;
 const who = (b: Booking) => `${esc(b.name)} (${b.bookerType === 'member' ? 'Mitglied' + (b.team ? ', ' + esc(b.team) : '') : 'nicht im Verein'}) · ${esc(b.email)} · ${esc(b.phone)}`;
 export const teamMails = {
-  newRequest: (to: string[], b: Booking, c?: Category, conflicts?: string) => {
-    const blocks = [P(who(b)), details(b, c, [['Abgesprochen mit', esc(b.agreedWith)]]), ...(b.note ? [P(`„${esc(b.note)}“`)] : []),
+  newRequest: (to: string[], b: Booking, c?: Category, conflicts?: string, series: Booking[] = []) => {
+    const blocks = [P(who(b)), ...(series.length > 1 ? [P(`<b>Serienanfrage:</b> ${series.length} Termine`)] : []), details(b, c, [['Abgesprochen mit', esc(b.agreedWith)]]), ...(b.note ? [P(`„${esc(b.note)}“`)] : []),
       ...(conflicts ? [P(`<span style="color:#B42F36"><b>Achtung:</b> ${esc(conflicts)}</span>`)] : [])];
     // Jede Person bekommt eine eigene Mail mit persönlichem Entscheidungslink (ohne Anmeldung nutzbar)
     return Promise.all(to.map((r) => sendMail({ kind: 'team-new', to: r, bookingId: b.id, number: b.number, replyTo: b.email, subject: `Neue Anfrage: ${b.title}, ${fmtDay(b.start)}`,
-      ...build({ preheader: `${b.name} fragt ${fmtLong(b.start)} an.`, heading: 'Neue Anfrage', blocks: [...blocks, SMALL(`Oder <a href="${adminLink(b)}" style="color:#2E367A">in der Verwaltung öffnen</a>.`)],
+      ...build({ preheader: `${b.name} fragt ${fmtLong(b.start)} an.`, heading: 'Neue Anfrage', blocks: [...blocks, ...seriesBlock(series, 'de'), SMALL(`Oder <a href="${adminLink(b)}" style="color:#2E367A">in der Verwaltung öffnen</a>.`)],
         cta: { href: `${appUrl()}/entscheiden/${decisionToken(r, b.id)}`, label: 'Bestätigen oder ablehnen' } }) }))).then((x) => x.every(Boolean));
   },
   autoConfirmed: (to: string[], b: Booking, c?: Category) => sendMail({ kind: 'team-info', to, bookingId: b.id, number: b.number, subject: `Eingetragen: ${b.title}, ${fmtDay(b.start)}`,

@@ -32,7 +32,7 @@ const toHm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}
 const START_OPTIONS = Array.from({ length: (23 - 7) * 4 + 4 }, (_, i) => toHm(7 * 60 + i * 15));
 const initials = (n: string) => n.split(' ').map((p) => p[0]).join('').slice(0, 2);
 
-type Done = { number: string; email: string };
+type Done = { number: string; email: string; count?: number; skipped?: number };
 
 /** Webmailer zur Adresse, damit man die Bestätigungsmail mit einem Tipp öffnet. */
 function mailApp(email: string): { name: string; url: string } | null {
@@ -109,6 +109,18 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
     return { start, end, guests: +f.guests || 0 };
   }, [f.date, f.start, f.end, f.guests]);
   useEffect(() => { setWait({ open: false, state: 'idle', msg: '' }); }, [f.date, f.start, f.end, catId]);
+  const [repeat, setRepeat] = useState<{ on: boolean; freq: 'weekly' | 'biweekly'; count: number }>({ on: false, freq: 'weekly', count: 6 });
+  const seriesOn = repeat.on && !!cat && !cat.isParty;
+  const seriesPreview = useMemo(() => {
+    if (!seriesOn || !draft || !catId) return [];
+    const step = repeat.freq === 'weekly' ? 7 : 14, len = draft.end - draft.start;
+    const knownTo = berlinToUtc(addDays(shiftMonth(month, 1), 7), '00:00');
+    return Array.from({ length: repeat.count }, (_, i) => {
+      const d = addDays(f.date, i * step); const st = berlinToUtc(d, f.start);
+      const r = st < knownTo ? checkBooking({ start: st, end: st + len, guests: draft.guests, categoryId: catId }, { ...data, now, lang }) : null;
+      return { date: d, start: st, state: r ? (r.level === 'block' ? 'taken' : 'ok') : 'unknown' } as const;
+    });
+  }, [seriesOn, draft, catId, repeat.freq, repeat.count, f.date, f.start, month, data, now, lang]);
   const result: CheckResult | null = useMemo(() => (draft && catId ? checkBooking({ ...draft, categoryId: catId }, { ...data, now, lang }) : null), [draft, catId, data, now, lang]);
 
   const endOptions = useMemo(() => {
@@ -146,10 +158,11 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
           categoryId: catId, title: f.title.trim(), note: f.note.trim(), date: f.date, start: f.start, end: f.end, guests: +f.guests,
           equipment, bookerType, team: bookerType === 'member' ? f.team.trim() : '', name: f.name.trim(), email: f.email.trim(),
           phone: f.phone.trim(), agreedWith: who, agreed: agree, rulesAccepted: rules, lang, website: f.website, elapsed: Date.now() - loadedAt, turnstile: captcha,
+          ...(seriesOn ? { repeat: { freq: repeat.freq, count: repeat.count } } : {}),
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (res.ok) { try { localStorage.setItem('jr-kontakt', JSON.stringify({ name: f.name.trim(), team: f.team.trim(), email: f.email.trim(), phone: f.phone.trim(), bookerType })); } catch {} setDone({ number: json.number, email: f.email.trim() }); topRef.current?.scrollIntoView({ block: 'start' }); load(month); }
+      if (res.ok) { try { localStorage.setItem('jr-kontakt', JSON.stringify({ name: f.name.trim(), team: f.team.trim(), email: f.email.trim(), phone: f.phone.trim(), bookerType })); } catch {} setDone({ number: json.number, email: f.email.trim(), count: json.count, skipped: json.skipped?.length }); topRef.current?.scrollIntoView({ block: 'start' }); load(month); }
       else if (res.status === 409) { await load(month); setStep(1); setServerError(T.taken + (json.check?.messages?.[0]?.text ?? T.pickOther)); }
       else setServerError(json.error ?? T.sendFailed);
     } catch {
@@ -227,6 +240,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
             <span className="seal"><CheckCircle2 className="icon" /></span>
             <div><span className="eyebrow">{T.requestNo} <span className="refno">{done.number}</span></span><h2>{T.confirmEmail}</h2></div>
             <p>{T.sentTo(done.email)}</p>
+            {done.count && done.count > 1 ? <p className="badge b-info no-dot" style={{ whiteSpace: 'normal' }}>{T.doneSeries(done.count, done.skipped ?? 0)}</p> : null}
             {(() => { const m = mailApp(done.email); return m && <a className="btn btn-primary" href={m.url} target="_blank" rel="noopener">{T.openMail(m.name)}</a>; })()}
             <p className="muted small">{T.noMail}</p>
           </div>
@@ -379,6 +393,23 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
                     setF((v) => ({ ...v, date: d, start: berlinHm(s.start), end: berlinHm(s.end) })); if (monthStart(d) !== month) setMonth(monthStart(d));
                   }}>{result.suggestion.label}</button></div>}
                 </div>
+              </div>
+            )}
+            {f.date && cat && !cat.isParty && result?.level !== 'block' && (
+              <div className={`repeat-box${seriesOn ? ' on' : ''}`}>
+                <label className="check-inline"><input type="checkbox" checked={repeat.on} onChange={(e) => setRepeat((r) => ({ ...r, on: e.target.checked }))} />
+                  <span><b>{T.repeatLabel}</b> <span className="muted small">{T.repeatHint}</span></span></label>
+                {seriesOn && (<>
+                  <div className="inline" style={{ flexWrap: 'wrap', gap: 10 }}>
+                    <div className="segmented" role="group">{(['weekly', 'biweekly'] as const).map((fq) => <button type="button" key={fq} aria-pressed={repeat.freq === fq} onClick={() => setRepeat((r) => ({ ...r, freq: fq }))}>{T[fq]}</button>)}</div>
+                    <select aria-label={T.dates} value={repeat.count} onChange={(e) => setRepeat((r) => ({ ...r, count: +e.target.value }))} style={{ width: 'auto' }}>
+                      {Array.from({ length: 11 }, (_, i) => i + 2).map((n) => <option key={n} value={n}>{n} {T.dates}</option>)}</select>
+                  </div>
+                  <ul className="repeat-list">{seriesPreview.map((p) => (
+                    <li key={p.date} className={p.state}><span>{fmtDay(p.start, lang)}</span><span className="small">{p.state === 'taken' ? T.repeatTaken : p.state === 'unknown' ? T.repeatCheck : berlinHm(p.start)}</span></li>
+                  ))}</ul>
+                  <p className="muted small">{T.repeatNote}</p>
+                </>)}
               </div>
             )}
             {err('date') && <p className="field-error">{err('date')}</p>}

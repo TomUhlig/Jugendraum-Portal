@@ -4,8 +4,9 @@ import { Check, X } from 'lucide-react';
 import { BookingFacts } from '@/components/BookingFacts';
 import { StatusBadge } from '@/components/StatusBadge';
 import { parseDecisionToken } from '@/lib/auth';
-import { checkExisting, decide, getBooking, getCategories } from '@/lib/data';
-import { afterDecision } from '@/lib/notify';
+import { checkExisting, decide, decideSeries, getBooking, getCategories, listSeries } from '@/lib/data';
+import { berlinHm, fmtDay } from '@/lib/time';
+import { afterDecision, afterSeriesDecision } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Anfrage entscheiden', robots: { index: false } };
@@ -14,10 +15,17 @@ async function decideFromMail(fd: FormData) {
   'use server';
   const token = String(fd.get('token') ?? '');
   const action = fd.get('action') === 'reject' ? 'reject' : 'confirm';
+  const whole = fd.get('whole') === '1';
   const reason = String(fd.get('reason') ?? '').trim().slice(0, 500);
   const ctx = await parseDecisionToken(token);
   if (!ctx) redirect(`/entscheiden/${token}`);
   if (action === 'reject' && reason.length < 3) redirect(`/entscheiden/${token}?fehler=grund`);
+  const one = await getBooking(ctx!.bookingId);
+  if (whole && one?.seriesId) {
+    const list = await decideSeries(one.seriesId, action, ctx!.admin.name, action === 'reject' ? reason : undefined);
+    await afterSeriesDecision(list);
+    redirect(`/entscheiden/${token}?erledigt=${list.length ? action : 'schon'}`);
+  }
   const b = await decide(ctx!.bookingId, action, ctx!.admin.name, action === 'reject' ? reason : undefined);
   if (b) await afterDecision(b);
   redirect(`/entscheiden/${token}?erledigt=${b ? action : 'schon'}`);
@@ -41,6 +49,8 @@ export default async function Entscheiden({ params, searchParams }: { params: Pr
   }
   const cat = (await getCategories()).find((c) => c.id === b.categoryId);
   const open = b.status === 'requested';
+  const series = b.seriesId ? (await listSeries(b.seriesId)).filter((x) => x.status === 'requested') : [];
+  const whole = series.length > 1 ? '1' : '';
   const check = open ? await checkExisting(b) : null;
   const done = sp.erledigt;
   return (
@@ -59,18 +69,19 @@ export default async function Entscheiden({ params, searchParams }: { params: Pr
               <dt>Kontakt</dt><dd><a href={`mailto:${b.email}`}>{b.email}</a>{b.phone ? <> · <a href={`tel:${b.phone}`}>{b.phone}</a></> : null}</dd>
             </dl>
             {b.note && <div className="note">„{b.note}“</div>}
+            {series.length > 1 && <div className="stack-sm"><b className="small">Serienanfrage: {series.length} Termine</b><ul className="repeat-list">{series.map((x) => <li key={x.id} className="ok"><span>{fmtDay(x.start)}</span><span className="small">{berlinHm(x.start)}</span></li>)}</ul></div>}
             {check && <span className={`badge b-${check.level === 'ok' ? 'ok' : check.level === 'warn' ? 'warn' : 'bad'}`} style={{ justifySelf: 'start', whiteSpace: 'normal' }}>{check.level === 'ok' ? 'Keine Konflikte' : check.messages.map((m) => m.text).join(' ')}</span>}
           </div>
           {open && (
             <div className="card-foot decide-foot">
               <form action={decideFromMail}>
-                <input type="hidden" name="token" value={token} /><input type="hidden" name="action" value="confirm" />
-                <button className="btn btn-ok btn-lg" type="submit"><Check className="icon-sm" />Bestätigen</button>
+                <input type="hidden" name="token" value={token} /><input type="hidden" name="action" value="confirm" /><input type="hidden" name="whole" value={whole} />
+                <button className="btn btn-ok btn-lg" type="submit"><Check className="icon-sm" />{whole ? `Alle ${series.length} bestätigen` : 'Bestätigen'}</button>
               </form>
               <details className="reject-box">
                 <summary className="btn btn-danger"><X className="icon-sm" />Ablehnen …</summary>
                 <form action={decideFromMail} className="stack-sm" style={{ marginTop: 12 }}>
-                  <input type="hidden" name="token" value={token} /><input type="hidden" name="action" value="reject" />
+                  <input type="hidden" name="token" value={token} /><input type="hidden" name="action" value="reject" /><input type="hidden" name="whole" value={whole} />
                   <label className="field"><span className="label">Begründung für {b.name}</span><textarea name="reason" rows={3} required minLength={3} placeholder="z. B. An dem Abend ist schon eine Vereinsveranstaltung geplant." /></label>
                   <button className="btn btn-danger" type="submit">Ablehnen und Mail senden</button>
                 </form>

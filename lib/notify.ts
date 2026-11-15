@@ -1,5 +1,5 @@
 import 'server-only';
-import { Booking, checkExisting, freeWaitlistFor, getCategories, markStripePaid, notifyRecipients } from './data';
+import { Booking, listSeries, checkExisting, freeWaitlistFor, getCategories, markStripePaid, notifyRecipients } from './data';
 import { getCheckout } from './stripe';
 import { pushTeam } from './push';
 import { fmtDay } from './time';
@@ -22,9 +22,10 @@ export async function afterVerified(b: Booking) {
       await pushTeam({ title: `Neuer Termin: ${b.title}`, body: `${fmtDay(b.start)} · ${b.name} (automatisch eingetragen)`, url: `/admin/buchung/${b.id}` });
     } else {
       await pushTeam({ title: `Neue Anfrage: ${b.title}`, body: `${fmtDay(b.start)} · ${b.name}${b.bookerType === 'external' ? ' (nicht im Verein)' : ''}`, url: `/admin/buchung/${b.id}`, tag: 'anfrage-' + b.id });
-      await mails.received(b, cat);
+      const series = b.seriesId ? (await listSeries(b.seriesId)).filter((x) => x.status === 'requested') : [];
+      await mails.received(b, cat, series);
       const conflicts = (await checkExisting(b)).messages.map((m) => m.text).join(' ');
-      await teamMails.newRequest(team, b, cat, conflicts || undefined);
+      await teamMails.newRequest(team, b, cat, conflicts || undefined, series);
     }
   });
 }
@@ -37,6 +38,18 @@ export async function afterDecision(b: Booking) {
     if (b.status === 'cancelled') await mails.cancelled(b, cat);
   });
   if (b.status === 'rejected' || b.status === 'cancelled') await notifyWaitlist([b]);
+}
+
+/** Ganze Serie entschieden: eine Mail mit allen Terminen statt vieler einzelner. */
+export async function afterSeriesDecision(list: Booking[]) {
+  if (!list.length) return;
+  const b = list[0];
+  await safe('series-decision', async () => {
+    const cat = await categoryOf(b);
+    if (b.status === 'confirmed') await mails.confirmed(b, cat, list);
+    if (b.status === 'rejected') await mails.rejected(b, cat, list);
+  });
+  if (b.status === 'rejected') await notifyWaitlist(list);
 }
 
 export async function afterBookerCancel(b: Booking) {

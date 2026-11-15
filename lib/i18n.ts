@@ -30,6 +30,9 @@ const de = {
   dow: ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'],
   oclock: 'Uhr',
   app: {
+    repeatLabel: 'Regelmäßig wiederholen', repeatHint: 'z. B. Training oder Sitzungen, bis zu 12 Termine', weekly: 'jede Woche', biweekly: 'alle 2 Wochen', dates: 'Termine',
+    repeatTaken: 'belegt, wird übersprungen', repeatCheck: 'wird beim Absenden geprüft', repeatNote: 'Serien prüft immer das Orga-Team.',
+    doneSeries: (n: number, k: number) => `Angefragt: ${n} Termine${k ? `, ${k} belegte übersprungen` : ''}.`,
     steps: ['Anlass', 'Termin', 'Kontakt', 'Prüfen'],
     errCat: 'Bitte wähle aus, was ihr vorhabt.', errTitle: 'Bitte gib einen Anlass an.', errGuests: 'Bitte schätze die Personenzahl.',
     errDate: 'Bitte wähle einen Tag im Kalender.', errTime: 'Der gewählte Zeitraum ist nicht frei.', errName: 'Bitte gib deinen Namen an.',
@@ -143,6 +146,9 @@ const en: Dict = {
   dow: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
   oclock: '',
   app: {
+    repeatLabel: 'Repeat regularly', repeatHint: 'e.g. training or meetings, up to 12 dates', weekly: 'every week', biweekly: 'every 2 weeks', dates: 'dates',
+    repeatTaken: 'taken, will be skipped', repeatCheck: 'checked when you send', repeatNote: 'The team always reviews series.',
+    doneSeries: (n: number, k: number) => `Requested: ${n} dates${k ? `, ${k} taken dates skipped` : ''}.`,
     steps: ['Occasion', 'Date', 'Contact', 'Review'],
     errCat: 'Please choose what you are planning.', errTitle: 'Please enter an occasion.', errGuests: 'Please estimate the number of people.',
     errDate: 'Please choose a day in the calendar.', errTime: 'The selected time is not available.', errName: 'Please enter your name.',
@@ -254,6 +260,9 @@ const tr: Dict = {
   dow: ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pz'],
   oclock: '',
   app: {
+    repeatLabel: 'Düzenli tekrarla', repeatHint: 'ör. antrenman veya toplantılar, en fazla 12 tarih', weekly: 'her hafta', biweekly: '2 haftada bir', dates: 'tarih',
+    repeatTaken: 'dolu, atlanacak', repeatCheck: 'gönderirken kontrol edilecek', repeatNote: 'Serileri her zaman ekip inceler.',
+    doneSeries: (n: number, k: number) => `Talep edildi: ${n} tarih${k ? `, ${k} dolu tarih atlandı` : ''}.`,
     steps: ['Etkinlik', 'Tarih', 'İletişim', 'Kontrol'],
     errCat: 'Lütfen ne planladığınızı seçin.', errTitle: 'Lütfen etkinliğin adını yazın.', errGuests: 'Lütfen yaklaşık kişi sayısını girin.',
     errDate: 'Lütfen takvimden bir gün seçin.', errTime: 'Seçilen saat aralığı müsait değil.', errName: 'Lütfen adınızı yazın.',
