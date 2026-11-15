@@ -639,3 +639,25 @@ export async function bookingsForYear(year: number): Promise<Booking[]> {
   const from = new Date(`${year}-01-01T00:00:00+01:00`), to = new Date(`${year + 1}-01-01T00:00:00+01:00`);
   return (await db()`select * from bookings where status = 'confirmed' and starts_at >= ${from} and starts_at < ${to} order by starts_at`).map(toBooking);
 }
+
+/** Die nächsten freien Abende (Standard 18–22 Uhr) für Besprechungen, für die Schnellauswahl auf der Startseite. */
+export async function nextFreeEvenings(n = 6, from = '18:00', to = '22:00'): Promise<{ date: string; start: number; end: number }[]> {
+  const q = db();
+  const { berlinYmd, berlinToUtc: b2u, addDays } = await import('./time');
+  const today = berlinYmd(Date.now());
+  const horizon = 42;
+  const [categories, settings] = await Promise.all([getCategories(q), getSettings(q)]);
+  const cat = categories.find((c) => !c.isParty && !c.requiresApproval) ?? categories.find((c) => !c.isParty) ?? categories[0];
+  if (!cat) return [];
+  const rangeFrom = b2u(today, '00:00'), rangeTo = b2u(addDays(today, horizon + 1), '00:00');
+  const [slots, blackouts] = await Promise.all([getSlots(q, rangeFrom - DAY, rangeTo + DAY), getAllBlocks(q, rangeFrom - DAY, rangeTo + DAY)]);
+  const out: { date: string; start: number; end: number }[] = [];
+  for (let i = 0; i <= horizon && out.length < n; i++) {
+    const date = addDays(today, i);
+    const start = b2u(date, from), end = b2u(date, to);
+    if (start < Date.now() + 2 * 3600e3) continue;
+    const r = checkBooking({ categoryId: cat.id, start, end, guests: Math.min(10, settings.capacity) }, { categories, settings, slots, blackouts, now: Date.now() });
+    if (r.level !== 'block') out.push({ date, start, end });
+  }
+  return out;
+}

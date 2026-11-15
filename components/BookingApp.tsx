@@ -34,7 +34,7 @@ const initials = (n: string) => n.split(' ').map((p) => p[0]).join('').slice(0, 
 
 type Done = { number: string; email: string };
 
-export type Prefill = { date?: string; start?: string; end?: string; categoryId?: string };
+export type Prefill = { date?: string; start?: string; end?: string; categoryId?: string; title?: string; guests?: string; equipment?: string[] };
 const WAITABLE = new Set(['overlap', 'buffer', 'party-weekend', 'blackout']);
 
 export default function BookingApp({ initial, initialMonth, contactNote, prefill = {}, turnstileKey = '', lang = 'de' }: { initial: Occupancy; initialMonth: string; contactNote: string; prefill?: Prefill; turnstileKey?: string; lang?: Lang }) {
@@ -53,9 +53,19 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   const [step, setStep] = useState(0);
   const [reached, setReached] = useState(0);
   const [catId, setCatId] = useState<string | null>(prefill.categoryId ?? null);
-  const [f, setF] = useState({ title: '', guests: '20', note: '', date: prefill.date ?? '', start: prefill.start ?? '18:00', end: prefill.end ?? '22:00', name: '', team: '', email: '', phone: '', website: '' });
+  const [f, setF] = useState({ title: prefill.title ?? '', guests: prefill.guests ?? '20', note: '', date: prefill.date ?? '', start: prefill.start ?? '18:00', end: prefill.end ?? '22:00', name: '', team: '', email: '', phone: '', website: '' });
   const [wait, setWait] = useState<{ open: boolean; state: 'idle' | 'busy' | 'done' | 'error'; msg: string }>({ open: false, state: 'idle', msg: '' });
-  const [equipment, setEquipment] = useState<string[]>([]);
+  const [equipment, setEquipment] = useState<string[]>(prefill.equipment ?? []);
+  // Kontaktdaten auf diesem Gerät merken (nur im Browser, nie auf dem Server)
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('jr-kontakt') ?? 'null');
+      if (saved && typeof saved === 'object') {
+        setF((s) => ({ ...s, name: s.name || String(saved.name ?? ''), team: s.team || String(saved.team ?? ''), email: s.email || String(saved.email ?? ''), phone: s.phone || String(saved.phone ?? '') }));
+        if (saved.bookerType === 'external' || saved.bookerType === 'member') setBookerType(saved.bookerType);
+      }
+    } catch {}
+  }, []);
   const [bookerType, setBookerType] = useState<'member' | 'external'>('member');
   const [who, setWho] = useState('');
   const [agree, setAgree] = useState(false);
@@ -126,7 +136,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (res.ok) { setDone({ number: json.number, email: f.email.trim() }); topRef.current?.scrollIntoView({ block: 'start' }); load(month); }
+      if (res.ok) { try { localStorage.setItem('jr-kontakt', JSON.stringify({ name: f.name.trim(), team: f.team.trim(), email: f.email.trim(), phone: f.phone.trim(), bookerType })); } catch {} setDone({ number: json.number, email: f.email.trim() }); topRef.current?.scrollIntoView({ block: 'start' }); load(month); }
       else if (res.status === 409) { await load(month); setStep(1); setServerError(T.taken + (json.check?.messages?.[0]?.text ?? T.pickOther)); }
       else setServerError(json.error ?? T.sendFailed);
     } catch {

@@ -517,3 +517,57 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .lang-switch button { min-width: 32px; height: 28px; border: 0; background: transparent; border-radius: 6px; color: var(--muted); cursor: pointer; font-weight: 700; font-size: .75rem; letter-spacing: .04em }
 .lang-switch button:hover { color: var(--ink) }
 .lang-switch button[aria-pressed="true"] { background: var(--surface); color: var(--brand-ink); box-shadow: var(--shadow) }
+
+/* ---------- Startseite: Seitenkopf ---------- */
+.hero { position: relative; color: #fff; background: var(--intro); overflow: hidden; isolation: isolate }
+.hero::before { content: ""; position: absolute; inset: 0; z-index: -2; background-image: var(--hero-img, none); background-size: cover; background-position: center 40% }
+.hero::after { content: ""; position: absolute; inset: 0; z-index: -1;
+  background:
+    repeating-linear-gradient(115deg, transparent 0 22px, rgba(255, 216, 0, .07) 22px 23px),
+    linear-gradient(100deg, var(--intro) 0%, color-mix(in srgb, var(--intro) 92%, transparent) 45%, color-mix(in srgb, var(--intro) 55%, transparent) 100%) }
+.hero:not(.has-photo)::after { background: repeating-linear-gradient(115deg, transparent 0 22px, rgba(255, 216, 0, .07) 22px 23px), radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, #fff 9%, var(--intro)) 0%, var(--intro) 60%) }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .85fr); gap: 48px; align-items: center; padding-block: 48px 52px }
+.hero-copy { display: grid; gap: 16px; align-content: start }
+.hero-eyebrow { display: inline-flex; align-items: center; gap: 10px; font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gelb) }
+.hero-eyebrow::before { content: ""; width: 28px; height: 3px; background: var(--gelb); border-radius: 2px }
+.hero h1 { font-size: clamp(2rem, 4.4vw, 3.1rem); line-height: 1.05; letter-spacing: -.02em; color: #fff; text-wrap: balance }
+.hero p { color: rgba(255,255,255,.85); max-width: 58ch; font-size: 1.08rem; line-height: 1.55 }
+.hero-cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px }
+.btn-gelb { background: var(--gelb); border-color: var(--gelb); color: #1b1f4b; font-weight: 700; min-height: 46px; padding-inline: 20px }
+.btn-gelb:hover { background: #ffe33d; border-color: #ffe33d }
+.btn-gelb .icon { transition: transform .15s }
+.btn-gelb:hover .icon { transform: translateX(3px) }
+.btn-glass { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.28); color: #fff; min-height: 46px; padding-inline: 18px }
+.btn-glass:hover { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.5) }
+.hero .facts { margin-top: 10px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.14) }
+.hero-card { background: var(--surface); color: var(--ink); border-radius: 14px; padding: 22px 22px 14px; box-shadow: 0 24px 60px -24px rgba(8, 12, 40, .55), 0 0 0 1px rgba(255,255,255,.06) }
+.hero-card h2 { font-size: 1.15rem }
+.hero-card > p { color: var(--muted); font-size: .9rem; margin: 2px 0 14px }
+.free-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px }
+.free-list a { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 14px; padding: 6px 12px 6px 6px; border-radius: 10px; border: 1px solid var(--line); color: inherit; text-decoration: none; transition: border-color .15s, background .15s, transform .15s }
+.free-list a:hover { border-color: var(--brand); background: var(--brand-tint) }
+.free-list a:hover .icon { color: var(--brand); transform: translateX(2px) }
+.free-list .icon { color: var(--muted); transition: transform .15s }
+.fd { display: grid; justify-items: center; line-height: 1.05; background: var(--surface-2); border-radius: 8px; padding: 5px 0 }
+.free-list li:first-child .fd { background: var(--gelb); color: #1b1f4b }
+.free-list li:first-child .fd small { color: #1b1f4b }
+.fd small { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted) }
+.fd b { font-family: var(--f-display); font-size: 1.3rem }
+.ft { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap }
+.hero-card-foot { display: block; text-align: center; font-size: .88rem; font-weight: 600; padding: 12px 0 4px; margin-top: 8px; border-top: 1px solid var(--line) }
+.anchor { scroll-margin-top: 80px }
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; padding-block: 36px 32px; gap: 28px }
+  .free-list li:nth-child(n+5) { display: none }
+  .hero.has-photo::after { background: repeating-linear-gradient(115deg, transparent 0 22px, rgba(255, 216, 0, .07) 22px 23px), linear-gradient(180deg, color-mix(in srgb, var(--intro) 80%, transparent), color-mix(in srgb, var(--intro) 94%, transparent)) }
+}
+.pd-grid.receipt td { width: auto }
+.pd-grid.receipt small { color: #646A85 }
+.pd-grid.receipt tr.sum td { background: #F1F2F7 }
+.week-plan td { width: auto !important; vertical-align: top }
+.week-plan tr.empty-day td { color: #8A8FA8; height: 30px }
+.week-plan tr.blocked td { background: repeating-linear-gradient(135deg, #F1F2F7 0 6px, #fff 6px 12px) }
+.week-plan small { color: #3D4260 }
+.week-plan em { color: #9A6700; font-style: normal; font-weight: 600 }
+@media print { .print-doc.landscape { padding: 0; page: quer } }
+@page quer { size: A4 landscape; margin: 12mm }

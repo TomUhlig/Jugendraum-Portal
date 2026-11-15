@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { rebookHref } from '@/lib/gcal-link';
 import { StatusBadge } from '@/components/StatusBadge';
 import { emailFromBookerToken } from '@/lib/auth';
 import { getCategories, listByEmail } from '@/lib/data';
@@ -14,6 +15,7 @@ export default async function Liste({ params }: { params: Promise<{ token: strin
   const email = emailFromBookerToken((await params).token);
   const lang = await getLang();
   const M = t(lang).mine;
+  const B = t(lang).booker;
   if (!email) {
     return (
       <main className="wrap" style={{ paddingBlock: 40, maxWidth: 520 }}>
@@ -37,7 +39,10 @@ export default async function Liste({ params }: { params: Promise<{ token: strin
               <Link href={`/buchung/${b.manageToken}`} className="catdot" style={{ '--c': cat.get(b.categoryId)?.color, color: 'var(--ink)', fontWeight: 600, textDecoration: 'none' } as React.CSSProperties}>{b.title}</Link>
               <div className="muted small num">{fmtDay(b.start, lang)}, {berlinHm(b.start)}–{berlinHm(b.end)}{lang === 'de' ? ' Uhr' : ''} · {b.number}</div>
             </div>
-            <StatusBadge status={b.status} lang={lang} />
+            <div className="inline" style={{ gap: 8 }}>
+              {b.end < now && <Link className="btn btn-sm" href={rebookHref(b, berlinHm)}>{B.rebook}</Link>}
+              <StatusBadge status={b.status} lang={lang} />
+            </div>
           </li>
         ))}</ul>
       )}

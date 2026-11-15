@@ -28,7 +28,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
     const [list, blackouts] = await Promise.all([listBookings({ from, to, status: all ? undefined : [...ACTIVE] }), getAllBlocks(undefined, from, to)]);
     return (
       <>
-        <PageHead title="Kalender">
+        <PageHead title="Kalender"><Link className="btn" href="/admin/wochenplan">Wochenplan drucken</Link>
           <div className="segmented"><Link href={`?m=${w.slice(0, 7)}${all ? '&alle=1' : ''}`}>Monat</Link><Link href="#" aria-current="page">Woche</Link></div>
           <Link className="btn" href="/admin/sperrzeiten#neu"><Lock className="icon-sm" />Sperren</Link><Link className="btn btn-primary" href="/admin/neu"><Plus className="icon-sm" />Termin</Link>
         </PageHead>
@@ -57,7 +57,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
   const [list, blackouts] = await Promise.all([listBookings({ from, to, status: all ? undefined : [...ACTIVE] }), getAllBlocks(undefined, from, to)]);
   return (
     <>
-      <PageHead title="Kalender">
+      <PageHead title="Kalender"><Link className="btn" href="/admin/wochenplan">Wochenplan drucken</Link>
         <div className="segmented"><Link href="#" aria-current="page">Monat</Link><Link href={`?ansicht=woche&w=${monday(m.slice(0, 7) === today.slice(0, 7) ? today : m)}${all ? '&alle=1' : ''}`}>Woche</Link></div>
         <Link className="btn" href="/admin/sperrzeiten#neu"><Lock className="icon-sm" />Sperren</Link><Link className="btn btn-primary" href="/admin/neu"><Plus className="icon-sm" />Termin</Link>
       </PageHead>
