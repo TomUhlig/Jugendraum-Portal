@@ -144,6 +144,15 @@ Keine Einrichtung beim Hosting nötig. Jede Person im Team aktiviert Push selbst
 
 Benachrichtigt wird bei neuer Anfrage, Absage, Nachricht eines Buchers und Schadensmeldung, und zwar alle Team-Mitglieder mit aktivierter Benachrichtigung.
 
+## Antworten per Mail (automatisch)
+
+Wenn du ein eigenes Postfach (Schritt 3) nutzt, holt das Portal Antworten auf seine Mails selbst ab: Antwortet ein Bucher auf eine Mail, oder antwortest du auf „Neue Nachricht von …“, erscheint der Text im Nachrichtenverlauf der Buchung und geht an die andere Seite weiter. Andere Mails in deinem Postfach bleiben unberührt.
+
+- Bei **Gmail, GMX, WEB.DE, Outlook, t-online und iCloud** ist nichts weiter einzustellen, es werden dieselben Zugangsdaten wie für den Versand genutzt. Bei GMX und WEB.DE muss in den Postfach-Einstellungen „POP3/IMAP-Abruf“ eingeschaltet sein.
+- Andere Anbieter: zusätzlich `IMAP_HOST` eintragen (z. B. `imap.strato.de`).
+- Abgerufen wird beim Öffnen der Verwaltung (höchstens alle 2 Minuten), einmal täglich und per Knopf unter Einstellungen → Mailversand. Für schnellere Abrufe kannst du bei [cron-job.org](https://cron-job.org) kostenlos alle 5 Minuten diese Adresse aufrufen lassen: `https://<deine-adresse>/api/cron/postfach?key=<CRON_SECRET>`
+- Ausschalten: `IMAP_DISABLED=1`
+
 ## Optional: Google-Kalender verbinden
 
 Damit erscheinen bestätigte Buchungen automatisch in einem Google-Kalender (Änderungen und Absagen werden mitgezogen), und Termine, die du dort selbst einträgst (Vereinsfest, Renovierung), sperren den Raum für Anfragen.

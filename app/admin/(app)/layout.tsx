@@ -1,4 +1,6 @@
 import { LogOut } from 'lucide-react';
+import { after } from 'next/server';
+import { pollInboxThrottled } from '@/lib/inbox';
 import { AdminNav } from '@/components/AdminNav';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -10,6 +12,7 @@ export const metadata = { title: 'Verwaltung', robots: { index: false } };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const me = await requireAdmin();
+  after(() => pollInboxThrottled()); // Antworten per Mail im Hintergrund abholen
   const [{ n }] = await db()`select count(*)::int as n from bookings where status = 'requested'`;
   return (
     <div className="admin">

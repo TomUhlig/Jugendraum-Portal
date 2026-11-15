@@ -1,4 +1,5 @@
 import 'server-only';
+import { inboxEnabled, plusAddress } from './inbox-parse';
 import { decisionToken } from './auth';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { db } from './db';
@@ -17,7 +18,7 @@ export { appUrl };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 type Attachment = { filename: string; content: string }; // base64
-type Mail = { to: string | string[]; subject: string; html: string; text: string; kind: string; bookingId?: string; attachments?: Attachment[]; replyTo?: string };
+type Mail = { to: string | string[]; subject: string; html: string; text: string; kind: string; bookingId?: string; attachments?: Attachment[]; replyTo?: string; number?: string };
 
 /**
  * Versandweg, je nach Umgebungsvariablen:
@@ -53,7 +54,9 @@ export async function sendMail(m: Mail): Promise<boolean> {
   if (!to.length) return true;
   let ok = true; let error: string | null = null;
   const mode = mailMode();
-  const replyTo = m.replyTo || process.env.MAIL_REPLY_TO || undefined;
+  // Antworten mit Buchungsnummer in der Adresse, damit sie im Nachrichtenverlauf landen (nur mit Postfach-Abruf)
+  const plus = !m.replyTo && m.number && mode === 'smtp' && inboxEnabled() ? plusAddress(process.env.SMTP_USER ?? '', m.number) : null;
+  const replyTo = m.replyTo || plus || process.env.MAIL_REPLY_TO || undefined;
   try {
     if (mode === 'resend') {
       const res = await fetch('https://api.resend.com/emails', {
@@ -167,67 +170,67 @@ const when = (s: number, e: number, lang: Lang) => `${fmtLong(s, lang)}, ${berli
 export const mails = {
   verify: (b: Booking, c: Category | undefined, verifyToken: string) => {
     const M = MAIL_TEXT[b.lang], V = M.verify;
-    return sendMail({ kind: 'verify', to: bookerTo(b), bookingId: b.id, subject: V.subject(b.number),
+    return sendMail({ kind: 'verify', to: bookerTo(b), bookingId: b.id, number: b.number, subject: V.subject(b.number),
       ...build({ lang: b.lang, preheader: V.pre, heading: V.heading, blocks: [P(hello(b)), P(V.text), details(b, c, [], b.lang), SMALL(V.small)], cta: { href: `${appUrl()}/bestaetigen/${verifyToken}`, label: V.cta } }) });
   },
   received: async (b: Booking, c?: Category) => {
     const M = MAIL_TEXT[b.lang];
-    return sendMail({ kind: 'received', to: bookerTo(b), bookingId: b.id, subject: M.received.subject(b.title, fmtDay(b.start, b.lang)),
+    return sendMail({ kind: 'received', to: bookerTo(b), bookingId: b.id, number: b.number, subject: M.received.subject(b.title, fmtDay(b.start, b.lang)),
       ...build({ lang: b.lang, preheader: M.received.pre, heading: M.received.heading, blocks: [P(hello(b)), paragraphs(await text('received', b.lang)), details(b, c, [], b.lang)], cta: { href: manageLink(b), label: M.viewRequest } }) });
   },
   confirmed: async (b: Booking, c?: Category) => {
     const M = MAIL_TEXT[b.lang];
     const blocks = [P(hello(b)), paragraphs(await text('confirmed', b.lang)), details(b, c, [[M.labels.contact, esc(b.agreedWith)]], b.lang), ...(await payBlock(b))];
     const pdf = await hausordnungPdf(b, c, (await getSettings()).capacity, (await getExtras()).operator).catch((e) => { console.error('PDF:', e); return null; });
-    return sendMail({ kind: 'confirmed', to: bookerTo(b), bookingId: b.id, subject: M.confirmed.subject(b.title, fmtDay(b.start, b.lang)), attachments: [...(ics(b, c) ?? []), ...(pdf ? [pdf] : [])],
+    return sendMail({ kind: 'confirmed', to: bookerTo(b), bookingId: b.id, number: b.number, subject: M.confirmed.subject(b.title, fmtDay(b.start, b.lang)), attachments: [...(ics(b, c) ?? []), ...(pdf ? [pdf] : [])],
       ...build({ lang: b.lang, preheader: M.confirmed.pre(fmtLong(b.start, b.lang)), heading: M.confirmed.heading, blocks, cta: { href: manageLink(b), label: M.view } }) });
   },
   changed: async (b: Booking, before: Booking, c?: Category, note?: string) => {
     const M = MAIL_TEXT[b.lang], C = M.changed;
     const blocks = [P(hello(b)), P(C.text(when(before.start, before.end, b.lang))), ...(note ? [P(`<b>${C.note}</b> ${esc(note)}`)] : []), details(b, c, [], b.lang), SMALL(C.small)];
-    return sendMail({ kind: 'changed', to: bookerTo(b), bookingId: b.id, subject: C.subject(b.title, fmtDay(b.start, b.lang)), attachments: b.status === 'confirmed' ? ics(b, c) : undefined,
+    return sendMail({ kind: 'changed', to: bookerTo(b), bookingId: b.id, number: b.number, subject: C.subject(b.title, fmtDay(b.start, b.lang)), attachments: b.status === 'confirmed' ? ics(b, c) : undefined,
       ...build({ lang: b.lang, preheader: C.pre(when(b.start, b.end, b.lang)), heading: C.heading, blocks, cta: { href: manageLink(b), label: M.view } }) });
   },
   rejected: async (b: Booking, c?: Category) => {
     const R = MAIL_TEXT[b.lang].rejected;
     const blocks = [P(hello(b)), paragraphs(await text('rejected', b.lang)), ...(b.rejectReason ? [P(`<b>${R.reason}</b> ${esc(b.rejectReason)}`)] : []), details(b, c, [], b.lang), P(R.other)];
-    return sendMail({ kind: 'rejected', to: bookerTo(b), bookingId: b.id, subject: R.subject(b.title, fmtDay(b.start, b.lang)),
+    return sendMail({ kind: 'rejected', to: bookerTo(b), bookingId: b.id, number: b.number, subject: R.subject(b.title, fmtDay(b.start, b.lang)),
       ...build({ lang: b.lang, preheader: R.pre, heading: R.heading, blocks, cta: { href: appUrl(), label: R.cta } }) });
   },
   cancelled: (b: Booking, c?: Category) => {
     const X = MAIL_TEXT[b.lang].cancelled;
     const blocks = [P(hello(b)), P(X.text), ...(b.rejectReason ? [P(`<b>${X.reason}</b> ${esc(b.rejectReason)}`)] : []), details(b, c, [], b.lang)];
-    return sendMail({ kind: 'cancelled', to: bookerTo(b), bookingId: b.id, subject: X.subject(b.title, fmtDay(b.start, b.lang)),
+    return sendMail({ kind: 'cancelled', to: bookerTo(b), bookingId: b.id, number: b.number, subject: X.subject(b.title, fmtDay(b.start, b.lang)),
       ...build({ lang: b.lang, preheader: X.pre, heading: X.heading, blocks }) });
   },
   reminder: async (b: Booking, c: Category | undefined, w: '3d' | '1d') => {
     const M = MAIL_TEXT[b.lang], R = M.reminder;
     const blocks = [P(hello(b)), paragraphs(await text('reminder', b.lang)), details(b, c, [[M.labels.contact, esc(b.agreedWith)]], b.lang), ...(await payBlock(b))];
     const label = w === '1d' ? R.tomorrow : R.in3;
-    return sendMail({ kind: `reminder-${w}`, to: bookerTo(b), bookingId: b.id, subject: R.subject(label, b.title),
+    return sendMail({ kind: `reminder-${w}`, to: bookerTo(b), bookingId: b.id, number: b.number, subject: R.subject(label, b.title),
       ...build({ lang: b.lang, preheader: `${label}, ${berlinHm(b.start)}${M.labels.uhr}.`, heading: R.heading(label), blocks, cta: { href: manageLink(b), label: M.view } }) });
   },
   paid: (b: Booking, amount: number) => {
     const M = MAIL_TEXT[b.lang], X = M.paid, a = eurL(amount, b.lang);
-    return sendMail({ kind: 'paid', to: bookerTo(b), bookingId: b.id, subject: X.subject(a, b.number),
+    return sendMail({ kind: 'paid', to: bookerTo(b), bookingId: b.id, number: b.number, subject: X.subject(a, b.number),
       ...build({ lang: b.lang, preheader: X.pre, heading: X.heading, blocks: [P(hello(b)), P(X.text(a, esc(b.title), fmtLong(b.start, b.lang))),
         ...(b.depositPaid && b.deposit > 0 ? [SMALL(X.deposit)] : [])], cta: { href: manageLink(b), label: M.view } }) });
   },
   message: (b: Booking, from: string, body: string) => {
     const X = MAIL_TEXT[b.lang].message;
-    return sendMail({ kind: 'message', to: b.email, bookingId: b.id, subject: X.subject(b.number),
+    return sendMail({ kind: 'message', to: b.email, bookingId: b.id, number: b.number, subject: X.subject(b.number),
       ...build({ lang: b.lang, preheader: body.slice(0, 90), heading: X.heading, blocks: [P(hello(b)), P(X.text(esc(from), esc(b.title), fmtLong(b.start, b.lang))),
         `<div style="margin:0 0 18px;padding:12px 14px;background:#F8F9FB;border-left:3px solid #2E367A;font-size:15px;line-height:1.55;color:#161A33;white-space:pre-wrap">${esc(body)}</div>`,
         SMALL(X.small)], cta: { href: `${manageLink(b)}#nachrichten`, label: X.cta } }) });
   },
   depositRefunded: (b: Booking, amount: number) => {
     const X = MAIL_TEXT[b.lang].refund, a = eurL(amount, b.lang);
-    return sendMail({ kind: 'refund', to: bookerTo(b), bookingId: b.id, subject: X.subject(a, b.number),
+    return sendMail({ kind: 'refund', to: bookerTo(b), bookingId: b.id, number: b.number, subject: X.subject(a, b.number),
       ...build({ lang: b.lang, preheader: X.pre, heading: X.heading, blocks: [P(hello(b)), P(X.text(a, esc(b.title)))] }) });
   },
   followup: async (b: Booking) => {
     const X = MAIL_TEXT[b.lang].followup;
-    return sendMail({ kind: 'followup', to: bookerTo(b), bookingId: b.id, subject: X.subject(b.title),
+    return sendMail({ kind: 'followup', to: bookerTo(b), bookingId: b.id, number: b.number, subject: X.subject(b.title),
       ...build({ lang: b.lang, preheader: X.pre, heading: X.heading, blocks: [P(hello(b)), paragraphs(await text('followup', b.lang))], cta: { href: `${manageLink(b)}/feedback`, label: X.cta } }) });
   },
 };
@@ -259,19 +262,20 @@ export const teamMails = {
     const blocks = [P(who(b)), details(b, c, [['Abgesprochen mit', esc(b.agreedWith)]]), ...(b.note ? [P(`„${esc(b.note)}“`)] : []),
       ...(conflicts ? [P(`<span style="color:#B42F36"><b>Achtung:</b> ${esc(conflicts)}</span>`)] : [])];
     // Jede Person bekommt eine eigene Mail mit persönlichem Entscheidungslink (ohne Anmeldung nutzbar)
-    return Promise.all(to.map((r) => sendMail({ kind: 'team-new', to: r, bookingId: b.id, replyTo: b.email, subject: `Neue Anfrage: ${b.title}, ${fmtDay(b.start)}`,
+    return Promise.all(to.map((r) => sendMail({ kind: 'team-new', to: r, bookingId: b.id, number: b.number, replyTo: b.email, subject: `Neue Anfrage: ${b.title}, ${fmtDay(b.start)}`,
       ...build({ preheader: `${b.name} fragt ${fmtLong(b.start)} an.`, heading: 'Neue Anfrage', blocks: [...blocks, SMALL(`Oder <a href="${adminLink(b)}" style="color:#2E367A">in der Verwaltung öffnen</a>.`)],
         cta: { href: `${appUrl()}/entscheiden/${decisionToken(r, b.id)}`, label: 'Bestätigen oder ablehnen' } }) }))).then((x) => x.every(Boolean));
   },
-  autoConfirmed: (to: string[], b: Booking, c?: Category) => sendMail({ kind: 'team-info', to, bookingId: b.id, subject: `Eingetragen: ${b.title}, ${fmtDay(b.start)}`,
+  autoConfirmed: (to: string[], b: Booking, c?: Category) => sendMail({ kind: 'team-info', to, bookingId: b.id, number: b.number, subject: `Eingetragen: ${b.title}, ${fmtDay(b.start)}`,
     ...build({ preheader: 'Automatisch bestätigt.', heading: 'Neuer Termin (automatisch bestätigt)', blocks: [P(who(b)), details(b, c)], cta: { href: adminLink(b), label: 'Ansehen' } }) }),
-  cancelled: (to: string[], b: Booking, c?: Category) => sendMail({ kind: 'team-cancelled', to, bookingId: b.id, subject: `Abgesagt: ${b.title}, ${fmtDay(b.start)}`,
+  cancelled: (to: string[], b: Booking, c?: Category) => sendMail({ kind: 'team-cancelled', to, bookingId: b.id, number: b.number, subject: `Abgesagt: ${b.title}, ${fmtDay(b.start)}`,
     ...build({ preheader: 'Der Termin ist wieder frei.', heading: 'Buchung abgesagt', blocks: [P(`${esc(b.name)} hat abgesagt. Der Termin ist wieder frei.`), details(b, c)], cta: { href: adminLink(b), label: 'Ansehen' } }) }),
-  message: (to: string[], b: Booking, body: string) => sendMail({ kind: 'team-message', to, bookingId: b.id, replyTo: b.email, subject: `Nachricht von ${b.name}: ${b.title}`,
+  message: (to: string[], b: Booking, body: string) => sendMail({ kind: 'team-message', to, bookingId: b.id, number: b.number, subject: `Nachricht von ${b.name}: ${b.title} (${b.number})`,
     ...build({ preheader: body.slice(0, 90), heading: 'Neue Nachricht', blocks: [P(`${esc(b.name)} schreibt zu „${esc(b.title)}“ (${fmtLong(b.start)}):`),
-      `<div style="margin:0 0 18px;padding:12px 14px;background:#F8F9FB;border-left:3px solid #FFD800;font-size:15px;line-height:1.55;color:#161A33;white-space:pre-wrap">${esc(body)}</div>`],
+      `<div style="margin:0 0 18px;padding:12px 14px;background:#F8F9FB;border-left:3px solid #FFD800;font-size:15px;line-height:1.55;color:#161A33;white-space:pre-wrap">${esc(body)}</div>`,
+      ...(inboxEnabled() ? [SMALL('Du kannst auch einfach auf diese Mail antworten. Die Antwort geht an den Bucher und erscheint im Verlauf.')] : [])],
       cta: { href: `${adminLink(b)}#nachrichten`, label: 'In der Verwaltung antworten' } }) }),
-  damage: (to: string[], b: Booking, comment: string) => sendMail({ kind: 'team-damage', to, bookingId: b.id, replyTo: b.email, subject: `Schaden gemeldet: ${b.title} (${b.number})`,
+  damage: (to: string[], b: Booking, comment: string) => sendMail({ kind: 'team-damage', to, bookingId: b.id, number: b.number, replyTo: b.email, subject: `Schaden gemeldet: ${b.title} (${b.number})`,
     ...build({ preheader: 'Bei der Rückmeldung wurde ein Schaden gemeldet.', heading: 'Schaden gemeldet', blocks: [P(who(b)), P(comment ? `„${esc(comment)}“` : 'Ohne Beschreibung.'), details(b)], cta: { href: adminLink(b), label: 'Zur Buchung' } }) }),
   test: (to: string) => sendMail({ kind: 'test', to, subject: 'Testmail: Jugendraum-Portal',
     ...build({ preheader: 'Der Mailversand funktioniert.', heading: 'Der Mailversand funktioniert', blocks: [P('Diese Mail kommt aus dem Jugendraum-Portal. Wenn du sie liest, ist alles richtig eingerichtet.'), SMALL(`Versandweg: ${mailMode() === 'smtp' ? 'eigenes Postfach (SMTP)' : mailMode() === 'resend' ? 'Resend' : 'Konsole'} · Absender: ${esc(mailFrom())}`)] }) }),

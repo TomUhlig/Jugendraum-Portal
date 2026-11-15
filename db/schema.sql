@@ -287,6 +287,15 @@ alter table waitlist add column if not exists lang text not null default 'de';
 alter table bookings add column if not exists google_event_id text;
 insert into settings (key, value) values ('google', '{"export": true, "import": true, "publicTitles": false}') on conflict (key) do nothing;
 
+-- ---------- Version 12: Antworten per Mail ----------
+create table if not exists inbound_mail (
+  message_id text primary key,
+  booking_id uuid references bookings(id) on delete set null,
+  sender text not null default '',
+  accepted boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -306,5 +315,6 @@ do $$ begin
     execute 'alter table messages enable row level security';
     execute 'alter table photos enable row level security';
     execute 'alter table push_subscriptions enable row level security';
+    execute 'alter table inbound_mail enable row level security';
   end if;
 end $$;

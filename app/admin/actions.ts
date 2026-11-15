@@ -13,6 +13,7 @@ import { refund } from '@/lib/stripe';
 import { afterDecision, notifyWaitlist } from '@/lib/notify';
 import { Freq, describeSeries, seriesDates } from '@/lib/series';
 import { addDays, berlinToUtc } from '@/lib/time';
+import { pollInbox } from '@/lib/inbox';
 import { clearGoogleCache, syncToGoogle, testConnection } from '@/lib/gcal';
 import { db } from '@/lib/db';
 const DAY_MS = 86400e3;
@@ -394,4 +395,11 @@ export async function googleResyncAction() {
   clearGoogleCache();
   await db()`insert into audit_log (actor, action, detail) values (${admin.name}, 'google-resync', ${db().json({ count: list.length })})`;
   go('/admin/einstellungen#google', 'ok', `${list.length} kommende Termine an Google übertragen.`);
+}
+
+export async function inboxAction() {
+  await requireAdmin('manager');
+  const r = await pollInbox();
+  if (r.error) go('/admin/einstellungen#mail', 'fehler', `Postfach-Abruf fehlgeschlagen: ${r.error}`);
+  go('/admin/einstellungen#mail', 'ok', r.added ? `${r.added} Antwort(en) in die Nachrichten übernommen.` : 'Keine neuen Antworten im Postfach.');
 }

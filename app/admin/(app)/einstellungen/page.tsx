@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { imapConfig } from '@/lib/inbox-parse';
+import { db } from '@/lib/db';
 import { CopyText } from '@/components/CopyText';
 import { Flash, PageHead } from '@/components/Flash';
 import { requireAdmin } from '@/lib/auth';
@@ -9,7 +11,7 @@ import { stripeEnabled } from '@/lib/stripe';
 import { appUrl } from '@/lib/url';
 import type { MailTextKey } from '@/lib/data';
 import { calendarId, googleConfigured, googleSettings, serviceEmail } from '@/lib/gcal';
-import { googleResyncAction, googleSettingsAction, googleTestAction, offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
+import { inboxAction, googleResyncAction, googleSettingsAction, googleTestAction, offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
 
 const de = (n: number) => n.toString().replace('.', ',');
 
@@ -18,6 +20,9 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const [cats, s, x, gs] = await Promise.all([getCategories(), getSettings(), getExtras(), googleSettings()]);
   const gOn = googleConfigured();
+  const imap = imapConfig();
+  const [inboxRow] = await db()`select value from settings where key = 'inbox'`;
+  const inboxState = inboxRow?.value as { at?: number; error?: string } | undefined;
   const ro = me.role !== 'admin';
   const mode = mailMode();
   return (
@@ -33,7 +38,13 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
           <dl className="kv"><dt>Versandweg</dt><dd>{({ resend: 'Resend (eigene Domain)', smtp: `Eigenes Postfach über ${process.env.SMTP_HOST}`, console: 'nicht eingerichtet' } as const)[mode]}</dd>{mode !== 'console' && <><dt>Absender</dt><dd>{mailFrom()}</dd></>}</dl>
           {mode === 'console' && <p className="muted small">Ohne Mailversand bekommen weder Buchende noch das Team Nachrichten, und niemand kann sich in der Verwaltung anmelden.</p>}
         </div>
-        <form action={testMailAction} className="card-foot inline"><button className="btn" type="submit" disabled={mode === 'console'}>Testmail an {me.email} senden</button></form>
+        <div className="card-body stack-sm" style={{ borderTop: '1px solid var(--line)' }}>
+          <div className="between"><b>Antworten per Mail</b><span className={`badge ${imap ? 'b-ok' : 'b-expired'}`}>{imap ? 'aktiv' : 'aus'}</span></div>
+          {imap ? <p className="small muted">Antworten von Buchenden und vom Team auf Mails des Portals landen automatisch im Nachrichtenverlauf der Buchung (Abruf über {imap.host}, beim Öffnen der Verwaltung höchstens alle 2 Minuten und täglich). {inboxState?.at ? `Zuletzt abgerufen: ${new Date(inboxState.at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'short', timeStyle: 'short' })}${inboxState.error ? `, Fehler: ${inboxState.error}` : ''}.` : ''}</p>
+            : <p className="small muted">Mit einem eigenen Postfach (SMTP) holt das Portal Antworten automatisch ab. Bei Gmail, GMX, WEB.DE und Outlook passiert das ohne weitere Einstellung, sonst <code>IMAP_HOST</code> eintragen.</p>}
+        </div>
+        <form action={testMailAction} className="card-foot inline"><button className="btn" type="submit" disabled={mode === 'console'}>Testmail an {me.email} senden</button>
+          {imap && <button className="btn" formAction={inboxAction} disabled={ro}>Postfach jetzt abrufen</button>}</form>
       </section>
 
       <section className="card" id="google">

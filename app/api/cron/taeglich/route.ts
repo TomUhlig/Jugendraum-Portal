@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { Booking, getBooking, getCategories, listBookings, notifyRecipients, toBooking } from '@/lib/data';
 import { syncToGoogle } from '@/lib/gcal';
+import { pollInbox } from '@/lib/inbox';
 import { mails, teamMails } from '@/lib/mail';
 import { notifyWaitlist } from '@/lib/notify';
 import { DAY, addDays, berlinParts, berlinToUtc, berlinYmd } from '@/lib/time';
@@ -64,6 +65,10 @@ export async function GET(req: Request) {
   report.anonymized = anon.length;
   // auch im Google-Kalender die Namen entfernen
   for (const r of anon.filter((x) => x.google_event_id).slice(0, 50)) await syncToGoogle(toBooking(r));
+
+  // 7. Antworten per Mail abholen
+  const inbox = await pollInbox();
+  report.inbox = inbox.added;
 
   return NextResponse.json({ ok: true, ...report });
 }
