@@ -24,8 +24,8 @@ export default async function Neu({ searchParams }: { searchParams: Promise<Reco
               </div>
               <div className="row">
                 <div className="field"><label htmlFor="n-date" className="req">Datum</label><input id="n-date" name="date" type="date" required defaultValue={sp.datum ?? tomorrow} /></div>
-                <div className="field"><label htmlFor="n-start" className="req">Von</label><input id="n-start" name="start" type="time" step={900} required defaultValue="19:00" /></div>
-                <div className="field"><label htmlFor="n-end" className="req">Bis</label><input id="n-end" name="end" type="time" step={900} required defaultValue="21:00" /><span className="hint">früher als Beginn = Folgetag</span></div>
+                <div className="field"><label htmlFor="n-start" className="req">Von</label><input id="n-start" name="start" type="time" step={900} required defaultValue={/^\d\d:\d\d$/.test(sp.von ?? '') ? sp.von : '19:00'} /></div>
+                <div className="field"><label htmlFor="n-end" className="req">Bis</label><input id="n-end" name="end" type="time" step={900} required defaultValue={/^\d\d:\d\d$/.test(sp.bis ?? '') ? sp.bis : '21:00'} /><span className="hint">früher als Beginn = Folgetag</span></div>
                 <div className="field"><label htmlFor="n-guests">Personen</label><input id="n-guests" name="guests" type="number" min={1} defaultValue={10} /></div>
               </div>
               {extras.equipment.length > 0 && <div className="field"><span className="label">Ausstattung</span><div className="chips">{extras.equipment.map((e) => <label key={e} className="chip"><input type="checkbox" name="equipment" value={e} />{e}</label>)}</div></div>}

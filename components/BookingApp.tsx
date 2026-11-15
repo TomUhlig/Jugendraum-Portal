@@ -34,6 +34,19 @@ const initials = (n: string) => n.split(' ').map((p) => p[0]).join('').slice(0, 
 
 type Done = { number: string; email: string };
 
+/** Webmailer zur Adresse, damit man die Bestätigungsmail mit einem Tipp öffnet. */
+function mailApp(email: string): { name: string; url: string } | null {
+  const d = email.split('@')[1]?.toLowerCase() ?? '';
+  if (/^(gmail|googlemail)\.com$/.test(d)) return { name: 'Gmail', url: 'https://mail.google.com/mail/u/0/#search/from%3Ajugendraum+OR+Jugendraum' };
+  if (/^(outlook|hotmail|live|msn)\.(com|de)$/.test(d)) return { name: 'Outlook', url: 'https://outlook.live.com/mail/' };
+  if (/^gmx\.(de|net|at|ch)$/.test(d)) return { name: 'GMX', url: 'https://www.gmx.net/' };
+  if (d === 'web.de') return { name: 'WEB.DE', url: 'https://web.de/' };
+  if (/^(t-online)\.de$/.test(d)) return { name: 't-online', url: 'https://email.t-online.de/' };
+  if (/^(icloud|me|mac)\.com$/.test(d)) return { name: 'iCloud Mail', url: 'https://www.icloud.com/mail' };
+  if (/^(yahoo)\.(com|de)$/.test(d)) return { name: 'Yahoo Mail', url: 'https://mail.yahoo.com/' };
+  return null;
+}
+
 export type Prefill = { date?: string; start?: string; end?: string; categoryId?: string; title?: string; guests?: string; equipment?: string[] };
 const WAITABLE = new Set(['overlap', 'buffer', 'party-weekend', 'blackout']);
 
@@ -168,7 +181,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   const lineDate = f.date || todayKey;
   const w0 = berlinToUtc(lineDate, '08:00'), span = berlinToUtc(addDays(lineDate, 1), '02:00') - w0;
   const x = (t: number) => Math.max(0, Math.min(100, ((t - w0) / span) * 100));
-  const availability = !result ? null : result.level;
+  const availability = !result || done ? null : result.level;
 
   // ---------- Darstellung ----------
   const Summary = (
@@ -195,14 +208,14 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
         {PEOPLE.map((p) => <div className="contact" key={p}><span className="avatar">{initials(p)}</span><div><b>{p}</b><br /><span className="muted small">{T.contactRole}</span></div></div>)}
         {contactNote && lang === 'de' && <p className="muted small">{contactNote}</p>}
       </section>
-      <section className="card card-body stack">
+      {!done && <section className="card card-body stack">
         <h2 className="section-title">{T.howItGoes}</h2>
         <ol className="next-steps">
           <li>{T.next1}</li>
           <li>{T.next2}</li>
           <li>{T.next3}</li>
         </ol>
-      </section>
+      </section>}
     </aside>
   );
 
@@ -214,7 +227,12 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
             <span className="seal"><CheckCircle2 className="icon" /></span>
             <div><span className="eyebrow">{T.requestNo} <span className="refno">{done.number}</span></span><h2>{T.confirmEmail}</h2></div>
             <p>{T.sentTo(done.email)}</p>
+            {(() => { const m = mailApp(done.email); return m && <a className="btn btn-primary" href={m.url} target="_blank" rel="noopener">{T.openMail(m.name)}</a>; })()}
             <p className="muted small">{T.noMail}</p>
+          </div>
+          <div className="after-steps">
+            <h3>{T.nextTitle}</h3>
+            <ol>{T.afterSteps.map(([h, d], i) => <li key={h} className={i === 0 ? 'now' : ''}><b>{h}</b><span>{d}</span></li>)}</ol>
             <button className="btn" onClick={reset}>{T.another}</button>
           </div>
         </section>

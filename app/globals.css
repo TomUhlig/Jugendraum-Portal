@@ -571,3 +571,42 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .week-plan em { color: #9A6700; font-style: normal; font-weight: 600 }
 @media print { .print-doc.landscape { padding: 0; page: quer } }
 @page quer { size: A4 landscape; margin: 12mm }
+.decide-foot { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start }
+.btn-lg { min-height: 46px; padding-inline: 22px; font-size: 1rem }
+.reject-box { flex: 1 1 260px }
+.reject-box > summary { list-style: none; display: inline-flex; min-height: 46px }
+.reject-box > summary::-webkit-details-marker { display: none }
+.reject-box[open] > summary { background: var(--bad-bg) }
+/* ---------- Schnellsuche (Verwaltung) ---------- */
+.qs { position: relative; margin-bottom: 6px }
+.qs-box { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 38px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface-2); color: var(--muted); cursor: text }
+.qs-box:focus-within { border-color: var(--brand); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent) }
+.qs-box input { border: 0; outline: 0; background: transparent; flex: 1; min-width: 0; font: inherit; font-size: .9rem; color: var(--ink); padding: 0; height: 100% }
+.qs-box input::-webkit-search-cancel-button { display: none }
+.qs-box kbd { font: 600 .68rem/1 var(--f-body); border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px; padding: 3px 5px; color: var(--muted); white-space: nowrap }
+.qs-box:focus-within kbd { display: none }
+.qs-list { list-style: none; margin: 6px 0 0; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 12px 30px -12px rgba(10, 14, 40, .35); display: grid; gap: 2px }
+.qs-list button { all: unset; box-sizing: border-box; display: grid; gap: 1px; width: 100%; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: .82rem; color: var(--muted) }
+.qs-list button b { color: var(--ink); font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.qs-list button.on { background: var(--brand-tint) }
+.qs-list .qs-all { text-align: center; color: var(--brand-ink); font-weight: 600; border-top: 1px solid var(--line); border-radius: 0 0 7px 7px }
+.qs-empty { padding: 10px; color: var(--muted); font-size: .85rem; text-align: center }
+.qs-st.s-requested, .qs-st.s-pending_email { color: var(--warn) } .qs-st.s-confirmed { color: var(--ok) } .qs-st.s-rejected, .qs-st.s-cancelled { color: var(--bad) }
+@media (max-width: 900px) {
+  .qs { flex: 0 0 220px; margin: 0 8px 0 0 }
+  .qs-list { position: fixed; left: 12px; right: 12px; z-index: 50 }
+  .qs-box kbd { display: none }
+}
+.wcol.addable { cursor: copy }
+.wcol.addable:hover { background-image: linear-gradient(color-mix(in srgb, var(--brand) 5%, transparent), color-mix(in srgb, var(--brand) 5%, transparent)) }
+/* ---------- Erfolgsseite ---------- */
+.after-steps { border-top: 1px solid var(--line); padding: 22px 28px 26px; display: grid; gap: 14px; background: var(--surface-2) }
+.after-steps h3 { font-size: 1rem }
+.after-steps ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; counter-reset: st }
+.after-steps li { counter-increment: st; position: relative; display: grid; gap: 2px; padding: 0 0 16px 40px; font-size: .92rem }
+.after-steps li::before { content: counter(st); position: absolute; left: 0; top: -2px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: .8rem; background: var(--surface); border: 1px solid var(--line-strong); color: var(--muted) }
+.after-steps li:not(:last-child)::after { content: ""; position: absolute; left: 12.5px; top: 26px; bottom: 2px; width: 1px; background: var(--line-strong) }
+.after-steps li.now::before { background: var(--gelb); border-color: var(--gelb); color: #1b1f4b }
+.after-steps li span { color: var(--muted) }
+.after-steps .btn { justify-self: start }
+.qs-box input:focus { box-shadow: none; border: 0 }

@@ -75,7 +75,15 @@ export function WeekBoard({ days, today, events, blocks, canEdit }: { days: stri
           {days.map((d) => <div key={d} className={`wh ${d === today ? 'today' : ''}`}>{new Date(d + 'T12:00:00Z').toLocaleDateString('de-DE', { weekday: 'short', timeZone: 'UTC' })} {+d.slice(8)}.</div>)}
           <div className="hours" style={{ height: HEIGHT }}>{Array.from({ length: SPAN }, (_, i) => <span key={i} style={{ top: `${(i / SPAN) * 100}%` }}>{i ? String((H0 + i) % 24).padStart(2, '0') + ':00' : ''}</span>)}</div>
           {days.map((d) => (
-            <div key={d} className="wcol" style={{ height: HEIGHT }}>
+            <div key={d} className={`wcol${canEdit && d >= today ? ' addable' : ''}`} style={{ height: HEIGHT }}
+              title={canEdit && d >= today ? 'Klicken, um hier einen Termin einzutragen' : undefined}
+              onClick={(e) => {
+                if (!canEdit || d < today || e.target !== e.currentTarget) return;
+                const r = e.currentTarget.getBoundingClientRect();
+                const mins = Math.max(0, Math.floor((((e.clientY - r.top) / r.height) * SPAN * 60) / 30) * 30);
+                const h = (H0 * 60 + mins) / 60, hh = (x: number) => `${String(Math.floor(x) % 24).padStart(2, '0')}:${x % 1 ? '30' : '00'}`;
+                router.push(`/admin/neu?datum=${d}&von=${hh(h)}&bis=${hh(Math.min(h + 2, 23.5))}`);
+              }}>
               {blocks.map((x) => { const p = pos(d, x.start, x.end); return p && <Link href="/admin/sperrzeiten" key={x.id} className="wev sys" style={{ '--c': 'var(--bad)', top: `${p.top}%`, height: `${p.height}%`, background: 'var(--bad-bg)' } as React.CSSProperties}><b>{x.scope === 'party' ? 'Keine Feiern' : 'Gesperrt'}</b>{x.reason}</Link>; })}
               {events.map((ev) => {
                 const p = pos(d, ev.start, ev.end); if (!p) return null;

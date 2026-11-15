@@ -1,4 +1,5 @@
 import 'server-only';
+import { decisionToken } from './auth';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { db } from './db';
 import { amountsDue, getExtras, type Booking, type MailTextKey } from './data';
@@ -255,8 +256,10 @@ export const teamMails = {
   newRequest: (to: string[], b: Booking, c?: Category, conflicts?: string) => {
     const blocks = [P(who(b)), details(b, c, [['Abgesprochen mit', esc(b.agreedWith)]]), ...(b.note ? [P(`„${esc(b.note)}“`)] : []),
       ...(conflicts ? [P(`<span style="color:#B42F36"><b>Achtung:</b> ${esc(conflicts)}</span>`)] : [])];
-    return sendMail({ kind: 'team-new', to, bookingId: b.id, replyTo: b.email, subject: `Neue Anfrage: ${b.title}, ${fmtDay(b.start)}`,
-      ...build({ preheader: `${b.name} fragt ${fmtLong(b.start)} an.`, heading: 'Neue Anfrage', blocks, cta: { href: adminLink(b), label: 'Prüfen und entscheiden' } }) });
+    // Jede Person bekommt eine eigene Mail mit persönlichem Entscheidungslink (ohne Anmeldung nutzbar)
+    return Promise.all(to.map((r) => sendMail({ kind: 'team-new', to: r, bookingId: b.id, replyTo: b.email, subject: `Neue Anfrage: ${b.title}, ${fmtDay(b.start)}`,
+      ...build({ preheader: `${b.name} fragt ${fmtLong(b.start)} an.`, heading: 'Neue Anfrage', blocks: [...blocks, SMALL(`Oder <a href="${adminLink(b)}" style="color:#2E367A">in der Verwaltung öffnen</a>.`)],
+        cta: { href: `${appUrl()}/entscheiden/${decisionToken(r, b.id)}`, label: 'Bestätigen oder ablehnen' } }) }))).then((x) => x.every(Boolean));
   },
   autoConfirmed: (to: string[], b: Booking, c?: Category) => sendMail({ kind: 'team-info', to, bookingId: b.id, subject: `Eingetragen: ${b.title}, ${fmtDay(b.start)}`,
     ...build({ preheader: 'Automatisch bestätigt.', heading: 'Neuer Termin (automatisch bestätigt)', blocks: [P(who(b)), details(b, c)], cta: { href: adminLink(b), label: 'Ansehen' } }) }),

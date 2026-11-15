@@ -83,3 +83,20 @@ export function emailFromBookerToken(token: string): string | null {
   const [email, exp] = Buffer.from(payload, 'base64url').toString().split('|');
   return +exp > Date.now() ? email : null;
 }
+
+/** Persönlicher Entscheidungslink aus der Team-Mail (14 Tage gültig): Anfrage ohne Anmeldung bestätigen oder ablehnen. */
+export function decisionToken(email: string, bookingId: string): string {
+  const payload = Buffer.from(`${email.trim().toLowerCase()}|${bookingId}|${Date.now() + 14 * 864e5}`).toString('base64url');
+  return `${payload}.${sign('decide:' + payload).slice(0, 32)}`;
+}
+export async function parseDecisionToken(token: string): Promise<{ admin: Admin; bookingId: string } | null> {
+  const [payload, sig] = token.split('.');
+  if (!payload || !sig || sig.length !== 32) return null;
+  const want = sign('decide:' + payload).slice(0, 32);
+  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(want))) return null;
+  const [email, bookingId, exp] = Buffer.from(payload, 'base64url').toString().split('|');
+  if (!(+exp > Date.now()) || !/^[0-9a-f-]{36}$/.test(bookingId ?? '')) return null;
+  const [admin] = await db()`select id, email, name, role, notify from admins where lower(email) = ${email}`;
+  if (!admin || admin.role === 'viewer') return null;
+  return { admin: admin as unknown as Admin, bookingId };
+}

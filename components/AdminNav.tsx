@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { QuickSearch } from './QuickSearch';
 import { BarChart3, FileSpreadsheet, CalendarDays, CalendarOff, ClipboardList, History, Hourglass, Image as ImageIcon, LayoutDashboard, MessageSquareText, PlusCircle, Settings, Users } from 'lucide-react';
 
 const GROUPS = [
@@ -29,6 +30,7 @@ export function AdminNav({ open, children }: { open: number; children: React.Rea
   const path = usePathname();
   return (
     <nav className="sidebar" aria-label="Verwaltung">
+      <QuickSearch />
       {GROUPS.map((g) => (
         <div key={g.name} style={{ display: 'contents' }}>
           <span className="group">{g.name}</span>
