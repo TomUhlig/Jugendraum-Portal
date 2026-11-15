@@ -439,7 +439,8 @@ export async function getStats(fromTs: number, toTs: number) {
   ]);
   const [rej] = await q`select count(*) filter (where status = 'rejected')::int as rejected, count(*) filter (where status in ('confirmed', 'rejected'))::int as decided
     from bookings where starts_at >= ${new Date(fromTs)} and starts_at < ${new Date(toTs)}`;
-  return { months, cats, types, teams, totals: totals[0], feedback: fb[0], rejected: rej };
+  const spans = (await q`select starts_at, ends_at from bookings where ${range}`).map((r) => ({ start: +r.starts_at, end: +r.ends_at }));
+  return { months, cats, types, teams, totals: totals[0], feedback: fb[0], rejected: rej, spans };
 }
 
 // ---------- Team ----------

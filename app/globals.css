@@ -610,3 +610,19 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .after-steps li span { color: var(--muted) }
 .after-steps .btn { justify-self: start }
 .qs-box input:focus { box-shadow: none; border: 0 }
+/* ---------- Statistik: Vorjahr und Heatmap ---------- */
+.chart .prev { stroke: var(--ink-2); stroke-width: 2; stroke-linecap: round; opacity: .55 }
+.chart-legend { display: flex; gap: 14px; font-size: .8rem; color: var(--ink-2); flex-wrap: wrap }
+.chart-legend span { display: inline-flex; align-items: center; gap: 6px }
+.chart-legend .sw-bar { width: 10px; height: 10px; border-radius: 2px; background: var(--brand-ink) }
+.chart-legend .sw-prev { width: 14px; height: 2px; border-radius: 1px; background: var(--ink-2); opacity: .55 }
+.heat { display: grid; gap: 2px; max-width: 640px }
+.heat-row { display: grid; grid-template-columns: 36px repeat(5, 1fr); gap: 2px }
+.heat-row > span[role="rowheader"] { font-size: .82rem; font-weight: 600; color: var(--ink-2); align-self: center }
+.heat-row.head > span { font-size: .75rem; color: var(--muted); text-align: center; padding-bottom: 4px; font-variant-numeric: tabular-nums }
+.heat .cell { height: 36px; border-radius: 4px; display: grid; place-items: center; font-size: .78rem; font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; cursor: default; transition: outline-color .1s; outline: 2px solid transparent; outline-offset: -2px }
+.heat .cell.dark { color: var(--surface) }
+.heat .cell:hover { outline-color: var(--ink) }
+.heat-legend { display: flex; align-items: center; gap: 4px; margin-top: 10px; font-size: .75rem; color: var(--muted) }
+.heat-legend i { width: 22px; height: 10px; border-radius: 2px }
+.heat-legend span:first-child { margin-right: 4px } .heat-legend span:nth-last-child(2) { margin-left: 4px }
