@@ -283,6 +283,10 @@ create table if not exists push_subscriptions (
 alter table bookings add column if not exists lang text not null default 'de';
 alter table waitlist add column if not exists lang text not null default 'de';
 
+-- ---------- Version 11: Google-Kalender ----------
+alter table bookings add column if not exists google_event_id text;
+insert into settings (key, value) values ('google', '{"export": true, "import": true, "publicTitles": false}') on conflict (key) do nothing;
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then

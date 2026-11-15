@@ -144,6 +144,22 @@ Keine Einrichtung beim Hosting nötig. Jede Person im Team aktiviert Push selbst
 
 Benachrichtigt wird bei neuer Anfrage, Absage, Nachricht eines Buchers und Schadensmeldung, und zwar alle Team-Mitglieder mit aktivierter Benachrichtigung.
 
+## Optional: Google-Kalender verbinden
+
+Damit erscheinen bestätigte Buchungen automatisch in einem Google-Kalender (Änderungen und Absagen werden mitgezogen), und Termine, die du dort selbst einträgst (Vereinsfest, Renovierung), sperren den Raum für Anfragen.
+
+1. Auf [console.cloud.google.com](https://console.cloud.google.com/) ein Projekt anlegen (z. B. „Jugendraum“).
+2. Unter **APIs & Dienste → Bibliothek** die **Google Calendar API** suchen und aktivieren.
+3. Unter **IAM & Verwaltung → Dienstkonten** ein Dienstkonto anlegen (Name egal, keine Rollen nötig). Beim Dienstkonto **Schlüssel → Schlüssel hinzufügen → JSON** wählen. Eine Datei wird heruntergeladen.
+4. In Google Kalender einen eigenen Kalender anlegen (z. B. „Jugendraum“) oder einen vorhandenen nehmen. Dort **Einstellungen und Freigabe → Für bestimmte Personen freigeben** die Adresse des Dienstkontos (endet auf `iam.gserviceaccount.com`) mit **„Änderungen an Terminen vornehmen“** hinzufügen.
+5. Weiter unten bei **Kalender integrieren** die **Kalender-ID** kopieren.
+6. In Vercel eintragen und Redeploy:
+   - `GOOGLE_SERVICE_ACCOUNT` = kompletter Inhalt der JSON-Datei (einfach alles hineinkopieren)
+   - `GOOGLE_CALENDAR_ID` = die Kalender-ID
+7. In der Verwaltung unter **Einstellungen → Google-Kalender** auf „Verbindung testen“ und dann „Alle kommenden Termine übertragen“ klicken.
+
+Termine, bei denen in Google „Anzeigen als: Verfügbar“ eingestellt ist, sperren den Raum nicht. Im öffentlichen Kalender steht für Google-Termine nur „Vereinstermin“, außer du schaltest „Titel öffentlich zeigen“ ein.
+
 ## Später: Updates einspielen
 
 Neue Versionen landen per Pull Request auf `main`. Vercel veröffentlicht sie automatisch (Änderungen auf anderen Zweigen bekommen nur eine Vorschau-Adresse). Wenn sich `db/schema.sql` geändert hat, das Skript wie in Schritt 2.4 einmal erneut im SQL Editor ausführen.

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { Booking, getBooking, getCategories, listBookings, notifyRecipients } from '@/lib/data';
+import { Booking, getBooking, getCategories, listBookings, notifyRecipients, toBooking } from '@/lib/data';
+import { syncToGoogle } from '@/lib/gcal';
 import { mails, teamMails } from '@/lib/mail';
 import { notifyWaitlist } from '@/lib/notify';
 import { DAY, addDays, berlinParts, berlinToUtc, berlinYmd } from '@/lib/time';
@@ -59,8 +60,10 @@ export async function GET(req: Request) {
 
   // 6. Datenschutz: personenbezogene Daten 12 Monate nach dem Termin entfernen
   const anon = await q`update bookings set name = 'gelöscht', email = 'geloescht@invalid', phone = '', note = '', team = '', internal_note = ''
-    where ends_at < now() - interval '12 months' and email <> 'geloescht@invalid' returning id`;
+    where ends_at < now() - interval '12 months' and email <> 'geloescht@invalid' returning *`;
   report.anonymized = anon.length;
+  // auch im Google-Kalender die Namen entfernen
+  for (const r of anon.filter((x) => x.google_event_id).slice(0, 50)) await syncToGoogle(toBooking(r));
 
   return NextResponse.json({ ok: true, ...report });
 }

@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
   Admin, MailTextKey, addBlackout, deletePhoto, movePhoto, updatePhoto, addMessage, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
-  removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin,
+  removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
 } from '@/lib/data';
 import { mailMode, mails, teamMails } from '@/lib/mail';
 import { isValidIban, normalizeIban } from '@/lib/payment';
@@ -13,6 +13,9 @@ import { refund } from '@/lib/stripe';
 import { afterDecision, notifyWaitlist } from '@/lib/notify';
 import { Freq, describeSeries, seriesDates } from '@/lib/series';
 import { addDays, berlinToUtc } from '@/lib/time';
+import { clearGoogleCache, syncToGoogle, testConnection } from '@/lib/gcal';
+import { db } from '@/lib/db';
+const DAY_MS = 86400e3;
 
 const go = (url: string, key: 'ok' | 'fehler', msg: string): never => {
   const [path, hash] = url.split('#');
@@ -367,4 +370,28 @@ export async function removeAdminAction(fd: FormData) {
 export async function logoutAction() {
   (await cookies()).delete(sessionCookie.name);
   redirect('/admin/anmelden');
+}
+
+// ---------- Google-Kalender ----------
+export async function googleSettingsAction(fd: FormData) {
+  const admin = await requireAdmin('admin');
+  await saveSettings(admin.name, { google: { export: fd.get('export') === 'on', import: fd.get('import') === 'on', publicTitles: fd.get('publicTitles') === 'on' } }, []);
+  clearGoogleCache();
+  revalidatePath('/', 'layout');
+  go('/admin/einstellungen#google', 'ok', 'Google-Kalender-Einstellungen gespeichert.');
+}
+export async function googleTestAction() {
+  await requireAdmin('admin');
+  let msg = '';
+  try { msg = `Verbindung steht: Kalender „${await testConnection()}“.`; } catch (e) { go('/admin/einstellungen#google', 'fehler', (e as Error).message); }
+  go('/admin/einstellungen#google', 'ok', msg);
+}
+/** Alle kommenden aktiven Buchungen (neu) nach Google übertragen. */
+export async function googleResyncAction() {
+  const admin = await requireAdmin('admin');
+  const list = await listBookings({ from: Date.now() - DAY_MS, to: Date.now() + 400 * DAY_MS, status: ['confirmed', 'requested'] });
+  for (const b of list) await syncToGoogle(b);
+  clearGoogleCache();
+  await db()`insert into audit_log (actor, action, detail) values (${admin.name}, 'google-resync', ${db().json({ count: list.length })})`;
+  go('/admin/einstellungen#google', 'ok', `${list.length} kommende Termine an Google übertragen.`);
 }

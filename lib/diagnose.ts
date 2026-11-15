@@ -52,6 +52,12 @@ export async function runChecks(): Promise<{ checks: Check[]; dbOk: boolean; has
   if (env('STRIPE_SECRET_KEY')) {
     checks.push({ label: 'Stripe: Webhook-Secret eingetragen', ok: env('STRIPE_WEBHOOK_SECRET').startsWith('whsec_'), hint: 'Ohne STRIPE_WEBHOOK_SECRET werden Lastschriften erst verbucht, wenn jemand die Buchungsseite öffnet. Webhook in Stripe anlegen (siehe EINRICHTUNG.md, Bezahlung).' });
   }
+  if (env('GOOGLE_SERVICE_ACCOUNT') || env('GOOGLE_CALENDAR_ID')) {
+    let okJson = false;
+    try { const r = env('GOOGLE_SERVICE_ACCOUNT'); const j = JSON.parse(r.startsWith('{') ? r : Buffer.from(r, 'base64').toString('utf8')); okJson = !!(j.client_email && j.private_key); } catch {}
+    checks.push({ label: 'Google: Dienstkonto-Schlüssel (GOOGLE_SERVICE_ACCOUNT)', ok: okJson, hint: 'Den kompletten Inhalt der heruntergeladenen JSON-Datei eintragen, inklusive der geschweiften Klammern.' });
+    checks.push({ label: 'Google: Kalender-ID (GOOGLE_CALENDAR_ID)', ok: !!env('GOOGLE_CALENDAR_ID'), hint: 'Steht im Google-Kalender unter Einstellungen → „Kalender integrieren“, z. B. abc123@group.calendar.google.com' });
+  }
   if (!hasAdmins) checks.push({ label: 'INITIAL_ADMIN_EMAIL für die erste Anmeldung', ok: !!env('INITIAL_ADMIN_EMAIL'), hint: 'Deine E-Mail-Adresse eintragen. Damit meldest du dich als erster Admin an.' });
   for (const c of checks) if (c.ok) delete c.hint;
   return { checks, dbOk: dbOk && schemaOk, hasAdmins };

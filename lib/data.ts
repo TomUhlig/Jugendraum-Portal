@@ -1,6 +1,7 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
 import type postgres from 'postgres';
+import { googleBusy, queueGoogle } from './gcal';
 import { db } from './db';
 import {
   ACTIVE_STATUSES, Blackout, Category, CheckResult, DEFAULT_SETTINGS, Message, RecurringBlock, Settings, Slot, checkBooking, expandRecurring, partyWeekendOf,
@@ -25,7 +26,7 @@ type Row = Record<string, unknown>;
 const num = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
 const numOrNull = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const ts = (v: unknown) => (v ? +(v as Date) : null);
-const toBooking = (r: Row): Booking => ({
+export const toBooking = (r: Row): Booking => ({
   id: r.id as string, number: r.number as string, status: r.status as Status, categoryId: r.category_id as string,
   title: r.title as string, note: r.note as string, start: +(r.starts_at as Date), end: +(r.ends_at as Date),
   guests: r.guests as number, bookerType: r.booker_type as Booking['bookerType'], team: r.team as string,
@@ -116,8 +117,8 @@ export async function deleteRecurring(actor: string, id: string) {
 }
 /** Alle Sperren im Zeitraum: einzelne Sperrzeiten plus aufgelöste regelmäßige Sperren. */
 export async function getAllBlocks(q: Q = db(), from: number, to: number): Promise<Blackout[]> {
-  const [single, rec] = await Promise.all([getBlackouts(q, from, to), getRecurring(q)]);
-  return [...single, ...expandRecurring(rec, from, to)].sort((a, b) => a.start - b.start);
+  const [single, rec, google] = await Promise.all([getBlackouts(q, from, to), getRecurring(q), googleBusy(from, to)]);
+  return [...single, ...expandRecurring(rec, from, to), ...google].sort((a, b) => a.start - b.start);
 }
 
 /** Öffentliche, anonyme Belegung für den Kalender (ohne Namen, Notizen, Kontaktdaten). */
@@ -180,6 +181,7 @@ export async function verifyBooking(verifyToken: string): Promise<{ booking: Boo
     where id = ${row.id} and status = 'pending_email' returning *`;
   if (!upd) return { booking: toBooking(row), fresh: false };
   await audit(q, row.email, row.id, auto ? 'verified+auto-confirmed' : 'verified');
+  queueGoogle([toBooking(upd)]);
   return { booking: toBooking(upd), fresh: true };
 }
 
@@ -197,7 +199,7 @@ export async function cancelByBooker(manageToken: string): Promise<Booking | nul
   const q = db();
   const [row] = await q`update bookings set status = 'cancelled' where manage_token = ${manageToken}
     and status in ${q(ACTIVE_STATUSES)} and starts_at > now() returning *`;
-  if (row) await audit(q, row.email, row.id, 'cancelled-by-booker');
+  if (row) { await audit(q, row.email, row.id, 'cancelled-by-booker'); queueGoogle([toBooking(row)]); }
   return row ? toBooking(row) : null;
 }
 
@@ -208,7 +210,7 @@ export type AdminNew = Omit<NewBooking, 'start' | 'end' | 'agreedWith'> & { agre
 export type AdminCreateResult = { created: Booking[]; skipped: { start: number; reasons: string[] }[]; seriesId: string | null };
 
 export async function adminCreate(actor: string, b: AdminNew): Promise<AdminCreateResult> {
-  return db().begin(async (q) => {
+  const res = await db().begin(async (q) => {
     const first = b.slots[0], last = b.slots[b.slots.length - 1];
     const ctx = await lockedContext(q, first.start, last.end);
     const cat = ctx.categories.find((c) => c.id === b.categoryId)!;
@@ -235,13 +237,15 @@ export async function adminCreate(actor: string, b: AdminNew): Promise<AdminCrea
     }
     return { created, skipped, seriesId };
   });
+  queueGoogle(res.created);
+  return res;
 }
 
 // ---------- Admin: Termin ändern / verschieben ----------
 export type Change = { categoryId: string; title: string; start: number; end: number; guests: number; equipment: string[] };
 export async function changeBooking(id: string, actor: string, c: Change, override: boolean):
   Promise<{ ok: true; booking: Booking; before: Booking } | { ok: false; messages: Message[] }> {
-  return db().begin(async (q) => {
+  const res = await db().begin(async (q) => {
     const [cur] = await q`select * from bookings where id = ${id} for update`;
     if (!cur) return { ok: false as const, messages: [{ level: 'block' as const, code: 'missing', text: 'Buchung nicht gefunden.' }] };
     const before = toBooking(cur);
@@ -260,6 +264,8 @@ export async function changeBooking(id: string, actor: string, c: Change, overri
     });
     return { ok: true as const, booking: toBooking(row), before };
   });
+  if (res.ok) queueGoogle([res.booking]);
+  return res;
 }
 
 // ---------- Admin: Entscheidungen, Interna, Übergabe, Kosten ----------
@@ -269,7 +275,7 @@ export async function decide(id: string, action: 'confirm' | 'reject' | 'cancel'
   const allowed = action === 'confirm' ? ['requested'] : ['requested', 'confirmed', 'pending_email'];
   const [row] = await q`update bookings set status = ${next}, decided_by = ${actor}, decided_at = now(),
     reject_reason = ${reason ?? null} where id = ${id} and status in ${q(allowed)} returning *`;
-  if (row) await audit(q, actor, id, action, { reason: reason ?? null });
+  if (row) { await audit(q, actor, id, action, { reason: reason ?? null }); queueGoogle([toBooking(row)]); }
   return row ? toBooking(row) : null;
 }
 
@@ -278,6 +284,7 @@ export async function cancelSeries(seriesId: string, actor: string, reason: stri
   const rows = await q`update bookings set status = 'cancelled', decided_by = ${actor}, decided_at = now(), reject_reason = ${reason}
     where series_id = ${seriesId} and status in ${q(ACTIVE_STATUSES)} and starts_at >= ${new Date(fromTs)} returning *`;
   for (const r of rows) await audit(q, actor, r.id, 'cancel', { reason, series: true });
+  queueGoogle(rows.map(toBooking));
   return rows.map(toBooking);
 }
 

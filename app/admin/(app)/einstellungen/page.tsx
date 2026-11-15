@@ -7,14 +7,16 @@ import { formatIban } from '@/lib/payment';
 import { stripeEnabled } from '@/lib/stripe';
 import { appUrl } from '@/lib/url';
 import type { MailTextKey } from '@/lib/data';
-import { offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
+import { calendarId, googleConfigured, googleSettings, serviceEmail } from '@/lib/gcal';
+import { googleResyncAction, googleSettingsAction, googleTestAction, offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
 
 const de = (n: number) => n.toString().replace('.', ',');
 
 export default async function Einstellungen({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin();
   const sp = await searchParams;
-  const [cats, s, x] = await Promise.all([getCategories(), getSettings(), getExtras()]);
+  const [cats, s, x, gs] = await Promise.all([getCategories(), getSettings(), getExtras(), googleSettings()]);
+  const gOn = googleConfigured();
   const ro = me.role !== 'admin';
   const mode = mailMode();
   return (
@@ -31,6 +33,37 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
           {mode === 'console' && <p className="muted small">Ohne Mailversand bekommen weder Buchende noch das Team Nachrichten, und niemand kann sich in der Verwaltung anmelden.</p>}
         </div>
         <form action={testMailAction} className="card-foot inline"><button className="btn" type="submit" disabled={mode === 'console'}>Testmail an {me.email} senden</button></form>
+      </section>
+
+      <section className="card" id="google">
+        <div className="card-head"><div><h2>Google-Kalender</h2><p>Bestätigte Termine landen automatisch in einem Google-Kalender. Termine, die dort direkt eingetragen werden (z. B. Vereinsfeste), sperren den Raum.</p></div>
+          <span className={`badge ${gOn ? 'b-ok' : 'b-expired'}`}>{gOn ? 'verbunden' : 'nicht eingerichtet'}</span></div>
+        {gOn ? (
+          <form action={googleSettingsAction}>
+            <div className="card-body stack-sm">
+              <dl className="kv"><dt>Kalender</dt><dd className="mono small">{calendarId()}</dd><dt>Dienstkonto</dt><dd className="mono small">{serviceEmail()}</dd></dl>
+              <label className="choice"><input type="checkbox" name="export" defaultChecked={gs.export} disabled={ro} /><span><b>Buchungen übertragen</b><br /><span className="muted small">Bestätigte Termine und offene Anfragen (als „vorläufig“) erscheinen im Google-Kalender, Änderungen und Absagen werden mitgezogen.</span></span></label>
+              <label className="choice"><input type="checkbox" name="import" defaultChecked={gs.import} disabled={ro} /><span><b>Google-Termine sperren den Raum</b><br /><span className="muted small">Alle anderen Termine im Kalender gelten als belegt. Termine mit „Anzeigen als: Verfügbar“ werden ignoriert.</span></span></label>
+              <label className="choice"><input type="checkbox" name="publicTitles" defaultChecked={gs.publicTitles} disabled={ro} /><span><b>Titel öffentlich zeigen</b><br /><span className="muted small">Sonst steht im öffentlichen Kalender nur „Vereinstermin“.</span></span></label>
+            </div>
+            <div className="card-foot inline">
+              <button className="btn btn-primary" type="submit" disabled={ro}>Speichern</button>
+              <button className="btn" formAction={googleTestAction} disabled={ro}>Verbindung testen</button>
+              <button className="btn" formAction={googleResyncAction} disabled={ro}>Alle kommenden Termine übertragen</button>
+            </div>
+          </form>
+        ) : (
+          <div className="card-body stack-sm">
+            <p className="small">Einmalig einrichten (ca. 10 Minuten, kostenlos):</p>
+            <ol className="small" style={{ paddingLeft: 20, display: 'grid', gap: 6 }}>
+              <li>In der <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer">Google Cloud Console</a> ein Projekt anlegen und die <b>Google Calendar API</b> aktivieren.</li>
+              <li>Unter „IAM &amp; Verwaltung → Dienstkonten“ ein Dienstkonto anlegen, dort „Schlüssel → Neuer Schlüssel → JSON“ herunterladen.</li>
+              <li>Im Google-Kalender beim gewünschten Kalender „Einstellungen und Freigabe“ öffnen, die Adresse des Dienstkontos hinzufügen mit „Änderungen an Terminen vornehmen“.</li>
+              <li>In Vercel <code>GOOGLE_SERVICE_ACCOUNT</code> (kompletter Inhalt der JSON-Datei) und <code>GOOGLE_CALENDAR_ID</code> (steht unter „Kalender integrieren“) eintragen, dann Redeploy.</li>
+            </ol>
+            <p className="muted small">Nur ansehen statt abgleichen geht auch ohne Einrichtung: das iCal-Abo unter „Team“ lässt sich in Google Kalender abonnieren.</p>
+          </div>
+        )}
       </section>
 
       <form action={operatorAction} className="card" id="betreiber">
