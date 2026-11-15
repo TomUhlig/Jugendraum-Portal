@@ -4,7 +4,7 @@ import { Flash, PageHead } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { checkExisting, getCategories, getExtras, listBookings, operatorComplete, unreadMessages } from '@/lib/data';
+import { checkExisting, getAllBlocks, getCategories, getExtras, listBookings, operatorComplete, unreadMessages } from '@/lib/data';
 import { mailMode } from '@/lib/mail';
 import { eur } from '@/lib/labels';
 import { DAY, addDays, berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong, fmtRange } from '@/lib/time';
@@ -33,6 +33,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     unreadMessages(),
   ]);
   const cat = new Map(cats.map((c) => [c.id, c]));
+  // Bestätigte Termine, die mit einer später eingetragenen Sperre oder einem Google-Termin kollidieren
+  const soon = await listBookings({ status: ['confirmed'], from: now, to: now + 60 * DAY });
+  const blocks = soon.length ? await getAllBlocks(undefined, now, now + 60 * DAY) : [];
+  const clashes = soon.flatMap((b) => { const x = blocks.find((k) => k.scope === 'all' && k.start < b.end && k.end > b.start); return x ? [{ b, x }] : []; });
   const setup = [...(mailMode() === 'console' ? ['Mailversand einrichten'] : []), ...(operatorComplete((await getExtras()).operator) ? [] : ['Impressum ausfüllen'])];
   const checks = await Promise.all(open.map((b) => checkExisting(b)));
   const todays = upcoming.filter((b) => b.start < tEnd && b.end > tStart && b.status === 'confirmed');
@@ -40,7 +44,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const hours = monthB.reduce((s, b) => s + (b.end - b.start) / 3.6e6, 0);
   const days = Math.round((berlinToUtc(mNext, '00:00') - berlinToUtc(m, '00:00')) / DAY);
   const canDecide = me.role !== 'viewer';
-  const todo = setup.length + unread.length + unpaid.length + keysOut.length + deposits.length + damages.length + keysDue.length + (failed[0].n ? 1 : 0);
+  const todo = clashes.length + setup.length + unread.length + unpaid.length + keysOut.length + deposits.length + damages.length + keysDue.length + (failed[0].n ? 1 : 0);
 
   return (
     <>
@@ -82,6 +86,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <div className="card-head"><h2>Zu erledigen</h2>{todo > 0 && <span className="badge b-warn">{todo}</span>}</div>
             {todo === 0 ? <div className="empty">Nichts offen. Schlüssel, Kautionen und Schadensmeldungen sind erledigt.</div> : (
               <ul className="list">
+                {clashes.map(({ b, x }) => <li key={'c' + b.id} className="todo"><AlertTriangle className="icon" style={{ color: 'var(--bad)' }} /><span>Überschneidung: <Link href={`/admin/buchung/${b.id}`}>{b.title}</Link> <span className="muted">({fmtDay(b.start)}, {b.name})</span> trifft auf {x.id.startsWith('g:') ? 'Google-Termin' : 'Sperre'} „{x.reason || 'gesperrt'}“</span></li>)}
                 {setup.map((t) => <li key={t} className="todo"><Settings2 className="icon" style={{ color: 'var(--bad)' }} /><span><Link href={t.startsWith('Mail') ? '/admin/einstellungen#mail' : '/admin/einstellungen#betreiber'}>{t}</Link> <span className="muted">(Einrichtung)</span></span></li>)}
                 {unread.map((m) => <li key={'m' + m.booking_id} className="todo"><MessageSquareText className="icon" style={{ color: 'var(--info)' }} /><span>{m.n === 1 ? 'Neue Nachricht' : `${m.n} neue Nachrichten`} von {m.name}: <Link href={`/admin/buchung/${m.booking_id}#nachrichten`}>{m.title}</Link></span></li>)}
                 {unpaid.map((b) => <li key={'u' + b.id} className="todo"><Wallet className="icon" style={{ color: 'var(--warn)' }} /><span>Zahlung offen ({eur(+b.open)}): <Link href={`/admin/buchung/${b.id}`}>{b.title}</Link> <span className="muted">({fmtDay(+b.starts_at)}, {b.name})</span></span></li>)}

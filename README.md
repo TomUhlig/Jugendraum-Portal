@@ -116,3 +116,11 @@ lib/data.ts                 Datenbankzugriffe
 lib/mail.ts                 Mail-Vorlagen im Vereinsdesign
 db/schema.sql               Tabellen, Constraints, Startwerte
 ```
+
+### Neu
+- Google-Kalender-Abgleich in beide Richtungen (Einstellungen → Google-Kalender, Anleitung in EINRICHTUNG.md)
+- Startseite mit „Nächste freie Abende“ zum Antippen
+- „Erneut buchen“ und gemerkte Kontaktdaten
+- Zahlungsbestätigung zum Drucken (`/buchung/<link>/quittung`)
+- Belegungs-Widget für die Vereinsseite (`/einbetten`, Code unter Einstellungen → Einbinden)
+- Wochenplan für Platzwart/Hausmeister (`/admin/wochenplan`)
