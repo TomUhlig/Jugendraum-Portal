@@ -1,4 +1,5 @@
 import 'server-only';
+import { googleCalendarLink } from './gcal-link';
 import { inboxEnabled, plusAddress } from './inbox-parse';
 import { decisionToken } from './auth';
 import nodemailer, { type Transporter } from 'nodemailer';
@@ -89,10 +90,10 @@ const SMALL = (t: string) => `<p style="margin:0 0 12px;font-size:13px;line-heig
 const paragraphs = (t: string) => t.split(/\n{2,}/).map((x) => P(esc(x).replace(/\n/g, '<br>'))).join('');
 const eurL = (n: number, lang: Lang) => n.toLocaleString(LOCALE[lang], { style: 'currency', currency: 'EUR', maximumFractionDigits: n % 1 ? 2 : 0 });
 
-type Mailout = { preheader: string; heading: string; blocks: Block[]; cta?: { href: string; label: string }; lang?: Lang };
+type Mailout = { preheader: string; heading: string; blocks: Block[]; cta?: { href: string; label: string }; lang?: Lang; after?: Block[]; progress?: 1 | 2 | 3 | 4 };
 function layout(o: Mailout) {
   const M = MAIL_TEXT[o.lang ?? 'de'];
-  return `<!doctype html><html lang="${o.lang ?? 'de'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(o.heading)}</title></head>
+  return `<!doctype html><html lang="${o.lang ?? 'de'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${esc(o.heading)}</title></head>
 <body style="margin:0;padding:0;background:#F4F5F8;font-family:'Source Sans 3','Segoe UI',Helvetica,Arial,sans-serif">
 <span style="display:none;max-height:0;overflow:hidden">${esc(o.preheader)}</span>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F5F8;padding:28px 12px"><tr><td align="center">
@@ -103,15 +104,30 @@ function layout(o: Mailout) {
   <td style="padding-left:12px;font-size:16px;line-height:1.2;color:#2E367A;font-weight:700">${M.room}<br><span style="font-size:12px;color:#646A85;font-weight:400">SV Heepen</span></td>
   </tr></table></td></tr>
 <tr><td style="padding:28px 28px 8px">
-<h1 style="margin:0 0 16px;font-size:21px;line-height:1.3;color:#161A33;font-weight:700">${esc(o.heading)}</h1>
+${o.progress ? progressBar(o.progress, o.lang ?? 'de') : ''}<h1 style="margin:0 0 16px;font-size:21px;line-height:1.3;color:#161A33;font-weight:700">${esc(o.heading)}</h1>
 ${o.blocks.join('\n')}
 ${o.cta ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 22px"><tr><td style="background:#2E367A;border-radius:8px"><a href="${o.cta.href}" style="display:inline-block;padding:12px 22px;color:#FFFFFF;font-weight:600;font-size:15px;text-decoration:none">${esc(o.cta.label)}</a></td></tr></table>` : ''}
+${(o.after ?? []).join('\n')}
 </td></tr>
 <tr><td style="padding:16px 28px;border-top:1px solid #E1E4EC;font-size:12px;line-height:1.5;color:#646A85">${M.footer}</td></tr>
 </table></td></tr></table></body></html>`;
 }
+const PROGRESS: Record<Lang, string[]> = {
+  de: ['Angefragt', 'E-Mail bestätigt', 'Bestätigt', 'Termin'],
+  en: ['Requested', 'Email confirmed', 'Confirmed', 'Your date'],
+  tr: ['Talep', 'E-posta onaylandı', 'Onaylandı', 'Tarih'],
+};
+/** Kleine Schrittanzeige oben in Bucher-Mails: wo steht meine Anfrage? */
+function progressBar(step: number, lang: Lang): string {
+  const cells = PROGRESS[lang].map((l, i) => {
+    const done = i < step, cur = i === step - 1;
+    const dot = `<span style="display:inline-block;width:18px;height:18px;line-height:18px;border-radius:9px;text-align:center;font-size:11px;font-weight:700;${done ? 'background:#2E367A;color:#FFFFFF' : 'background:#FFFFFF;color:#8A8FA8;border:1px solid #C9CCDA;line-height:16px'}">${done && !cur ? '&#10003;' : i + 1}</span>`;
+    return `<td style="padding:0 6px 0 0;white-space:nowrap;font-size:12px;color:${cur ? '#161A33' : done ? '#3D4260' : '#8A8FA8'};font-weight:${cur ? 700 : 400}">${dot}&nbsp;${esc(l)}</td>${i < 3 ? `<td width="33%" style="padding:0 8px 0 2px"><div style="height:2px;background:${i < step - 1 ? '#2E367A' : '#E1E4EC'};min-width:12px"></div></td>` : ''}`;
+  }).join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px"><tr>${cells}</tr></table>`;
+}
 function toText(o: Mailout) {
-  const body = o.blocks.join('\n').replace(/<br\s*\/?>/g, '\n').replace(/<\/(p|tr|h1)>/g, '\n').replace(/<\/td><td[^>]*>/g, ': ').replace(/<[^>]+>/g, '')
+  const body = [...o.blocks, ...(o.after ?? [])].join('\n').replace(/<br\s*\/?>/g, '\n').replace(/<\/(p|tr|h1)>/g, '\n').replace(/<\/td><td[^>]*>/g, ': ').replace(/<[^>]+>/g, '')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/\n{3,}/g, '\n\n').trim();
   return `${o.heading}\n\n${body}${o.cta ? `\n\n${o.cta.label}: ${o.cta.href}` : ''}\n\n--\n${MAIL_TEXT[o.lang ?? 'de'].footerText}`;
 }
@@ -120,6 +136,8 @@ function build(o: Mailout) {
 }
 
 
+const GCAL_TX: Record<Lang, string> = { de: 'In Google Kalender eintragen', en: 'Add to Google Calendar', tr: 'Google Takvim’e ekle' };
+const ATTACH_TX: Record<Lang, string> = { de: 'Kalenderdatei und Hausordnung (PDF) im Anhang', en: 'Calendar file and house rules (PDF) attached', tr: 'Takvim dosyası ve ev kuralları (PDF) ekte' };
 const PROTO_TX = {
   de: { out: { subject: (t: string) => `Schlüssel übergeben: ${t}`, heading: 'Schlüssel übergeben', text: 'danke, der Schlüssel ist übergeben. Das unterschriebene Protokoll findest du im Anhang. Viel Spaß im Jugendraum!' },
         in: { subject: (t: string) => `Rückgabe bestätigt: ${t}`, heading: 'Rückgabe bestätigt', text: 'danke für die Rückgabe. Das unterschriebene Protokoll mit Zählerstand und Zustand findest du im Anhang.' } },
@@ -195,19 +213,20 @@ export const mails = {
   verify: (b: Booking, c: Category | undefined, verifyToken: string, series?: { dates: { start: number; end: number }[]; skipped: number[] }) => {
     const M = MAIL_TEXT[b.lang], V = M.verify;
     return sendMail({ kind: 'verify', to: bookerTo(b), bookingId: b.id, number: b.number, subject: V.subject(b.number),
-      ...build({ lang: b.lang, preheader: V.pre, heading: V.heading, blocks: [P(hello(b)), P(V.text), details(b, c, [], b.lang), ...(series ? seriesBlock(series.dates, b.lang, series.skipped) : []), SMALL(V.small)], cta: { href: `${appUrl()}/bestaetigen/${verifyToken}`, label: V.cta } }) });
+      ...build({ lang: b.lang, preheader: V.pre, heading: V.heading, blocks: [P(hello(b)), P(V.text), details(b, c, [], b.lang), ...(series ? seriesBlock(series.dates, b.lang, series.skipped) : [])], cta: { href: `${appUrl()}/bestaetigen/${verifyToken}`, label: V.cta }, after: [SMALL(V.small)], progress: 1 }) });
   },
   received: async (b: Booking, c?: Category, series: Booking[] = []) => {
     const M = MAIL_TEXT[b.lang];
     return sendMail({ kind: 'received', to: bookerTo(b), bookingId: b.id, number: b.number, subject: M.received.subject(b.title, fmtDay(b.start, b.lang)),
-      ...build({ lang: b.lang, preheader: M.received.pre, heading: M.received.heading, blocks: [P(hello(b)), paragraphs(await text('received', b.lang)), details(b, c, [], b.lang), ...seriesBlock(series, b.lang)], cta: { href: manageLink(b), label: M.viewRequest } }) });
+      ...build({ lang: b.lang, preheader: M.received.pre, heading: M.received.heading, blocks: [P(hello(b)), paragraphs(await text('received', b.lang)), details(b, c, [], b.lang), ...seriesBlock(series, b.lang)], cta: { href: manageLink(b), label: M.viewRequest }, progress: 2 }) });
   },
   confirmed: async (b: Booking, c?: Category, series: Booking[] = []) => {
     const M = MAIL_TEXT[b.lang];
     const blocks = [P(hello(b)), paragraphs(await text('confirmed', b.lang)), details(b, c, [[M.labels.contact, esc(b.agreedWith)]], b.lang), ...seriesBlock(series, b.lang), ...(await payBlock(b))];
     const pdf = await hausordnungPdf(b, c, (await getSettings()).capacity, (await getExtras()).operator).catch((e) => { console.error('PDF:', e); return null; });
     return sendMail({ kind: 'confirmed', to: bookerTo(b), bookingId: b.id, number: b.number, subject: M.confirmed.subject(b.title, fmtDay(b.start, b.lang)), attachments: [...(series.length > 1 ? [{ filename: `jugendraum-${b.number}-serie.ics`, content: Buffer.from(bookingIcs(series, c)).toString('base64') }] : ics(b, c)), ...(pdf ? [pdf] : [])],
-      ...build({ lang: b.lang, preheader: M.confirmed.pre(fmtLong(b.start, b.lang)), heading: M.confirmed.heading, blocks, cta: { href: manageLink(b), label: M.view } }) });
+      ...build({ lang: b.lang, preheader: M.confirmed.pre(fmtLong(b.start, b.lang)), heading: M.confirmed.heading, blocks, cta: { href: manageLink(b), label: M.view }, progress: 3,
+        after: [SMALL(`<a href="${googleCalendarLink({ title: `Jugendraum: ${b.title}`, start: b.start, end: b.end, details: `${b.number} · ${manageLink(b)}`, location: 'Jugendraum SV Heepen' })}" style="color:#2E367A">${GCAL_TX[b.lang]}</a> · ${ATTACH_TX[b.lang]}`)] }) });
   },
   changed: async (b: Booking, before: Booking, c?: Category, note?: string) => {
     const M = MAIL_TEXT[b.lang], C = M.changed;
@@ -241,7 +260,7 @@ export const mails = {
     const blocks = [P(hello(b)), paragraphs(await text('reminder', b.lang)), details(b, c, [[M.labels.contact, esc(b.agreedWith)]], b.lang), ...(await payBlock(b))];
     const label = w === '1d' ? R.tomorrow : R.in3;
     return sendMail({ kind: `reminder-${w}`, to: bookerTo(b), bookingId: b.id, number: b.number, subject: R.subject(label, b.title),
-      ...build({ lang: b.lang, preheader: `${label}, ${berlinHm(b.start)}${M.labels.uhr}.`, heading: R.heading(label), blocks, cta: { href: manageLink(b), label: M.view } }) });
+      ...build({ lang: b.lang, preheader: `${label}, ${berlinHm(b.start)}${M.labels.uhr}.`, heading: R.heading(label), blocks, cta: { href: manageLink(b), label: M.view }, progress: 4 }) });
   },
   paid: (b: Booking, amount: number) => {
     const M = MAIL_TEXT[b.lang], X = M.paid, a = eurL(amount, b.lang);

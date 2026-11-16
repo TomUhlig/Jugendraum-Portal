@@ -1,4 +1,9 @@
-import { CalendarClock, Clock, PartyPopper, ShieldCheck, Users } from 'lucide-react';
+import { ArrowRight, CalendarClock, Clock, PartyPopper, ShieldCheck, Users } from 'lucide-react';
+import Link from 'next/link';
+import { TocSpy } from '@/components/TocSpy';
+import { nextFreeEvenings } from '@/lib/data';
+import { t } from '@/lib/i18n';
+import { fmtDay, hmRange } from '@/lib/time';
 import { getCategories, getExtras, getRecurring, getSettings, listPhotos } from '@/lib/data';
 import { Gallery } from '@/components/Gallery';
 import { describeRecurring } from '@/lib/rules';
@@ -12,7 +17,8 @@ export const metadata = { title: 'Raum & Regeln' };
 const IDS = ['raum', 'ablauf', 'feiern', 'puffer', 'kosten', 'uebergabe', 'hausordnung', 'storno', 'datenschutz'];
 
 export default async function Raum() {
-  const [cats, s, x, rec, photos, lang] = await Promise.all([getCategories(), getSettings(), getExtras(), getRecurring(), listPhotos(), getLang()]);
+  const [cats, s, x, rec, photos, lang, free] = await Promise.all([getCategories(), getSettings(), getExtras(), getRecurring(), listPhotos(), getLang(), nextFreeEvenings(3).catch(() => [])]);
+  const D = t(lang);
   const T = raumText(lang, { capacity: s.capacity, fromH: s.weekendFromHour, untilH: String(s.weekendUntilHour).padStart(2, '0'), latest: s.partyLatestEnd, lead: s.partyMinLeadDays, whole: s.partyBlocksWholeWeekend });
   const eur = (n: number) => n.toLocaleString(LOCALE[lang], { style: 'currency', currency: 'EUR', maximumFractionDigits: n % 1 ? 2 : 0 });
   const today = new Date().toISOString().slice(0, 10);
@@ -42,7 +48,13 @@ export default async function Raum() {
           {x.equipment.length > 0 && <p><b>{T.equipment}</b> {x.equipment.join(', ')}. {T.equipmentTail}</p>}
 
           {H(1)}
-          <ol>{T.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
+          <ol className="step-list">{T.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
+
+          <div className="card cta-card cta-inline">
+            <b>{D.intro.title}</b>
+            {free.length > 0 && <p>{D.intro.nextFree}: {free.map((f) => fmtDay(f.start, lang)).join(' · ')}</p>}
+            <Link className="btn btn-gelb" href="/#anfrage">{D.intro.cta}<ArrowRight className="icon-sm" /></Link>
+          </div>
 
           {H(2)}
           <p>{T.partiesText}</p>
@@ -75,7 +87,20 @@ export default async function Raum() {
           {T.privacy(x.operator).map((p, i) => <p key={i}>{p}</p>)}
           <p className="inline" style={{ marginTop: 8 }}><ShieldCheck className="icon" style={{ color: 'var(--ok)' }} /><span className="muted small">{T.note}</span></p>
         </article>
+        <aside className="doc-aside">
+          <div className="card cta-card">
+            <b>{D.intro.title}</b>
+            <p>{D.intro.nextFree}:</p>
+            {free.length > 0 && <ul>{free.map((f) => <li key={f.date}><Link href={`/?datum=${f.date}&von=18:00&bis=22:00#anfrage`}><span>{fmtDay(f.start, lang)}</span><span className="num">{hmRange(f.start, f.end, lang)}</span></Link></li>)}</ul>}
+            <Link className="btn btn-gelb" href="/#anfrage">{D.intro.cta}<ArrowRight className="icon-sm" /></Link>
+          </div>
+          <div className="card card-body stack-sm">
+            <b className="small">{D.app.contacts}</b>
+            {['Michael Grieswelle', 'Sigrid Brodig'].map((n) => <div key={n} className="contact"><span className="avatar">{n.split(' ').map((w) => w[0]).join('')}</span><div><b className="small">{n}</b><br /><span className="muted small">{D.app.contactRole}</span></div></div>)}
+          </div>
+        </aside>
       </div>
+      <TocSpy />
     </main>
   );
 }
