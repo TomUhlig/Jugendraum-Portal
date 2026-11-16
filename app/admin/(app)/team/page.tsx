@@ -1,5 +1,7 @@
 import { Flash, PageHead } from '@/components/Flash';
-import { feedToken, requireAdmin } from '@/lib/auth';
+import { feedToken, requireAdmin, shareFeedToken } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { CopyText } from '@/components/CopyText';
 import { listAdmins } from '@/lib/data';
 import { initials } from '@/lib/labels';
 import { appUrl } from '@/lib/url';
@@ -18,6 +20,8 @@ export default async function Team({ searchParams }: { searchParams: Promise<Rec
   const [admins, keys, devices] = await Promise.all([listAdmins(), vapidKeys(), countSubscriptions(me.id)]);
   const feed = `${appUrl()}/api/ical/${feedToken(me.id)}`;
   const isAdmin = me.role === 'admin';
+  const teams = (await db()`select team from bookings where team <> '' and status = 'confirmed' and starts_at > now() - interval '12 months' group by team order by count(*) desc limit 12`).map((r) => r.team as string);
+  const gcal = (url: string) => `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(url.replace(/^https?:/, 'webcal:'))}`;
   return (
     <>
       <PageHead title="Team" />
@@ -55,12 +59,24 @@ export default async function Team({ searchParams }: { searchParams: Promise<Rec
         </form>
       )}
       <section className="card">
-        <div className="card-head"><div><h2>Dein Kalender-Abo</h2><p>Alle Buchungen automatisch im eigenen Kalender, stündlich aktualisiert</p></div></div>
-        <div className="card-body stack-sm">
-          <input type="text" readOnly value={feed} aria-label="Kalender-Abo-Link" className="small" />
-          <span className="muted small">Google Kalender: Weitere Kalender → Per URL. iPhone: Einstellungen → Kalender → Accounts → Kalenderabo hinzufügen. Outlook: Kalender hinzufügen → Aus dem Internet abonnieren.</span>
-          <span className="muted small">Der Link ist persönlich und enthält Namen und Telefonnummern. Bitte nicht weitergeben.</span>
-        </div>
+        <div className="card-head"><div><h2>Dein Kalender-Abo</h2><p>Buchungen automatisch im eigenen Kalender, stündlich aktualisiert. Enthält Namen und Telefonnummern, nur für dich.</p></div></div>
+        <ul className="list feed-list">
+          {[['Alle Termine und Anfragen', ''], ['Nur bestätigte Termine', '?nur=bestaetigt'], ['Nur Feiern', '?nur=feiern']].map(([label, q]) => (
+            <li key={label} className="feed-row"><div><b>{label}</b><CopyText text={feed + q} /></div><a className="btn btn-sm" href={gcal(feed + q)} target="_blank" rel="noreferrer">In Google Kalender</a></li>
+          ))}
+        </ul>
+        <div className="card-foot muted small">Google Kalender: Knopf rechts oder „Weitere Kalender → Per URL“. iPhone: Einstellungen → Kalender → Accounts → Kalenderabo hinzufügen. Outlook: Kalender hinzufügen → Aus dem Internet abonnieren.</div>
+      </section>
+
+      <section className="card">
+        <div className="card-head"><div><h2>Kalender zum Weitergeben</h2><p>Ohne Namen und Telefonnummern, z. B. für die WhatsApp-Gruppe einer Mannschaft oder den Vorstand. Nur bestätigte Termine.</p></div></div>
+        <ul className="list feed-list">
+          {[{ label: 'Belegung allgemein', hint: 'nur „Jugendraum belegt“', f: { k: 'all' as const } }, { label: 'Alle Feiern', hint: 'Anlass und Mannschaft', f: { k: 'parties' as const } },
+            ...teams.map((tm) => ({ label: tm, hint: 'Termine dieser Mannschaft', f: { k: 'team' as const, v: tm } }))].map((x) => {
+            const url = `${appUrl()}/api/ical/abo/${shareFeedToken(x.f)}.ics`;
+            return <li key={x.label} className="feed-row"><div><b>{x.label}</b> <span className="muted small">{x.hint}</span><CopyText text={url} /></div><a className="btn btn-sm" href={gcal(url)} target="_blank" rel="noreferrer">In Google Kalender</a></li>;
+          })}
+        </ul>
       </section>
     </>
   );

@@ -469,7 +469,7 @@ a.kpi:hover { border-color: var(--line-strong) }
 @media (max-width: 560px) { .pay-transfer { grid-template-columns: minmax(0, 1fr) } }
 .girocode { margin: 0; display: grid; justify-items: center; gap: 4px; background: #fff; padding: 8px; border-radius: 8px; border: 1px solid var(--line) }
 .girocode figcaption { font-size: .75rem; color: #3D4260 }
-.copytext { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap }
+.copytext { display: inline-flex; align-items: center; gap: 6px; flex-wrap: nowrap; min-width: 0 }
 .iconbtn-sm { border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 6px; width: 26px; height: 26px; display: inline-grid; place-items: center; cursor: pointer }
 .iconbtn-sm:hover { color: var(--brand-ink) }
 
@@ -866,3 +866,7 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .install-hint { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start; padding: 14px 14px 14px 16px; border-left: 3px solid var(--gelb) }
 .install-hint > .icon { color: var(--brand-ink); margin-top: 2px }
 .install-hint p { margin: 2px 0 8px; font-size: .88rem; color: var(--ink-2) }
+.feed-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap }
+.feed-row > div { min-width: 0; flex: 1; display: grid; gap: 4px }
+.feed-row .copytext { font-size: .78rem; color: var(--muted); max-width: 100%; overflow: hidden }
+.feed-row .copytext .num { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0 }

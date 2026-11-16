@@ -100,3 +100,15 @@ export async function parseDecisionToken(token: string): Promise<{ admin: Admin;
   if (!admin || admin.role === 'viewer') return null;
   return { admin: admin as unknown as Admin, bookingId };
 }
+
+/** Weitergebbare Kalender-Abos ohne persönliche Daten (z. B. für eine Mannschaft). Signiert, ohne Ablauf. */
+export type ShareFeed = { k: 'all' | 'parties' | 'team' | 'cat'; v?: string };
+export function shareFeedToken(f: ShareFeed): string {
+  const payload = Buffer.from(JSON.stringify(f)).toString('base64url');
+  return `${payload}.${sign('share:' + payload).slice(0, 20)}`;
+}
+export function parseShareFeed(token: string): ShareFeed | null {
+  const [payload, sig] = token.split('.');
+  if (!payload || !sig || sig !== sign('share:' + payload).slice(0, 20)) return null;
+  try { const f = JSON.parse(Buffer.from(payload, 'base64url').toString()); return ['all', 'parties', 'team', 'cat'].includes(f.k) ? f : null; } catch { return null; }
+}
