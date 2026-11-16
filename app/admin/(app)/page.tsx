@@ -7,7 +7,7 @@ import { db } from '@/lib/db';
 import { checkExisting, getAllBlocks, getCategories, getExtras, listBookings, operatorComplete, unreadMessages } from '@/lib/data';
 import { mailMode } from '@/lib/mail';
 import { eur } from '@/lib/labels';
-import { DAY, addDays, berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong, fmtRange } from '@/lib/time';
+import { DAY, addDays, berlinParts, berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong, fmtRange } from '@/lib/time';
 import { decideAction } from '../actions';
 
 export const metadata = { title: { absolute: 'Übersicht · Verwaltung Jugendraum' } };
@@ -46,11 +46,13 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const hours = monthB.reduce((s, b) => s + (b.end - b.start) / 3.6e6, 0);
   const days = Math.round((berlinToUtc(mNext, '00:00') - berlinToUtc(m, '00:00')) / DAY);
   const canDecide = me.role !== 'viewer';
+  const hour = berlinParts(now).hour;
+  const greet = hour < 5 ? 'Gute Nacht' : hour < 11 ? 'Guten Morgen' : hour < 17 ? 'Hallo' : 'Guten Abend';
   const todo = clashes.length + setup.length + unread.length + unpaid.length + keysOut.length + deposits.length + damages.length + keysDue.length + (failed[0].n ? 1 : 0);
 
   return (
     <>
-      <PageHead eyebrow={fmtLong(now)} title="Übersicht"><Link className="btn" href="/admin/sperrzeiten#neu"><Lock className="icon-sm" />Zeitraum sperren</Link><Link className="btn btn-primary" href="/admin/neu"><Plus className="icon-sm" />Termin eintragen</Link></PageHead>
+      <PageHead eyebrow={`${greet}, ${me.name.split(' ')[0]} · ${fmtLong(now)}`} title="Übersicht"><Link className="btn" href="/admin/sperrzeiten#neu"><Lock className="icon-sm" />Zeitraum sperren</Link><Link className="btn btn-primary" href="/admin/neu"><Plus className="icon-sm" />Termin eintragen</Link></PageHead>
       <Flash sp={sp} />
       <div className="kpis">
         <a href="#anfragen" className={`card kpi ${open.length ? 'attention' : ''}`}><span className="k">Offene Anfragen</span><span className="v">{open.length}</span><span className="s">{open.length ? 'warten auf Entscheidung' : 'alles erledigt'}</span></a>

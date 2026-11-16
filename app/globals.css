@@ -756,3 +756,46 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
   .doc .toc a[aria-current] { background: var(--brand-tint); border-color: transparent }
 }
 @media (min-width: 1180px) { .cta-inline { display: none } }
+/* ---------- Buchungsliste ---------- */
+.status-chips { display: flex; gap: 6px; flex-wrap: wrap }
+.status-chips a { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-2); text-decoration: none; font-size: .88rem; font-weight: 600 }
+.status-chips a b { font-size: .78rem; background: var(--surface-2); color: var(--muted); border-radius: 999px; padding: 0 7px; font-variant-numeric: tabular-nums }
+.status-chips a:hover { border-color: var(--muted) }
+.status-chips a[aria-current="page"] { background: var(--brand); border-color: var(--brand); color: #fff }
+.status-chips a[aria-current="page"] b { background: rgba(255,255,255,.2); color: #fff }
+.status-chips .st-requested b { background: var(--warn-bg); color: var(--warn) }
+.blist .month-row th { background: var(--surface-2); font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 8px 14px; position: sticky; top: 0 }
+.flags { display: flex; gap: 4px; margin-top: 6px }
+.flag { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px }
+.f-msg { background: var(--info-bg); color: var(--info) } .f-pay { background: var(--warn-bg); color: var(--warn) } .f-key { background: var(--brand-tint); color: var(--brand-ink) }
+.filters[data-autosubmit] .no-js-only { display: none }
+@media (max-width: 700px) {
+  .blist thead { display: none }
+  .blist, .blist tbody, .blist tr, .blist td, .blist th { display: block; width: 100% }
+  .blist tr.link { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 12px 16px; border-bottom: 1px solid var(--line) }
+  .blist tr.link td { border: 0; padding: 0 }
+  .blist tr.link td:nth-child(1) { grid-column: 1; order: 2; font-size: .85rem }
+  .blist tr.link td:nth-child(2) { grid-column: 1; order: 1 }
+  .blist tr.link td:nth-child(3) { grid-column: 1; order: 3; font-size: .85rem }
+  .blist tr.link td:nth-child(4), .blist tr.link td:nth-child(6) { display: none }
+  .blist tr.link td:nth-child(5) { grid-column: 2; grid-row: 1 / span 3; order: 4; text-align: right }
+  .blist tr.link td:nth-child(5) .flags { justify-content: flex-end }
+  .blist tr.link td:nth-child(1) br { display: none }
+  .blist tr.link td:nth-child(1) .muted::before { content: " · " }
+}
+/* ---------- Buchungsdetail ---------- */
+.rel { font-weight: 600 }
+.rel.soon { color: var(--warn) } .rel.now { color: var(--ok) } .rel.past { color: var(--muted) }
+.pager { display: inline-flex; gap: 2px; margin-right: 4px }
+.pager span.iconbtn { opacity: .35 }
+.contact-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px }
+.wa-btn { color: #128C4A; border-color: color-mix(in srgb, #128C4A 40%, transparent) }
+:root[data-theme="dark"] .wa-btn { color: #5FD3A2 }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .wa-btn { color: #5FD3A2 } }
+@media (max-width: 700px) {
+  .filters { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px 10px; padding: 12px 14px }
+  .filters .field.grow { grid-column: 1 / -1 }
+  .filters .field label { font-size: .75rem }
+  .filters select, .filters input { min-height: 38px; font-size: .9rem }
+  .filters .field:last-of-type:nth-of-type(odd) { grid-column: 1 / -1 }
+}

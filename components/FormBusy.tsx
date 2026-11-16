@@ -20,9 +20,21 @@ export function FormBusy() {
       }, 250);
     };
     document.addEventListener('submit', onSubmit);
+    // Filter-Formulare mit data-autosubmit: Auswahl ändern = sofort filtern (Suchfeld nach kurzer Pause)
+    let typing: ReturnType<typeof setTimeout> | undefined;
+    const onChange = (e: Event) => {
+      const el = e.target as HTMLInputElement;
+      const form = el.form;
+      if (!form || !form.hasAttribute('data-autosubmit')) return;
+      clearTimeout(typing);
+      if (e.type === 'input' && el.type === 'search') typing = setTimeout(() => form.requestSubmit(), 600);
+      else if (e.type === 'change' && el.type !== 'search') form.requestSubmit();
+    };
+    document.addEventListener('change', onChange);
+    document.addEventListener('input', onChange);
     const onShow = () => document.querySelectorAll<HTMLElement>('.is-busy').forEach(reset);
     window.addEventListener('pageshow', onShow);
-    return () => { document.removeEventListener('submit', onSubmit); window.removeEventListener('pageshow', onShow); };
+    return () => { document.removeEventListener('change', onChange); document.removeEventListener('input', onChange); document.removeEventListener('submit', onSubmit); window.removeEventListener('pageshow', onShow); };
   }, []);
   return null;
 }
