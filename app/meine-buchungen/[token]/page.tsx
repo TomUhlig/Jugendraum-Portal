@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { InstallHint } from '@/components/InstallHint';
 import { rebookHref } from '@/lib/gcal-link';
 import { StatusBadge } from '@/components/StatusBadge';
 import { emailFromBookerToken } from '@/lib/auth';
@@ -51,6 +52,7 @@ export default async function Liste({ params }: { params: Promise<{ token: strin
   return (
     <main className="wrap narrow" style={{ paddingBlock: 32 }}>
       <div className="stack">
+        <InstallHint text={t(lang).error.install} />
         <div><span className="eyebrow">{email}</span><h1 style={{ fontSize: '1.6rem' }}>{M.title}</h1></div>
         <Section title={M.upcoming} items={upcoming} />
         {past.length > 0 && <Section title={M.past} items={past} />}

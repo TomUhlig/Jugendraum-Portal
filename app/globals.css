@@ -860,3 +860,9 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 @media (prefers-reduced-motion: reduce) { .burst { display: none } }
 .sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0 }
 .now-line span { color: #fff !important; background: #C4262E !important }
+/* ---------- App / offline ---------- */
+.offline-bar { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; display: inline-flex; align-items: center; gap: 8px; background: #161A33; color: #fff; padding: 9px 16px; border-radius: 999px; font-size: .88rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,.5); max-width: calc(100% - 32px) }
+.admin ~ .offline-bar, body:has(.tabbar) .offline-bar { bottom: calc(80px + env(safe-area-inset-bottom)) }
+.install-hint { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start; padding: 14px 14px 14px 16px; border-left: 3px solid var(--gelb) }
+.install-hint > .icon { color: var(--brand-ink); margin-top: 2px }
+.install-hint p { margin: 2px 0 8px; font-size: .88rem; color: var(--ink-2) }

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { FormBusy } from '@/components/FormBusy';
+import { AppShell } from '@/components/AppShell';
 import { Archivo, Source_Sans_3 } from 'next/font/google';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
@@ -52,6 +53,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </header>
         <div id="inhalt" style={{ display: 'contents' }}>{children}</div>
         <FormBusy />
+        <AppShell offlineText={t(lang).error.offline} />
         <footer className="site-footer">
           <div className="wrap">
             <span className="grow"><img src="/logo.png" alt="" width={24} height={24} />{n.footer}</span>

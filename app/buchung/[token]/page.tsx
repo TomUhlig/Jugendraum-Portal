@@ -1,3 +1,4 @@
+import { InstallHint } from '@/components/InstallHint';
 import { CalendarPlus, CheckCircle2, FileText, MessageSquareText, Receipt, RotateCcw } from 'lucide-react';
 import { rebookHref } from '@/lib/gcal-link';
 import { berlinHm as hmOf, berlinHm, fmtDay } from '@/lib/time';
@@ -89,6 +90,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   return (
     <main className="wrap narrow" style={{ paddingBlock: 32 }}>
       <div className="stack">
+        <InstallHint text={t(lang).error.install} />
         {sp.bestaetigt && <div className="alert alert-ok"><CheckCircle2 className="icon" /><div>{B.confirmed(b.status === 'confirmed')}</div></div>}
         {sp.storniert && <div className="alert alert-ok"><CheckCircle2 className="icon" /><div>{B.cancelledMsg}</div></div>}
         {sp.danke && <div className="alert alert-ok"><CheckCircle2 className="icon" /><div>{B.thanksFeedback}</div></div>}

@@ -1,0 +1,21 @@
+{
+  "name": "Jugendraum Verwaltung",
+  "short_name": "JR Verwaltung",
+  "description": "Anfragen entscheiden, Kalender und Übergaben für das Orga-Team",
+  "id": "/admin",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F4F5F8",
+  "theme_color": "#2E367A",
+  "lang": "de",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Kalender", "url": "/admin/kalender", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Termin eintragen", "url": "/admin/neu", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Buchungen", "url": "/admin/buchungen", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

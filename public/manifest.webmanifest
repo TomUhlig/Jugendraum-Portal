@@ -1,8 +1,9 @@
 {
   "name": "Jugendraum SV Heepen",
   "short_name": "Jugendraum",
-  "description": "Jugendraum des SV Heepen anfragen und verwalten",
-  "start_url": "/admin",
+  "description": "Den Jugendraum des SV Heepen anfragen und eigene Buchungen ansehen",
+  "id": "/",
+  "start_url": "/?quelle=app",
   "scope": "/",
   "display": "standalone",
   "background_color": "#F4F5F8",
@@ -11,5 +12,10 @@
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Raum anfragen", "url": "/#anfrage", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Meine Buchungen", "url": "/meine-buchungen", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Raum & Regeln", "url": "/raum", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
   ]
 }

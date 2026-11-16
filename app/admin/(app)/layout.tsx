@@ -8,7 +8,7 @@ import { ROLE_LABEL } from '@/lib/labels';
 import { logoutAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: { default: 'Verwaltung', template: '%s · Verwaltung Jugendraum' }, robots: { index: false } };
+export const metadata = { title: { default: 'Verwaltung', template: '%s · Verwaltung Jugendraum' }, robots: { index: false }, manifest: '/admin.webmanifest' };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const me = await requireAdmin();
