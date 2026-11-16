@@ -20,7 +20,7 @@ export function Gallery({ photos, variant = 'grid' }: { photos: GalleryPhoto[]; 
       <div className={variant === 'strip' ? 'gallery-strip' : 'gallery-grid'}>
         {photos.map((ph, i) => (
           <button key={ph.id} type="button" className="gallery-item" onClick={() => setOpen(i)} aria-label={`Foto vergrößern${ph.caption ? ': ' + ph.caption : ''}`}>
-            <img src={`/fotos/${ph.id}?g=klein`} alt={ph.caption && variant === 'grid' ? '' : ph.caption || 'Foto vom Jugendraum'} loading="lazy" width={640} height={Math.round((640 * ph.height) / ph.width)} />
+            <img src={`/fotos/${ph.id}?g=klein`} alt={ph.caption && variant === 'grid' ? '' : ph.caption || 'Foto vom Jugendraum'} loading={i === 0 ? 'eager' : 'lazy'} fetchPriority={i === 0 ? 'high' : undefined} decoding="async" width={640} height={Math.round((640 * ph.height) / ph.width)} />
             {ph.caption && variant === 'grid' && <span>{ph.caption}</span>}
           </button>
         ))}

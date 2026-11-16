@@ -3,14 +3,18 @@ import { ImagePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-/** Verkleinert ein Bild im Browser auf maxSize Pixel (längste Seite) und gibt ein JPEG zurück. */
+/** Verkleinert ein Bild im Browser auf maxSize Pixel (längste Seite) und gibt WebP (sonst JPEG) zurück. */
 async function shrink(file: File, maxSize: number, quality: number): Promise<{ blob: Blob; width: number; height: number }> {
   const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions);
   const scale = Math.min(1, maxSize / Math.max(bmp.width, bmp.height));
   const width = Math.round(bmp.width * scale), height = Math.round(bmp.height * scale);
   const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
   const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height); ctx.drawImage(bmp, 0, 0, width, height);
-  const blob = await new Promise<Blob>((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('Bild konnte nicht umgewandelt werden.'))), 'image/jpeg', quality));
+  const encode = (type: string) => new Promise<Blob | null>((res) => canvas.toBlob(res, type, quality));
+  // WebP ist deutlich kleiner; Browser ohne WebP-Export liefern PNG zurück, dann JPEG nehmen
+  let blob = await encode('image/webp');
+  if (!blob || blob.type !== 'image/webp') blob = await encode('image/jpeg');
+  if (!blob) throw new Error('Bild konnte nicht umgewandelt werden.');
   return { blob, width, height };
 }
 

@@ -42,7 +42,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const mo = new Intl.DateTimeFormat(LOC, { month: 'short', timeZone: 'Europe/Berlin' });
   return (
     <main>
-      <section className={`hero${hero ? ' has-photo' : ''}`} style={hero ? ({ '--hero-img': `url(/fotos/${hero.id})` } as React.CSSProperties) : undefined}>
+      <section className={`hero${hero ? ' has-photo' : ''}`} style={hero ? ({ '--hero-img': `url(/fotos/${hero.id})`, '--hero-img-sm': `url(/fotos/${hero.id}?g=klein)` } as React.CSSProperties) : undefined}>
         <div className="wrap hero-grid">
           <div className="hero-copy">
             <span className="hero-eyebrow">{I.eyebrow}</span>
