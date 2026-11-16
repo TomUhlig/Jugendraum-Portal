@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { Move } from 'lucide-react';
 import { moveAction } from '@/app/admin/actions';
 import { DAY, MIN, berlinHm, berlinToUtc, fmtDay } from '@/lib/time';
@@ -12,6 +12,25 @@ export type WeekBlock = { id: string; start: number; end: number; scope?: 'all' 
 const H0 = 8, SPAN = 18, PX_PER_HOUR = 42, HEIGHT = SPAN * PX_PER_HOUR; // 08:00 bis 02:00
 const MOVABLE = new Set(['requested', 'confirmed', 'pending_email']);
 
+/** Überlappende Einträge eines Tages nebeneinander statt übereinander (Spalten wie in Kalender-Apps). */
+function lanesFor(items: { id: string; start: number; end: number }[]): Map<string, { lane: number; lanes: number }> {
+  const sorted = [...items].sort((a, b) => a.start - b.start || b.end - a.end);
+  const out = new Map<string, { lane: number; lanes: number }>();
+  let cluster: { id: string; lane: number }[] = [], laneEnds: number[] = [], clusterEnd = -Infinity;
+  const flush = () => { for (const c of cluster) out.set(c.id, { lane: c.lane, lanes: laneEnds.length }); cluster = []; laneEnds = []; };
+  for (const it of sorted) {
+    if (it.start >= clusterEnd) { flush(); clusterEnd = -Infinity; }
+    let lane = laneEnds.findIndex((e) => e <= it.start);
+    if (lane < 0) { lane = laneEnds.length; laneEnds.push(it.end); } else laneEnds[lane] = it.end;
+    cluster.push({ id: it.id, lane });
+    clusterEnd = Math.max(clusterEnd, it.end);
+  }
+  flush();
+  return out;
+}
+const laneStyle = (l?: { lane: number; lanes: number }): React.CSSProperties => (l && l.lanes > 1 ? { left: `calc(${(l.lane / l.lanes) * 100}% + 2px)`, right: 'auto', width: `calc(${100 / l.lanes}% - 4px)` } : {});
+const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
 /** Wochenraster mit Drag & Drop: Termine in 15-Minuten-Schritten auf andere Tage oder Uhrzeiten ziehen. */
 export function WeekBoard({ days, today, events, blocks, canEdit }: { days: string[]; today: string; events: WeekEvent[]; blocks: WeekBlock[]; canEdit: boolean }) {
   const router = useRouter();
@@ -21,6 +40,18 @@ export function WeekBoard({ days, today, events, blocks, canEdit }: { days: stri
   const [notify, setNotify] = useState(true);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, startTransition] = useTransition();
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => { setNow(Date.now()); const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
+  const lanes = useMemo(() => {
+    const m = new Map<string, Map<string, { lane: number; lanes: number }>>();
+    for (const d of days) {
+      const ds = berlinToUtc(d, '08:00'), de = ds + SPAN * 3600e3;
+      const items = [...blocks.map((b) => ({ id: 'b' + b.id, start: b.start, end: b.end })), ...events.map((e) => ({ id: e.id, start: e.start, end: e.end }))]
+        .filter((x) => x.end > ds && x.start < de).map((x) => ({ ...x, start: Math.max(x.start, ds), end: Math.min(x.end, de) }));
+      m.set(d, lanesFor(items));
+    }
+    return m;
+  }, [days, blocks, events]);
 
   const pos = (d: string, a: number, b: number) => {
     const w0 = berlinToUtc(d, '08:00'), w1 = w0 + SPAN * 3600e3;
@@ -72,10 +103,10 @@ export function WeekBoard({ days, today, events, blocks, canEdit }: { days: stri
       <div className="table-wrap">
         <div className="wgrid" ref={gridRef}>
           <div />
-          {days.map((d) => <div key={d} className={`wh ${d === today ? 'today' : ''}`}>{new Date(d + 'T12:00:00Z').toLocaleDateString('de-DE', { weekday: 'short', timeZone: 'UTC' })} {+d.slice(8)}.</div>)}
+          {days.map((d) => { const wd = new Date(d + 'T12:00:00Z').getUTCDay(); return <div key={d} className={`wh${d === today ? ' today' : ''}${wd === 0 || wd === 6 ? ' we' : ''}${d < today ? ' past' : ''}`}><small>{WD[wd]}</small><b>{+d.slice(8)}</b></div>; })}
           <div className="hours" style={{ height: HEIGHT }}>{Array.from({ length: SPAN }, (_, i) => <span key={i} style={{ top: `${(i / SPAN) * 100}%` }}>{i ? String((H0 + i) % 24).padStart(2, '0') + ':00' : ''}</span>)}</div>
           {days.map((d) => (
-            <div key={d} className={`wcol${canEdit && d >= today ? ' addable' : ''}`} style={{ height: HEIGHT }}
+            <div key={d} className={`wcol${canEdit && d >= today ? ' addable' : ''}${[0, 6].includes(new Date(d + 'T12:00:00Z').getUTCDay()) ? ' we' : ''}${d < today ? ' past' : ''}`} style={{ height: HEIGHT }}
               title={canEdit && d >= today ? 'Klicken, um hier einen Termin einzutragen' : undefined}
               onClick={(e) => {
                 if (!canEdit || d < today || e.target !== e.currentTarget) return;
@@ -84,7 +115,8 @@ export function WeekBoard({ days, today, events, blocks, canEdit }: { days: stri
                 const h = (H0 * 60 + mins) / 60, hh = (x: number) => `${String(Math.floor(x) % 24).padStart(2, '0')}:${x % 1 ? '30' : '00'}`;
                 router.push(`/admin/neu?datum=${d}&von=${hh(h)}&bis=${hh(Math.min(h + 2, 23.5))}`);
               }}>
-              {blocks.map((x) => { const p = pos(d, x.start, x.end); return p && <Link href="/admin/sperrzeiten" key={x.id} className="wev sys" style={{ '--c': 'var(--bad)', top: `${p.top}%`, height: `${p.height}%`, background: 'var(--bad-bg)' } as React.CSSProperties}><b>{x.scope === 'party' ? 'Keine Feiern' : 'Gesperrt'}</b>{x.reason}</Link>; })}
+              {d === today && now && (() => { const p = pos(d, now, now + 60_000); return p && <div className="now-line" style={{ top: `${p.top}%` }} aria-hidden><span>{berlinHm(now)}</span></div>; })()}
+              {blocks.map((x) => { const p = pos(d, x.start, x.end); return p && <Link href="/admin/sperrzeiten" key={x.id} className={`wev sys${x.scope === 'party' ? ' party' : ''}`} title={`${x.scope === 'party' ? 'Keine Feiern' : 'Gesperrt'}: ${x.reason}`} style={{ '--c': 'var(--bad)', top: `${p.top}%`, height: `${p.height}%`, ...laneStyle(lanes.get(d)?.get('b' + x.id)) } as unknown as React.CSSProperties}><b>{x.scope === 'party' ? 'Keine Feiern' : 'Gesperrt'}</b><span>{x.reason}</span></Link>; })}
               {events.map((ev) => {
                 const p = pos(d, ev.start, ev.end); if (!p) return null;
                 const pb = pos(d, ev.start - ev.before * MIN, ev.start), pa = pos(d, ev.end, ev.end + ev.after * MIN);
@@ -95,14 +127,14 @@ export function WeekBoard({ days, today, events, blocks, canEdit }: { days: stri
                 const preview = dragging ? moved(ev, drag) : null;
                 return (
                   <span key={ev.id}>
-                    {pb && <div className="wbuf" style={{ ...st, top: `${pb.top}%`, height: `${pb.height}%` }} />}
-                    {pa && <div className="wbuf" style={{ ...st, top: `${pa.top}%`, height: `${pa.height}%` }} />}
+                    {pb && !dragging && <div className="wbuf" style={{ ...st, top: `${pb.top}%`, height: `${pb.height}%`, ...laneStyle(lanes.get(d)?.get(ev.id)) }} />}
+                    {pa && !dragging && <div className="wbuf" style={{ ...st, top: `${pa.top}%`, height: `${pa.height}%`, ...laneStyle(lanes.get(d)?.get(ev.id)) }} />}
                     <div role="link" tabIndex={0} aria-label={`${ev.title}, ${berlinHm(ev.start)} bis ${berlinHm(ev.end)}${movable ? ', verschiebbar' : ''}`}
                       className={`wev ${ev.status}${movable ? ' movable' : ''}${dragging ? ' dragging' : ''}`} title={`${ev.title} · ${ev.name}${movable ? ' · ziehen zum Verschieben' : ''}`}
-                      style={{ ...st, top: `${p.top}%`, height: `${p.height}%`, transform: dragging ? `translate(${drag.dx}px, ${drag.dy}px)` : parked ? `translate(${parked.dx}px, ${parked.dy}px)` : undefined, outline: parked ? '2px solid var(--brand-ink)' : undefined, zIndex: parked ? 4 : undefined }}
+                      style={{ ...st, top: `${p.top}%`, height: `${p.height}%`, ...(dragging || parked ? {} : laneStyle(lanes.get(d)?.get(ev.id))), transform: dragging ? `translate(${drag.dx}px, ${drag.dy}px)` : parked ? `translate(${parked.dx}px, ${parked.dy}px)` : undefined, outline: parked ? '2px solid var(--brand-ink)' : undefined, zIndex: parked ? 4 : undefined }}
                       onPointerDown={(e) => onDown(e, ev)} onPointerMove={onMove} onPointerUp={() => onUp(ev)} onPointerCancel={() => setDrag(null)}
                       onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/admin/buchung/${ev.id}`); }}>
-                      <b>{ev.title}</b><span className="num">{parked ? `${berlinHm(parked.start)}–${berlinHm(parked.end)}` : preview ? `${fmtDay(preview.start)} ${berlinHm(preview.start)}–${berlinHm(preview.end)}` : `${berlinHm(ev.start)}–${berlinHm(ev.end)}`}</span>
+                      <b>{ev.title}</b>{ev.end - ev.start >= 90 * MIN && <span className="who">{ev.name}</span>}<span className="num">{parked ? `${berlinHm(parked.start)}–${berlinHm(parked.end)}` : preview ? `${fmtDay(preview.start)} ${berlinHm(preview.start)}–${berlinHm(preview.end)}` : `${berlinHm(ev.start)}–${berlinHm(ev.end)}`}</span>
                     </div>
                   </span>
                 );
