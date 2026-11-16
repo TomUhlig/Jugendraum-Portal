@@ -1,8 +1,10 @@
 import { InstallHint } from '@/components/InstallHint';
-import { CalendarPlus, CheckCircle2, FileText, MessageSquareText, Receipt, RotateCcw } from 'lucide-react';
+import { PartyPopper, CalendarPlus, CheckCircle2, FileText, MessageSquareText, Receipt, RotateCcw } from 'lucide-react';
 import { rebookHref } from '@/lib/gcal-link';
 import { berlinHm as hmOf, berlinHm, fmtDay } from '@/lib/time';
 import { notFound, redirect } from 'next/navigation';
+import { guestToken } from '@/lib/auth';
+import { ShareButton } from '@/components/ShareButton';
 import { BookingFacts } from '@/components/BookingFacts';
 import { StatusBadge } from '@/components/StatusBadge';
 import { cancelByBooker, getBookingByToken, getCategories, getFeedback, listSeries } from '@/lib/data';
@@ -119,6 +121,15 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           )}
         </section>
 
+        {b.status === 'confirmed' && future && (
+          <section className="card card-body invite-teaser">
+            <div><b>{B.guestTitle}</b><p className="muted small">{B.guestText}</p></div>
+            <div className="inline" style={{ flexWrap: 'wrap' }}>
+              <a className="btn btn-sm" href={`/einladung/${guestToken(b.id)}`} target="_blank" rel="noopener"><PartyPopper className="icon-sm" />{B.guestOpen}</a>
+              <ShareButton className="btn btn-sm btn-primary" url={`${appUrl()}/einladung/${guestToken(b.id)}`} title={b.title} label={B.guestShare} />
+            </div>
+          </section>
+        )}
         {series.length > 1 && (
           <section className="card">
             <div className="card-head"><h2>{({ de: 'Alle Termine dieser Serie', en: 'All dates in this series', tr: 'Bu serinin tüm tarihleri' } as const)[lang]}</h2><span className="muted small">{series.length}</span></div>

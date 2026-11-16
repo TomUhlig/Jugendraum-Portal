@@ -4,7 +4,9 @@ import { Check, X } from 'lucide-react';
 import { BookingFacts } from '@/components/BookingFacts';
 import { StatusBadge } from '@/components/StatusBadge';
 import { parseDecisionToken } from '@/lib/auth';
-import { checkExisting, decide, decideSeries, getBooking, getCategories, listSeries } from '@/lib/data';
+import { checkExisting, decide, decideSeries, getBooking, getCategories, getExtras, listSeries } from '@/lib/data';
+import { TemplatePicker } from '@/components/TemplatePicker';
+import { fillTemplate } from '@/lib/templates';
 import { berlinHm, fmtDay } from '@/lib/time';
 import { afterDecision, afterSeriesDecision } from '@/lib/notify';
 
@@ -82,7 +84,8 @@ export default async function Entscheiden({ params, searchParams }: { params: Pr
                 <summary className="btn btn-danger"><X className="icon-sm" />Ablehnen …</summary>
                 <form action={decideFromMail} className="stack-sm" style={{ marginTop: 12 }}>
                   <input type="hidden" name="token" value={token} /><input type="hidden" name="action" value="reject" /><input type="hidden" name="whole" value={whole} />
-                  <label className="field"><span className="label">Begründung für {b.name}</span><textarea name="reason" rows={3} required minLength={3} placeholder="z. B. An dem Abend ist schon eine Vereinsveranstaltung geplant." /></label>
+                  <label className="field"><span className="label">Begründung für {b.name}</span><textarea id="m-reason" name="reason" rows={3} required minLength={3} placeholder="z. B. An dem Abend ist schon eine Vereinsveranstaltung geplant." /></label>
+                  <TemplatePicker target="m-reason" items={(await getExtras()).templates.filter((t) => t.use !== 'message').map((t) => ({ title: t.title, text: fillTemplate(t.text, { name: b.name, title: b.title, date: fmtDay(b.start), time: berlinHm(b.start), agreedWith: b.agreedWith }) }))} />
                   <button className="btn btn-danger" type="submit">Ablehnen und Mail senden</button>
                 </form>
               </details>

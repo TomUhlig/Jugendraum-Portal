@@ -7,6 +7,7 @@ import {
   ACTIVE_STATUSES, Blackout, Category, CheckResult, DEFAULT_SETTINGS, Message, RecurringBlock, Settings, Slot, checkBooking, expandRecurring, partyWeekendOf,
 } from './rules';
 import { DAY } from './time';
+import { DEFAULT_TEMPLATES, type ReplyTemplate } from './templates';
 import { isLang, type Lang } from './i18n';
 import { DEFAULT_PAYMENT, type PaymentSettings } from './payment';
 
@@ -69,8 +70,8 @@ export async function getSettings(q: Q = db()): Promise<Settings> {
 
 export type Fees = { rent: number; deposit: number };
 export type MailTextKey = 'confirmed' | 'rejected' | 'reminder' | 'followup' | 'received';
-export type Operator = { name: string; address: string; email: string; phone: string; responsible: string };
-export type Extras = { payment: PaymentSettings; equipment: string[]; feesExternal: Fees; feesMemberParty: Fees; mailTexts: Partial<Record<MailTextKey, string>>; contactNote: string; operator: Operator };
+export type Operator = { name: string; address: string; email: string; phone: string; responsible: string; roomAddress?: string; roomHint?: string };
+export type Extras = { payment: PaymentSettings; equipment: string[]; feesExternal: Fees; feesMemberParty: Fees; mailTexts: Partial<Record<MailTextKey, string>>; contactNote: string; operator: Operator; templates: ReplyTemplate[] };
 export const operatorComplete = (o: Operator) => !!(o.name.trim() && o.address.trim() && o.email.trim());
 export async function getExtras(q: Q = db()): Promise<Extras> {
   const r = await settingsRows(q);
@@ -80,6 +81,7 @@ export async function getExtras(q: Q = db()): Promise<Extras> {
     feesMemberParty: (r.feesMemberParty as Fees) ?? { rent: 0, deposit: 0 },
     mailTexts: (r.mailTexts as Extras['mailTexts']) ?? {},
     contactNote: (r.contactNote as string) ?? '',
+    templates: Array.isArray(r.templates) ? (r.templates as ReplyTemplate[]) : DEFAULT_TEMPLATES,
     payment: { ...DEFAULT_PAYMENT, ...((r.payment as Partial<PaymentSettings>) ?? {}) },
     operator: { name: '', address: '', email: '', phone: '', responsible: '', ...((r.operator as Partial<Operator>) ?? {}) },
   };

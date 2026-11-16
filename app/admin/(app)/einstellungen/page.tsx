@@ -11,7 +11,7 @@ import { stripeEnabled } from '@/lib/stripe';
 import { appUrl } from '@/lib/url';
 import type { MailTextKey } from '@/lib/data';
 import { calendarId, googleConfigured, googleSettings, serviceEmail } from '@/lib/gcal';
-import { inboxAction, googleResyncAction, googleSettingsAction, googleTestAction, offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
+import { templatesAction, inboxAction, googleResyncAction, googleSettingsAction, googleTestAction, offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
 
 export const metadata = { title: 'Einstellungen' };
 
@@ -100,6 +100,8 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
           </div>
           <div className="row">
             <div className="field"><label htmlFor="op2" className="req">Anschrift</label><textarea id="op2" name="opAddress" defaultValue={x.operator.address} style={{ minHeight: 80 }} placeholder={'Straße Nr.\nPLZ Ort'} /></div>
+            <div className="field"><label htmlFor="op6">Adresse des Jugendraums</label><textarea id="op6" name="opRoomAddress" defaultValue={x.operator.roomAddress} style={{ minHeight: 60 }} placeholder={'z. B. Sportplatz Heepen\nStraße Nr., 33719 Bielefeld'} /><span className="hint">Erscheint auf der Gäste-Karte mit Link zur Karte.</span></div>
+            <div className="field"><label htmlFor="op7">Wegbeschreibung</label><input id="op7" name="opRoomHint" type="text" defaultValue={x.operator.roomHint} placeholder="z. B. Eingang links neben dem Vereinsheim, Parkplatz am Sportplatz" /></div>
             <div className="field"><label htmlFor="op5">Inhaltlich verantwortlich</label><input id="op5" name="opResponsible" type="text" defaultValue={x.operator.responsible} placeholder="Name, Anschrift (falls abweichend)" />
               <span className="hint">Bei einem Verein zusätzlich sinnvoll: Vereinsregister und Registernummer im Namensfeld oder hier.</span></div>
           </div>
@@ -174,6 +176,21 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
           </div>
         </fieldset>
         {!ro && <div className="card-foot"><button className="btn btn-primary" type="submit">Speichern</button></div>}
+      </form>
+
+      <form action={templatesAction} className="card" id="bausteine">
+        <div className="card-head"><div><h2>Textbausteine</h2><p>Für Ablehnungen, Stornos und Nachrichten, per Klick einfügbar. Platzhalter: {'{vorname}'}, {'{anlass}'}, {'{datum}'}, {'{uhrzeit}'}, {'{ansprechperson}'}</p></div></div>
+        <div className="card-body stack-sm">
+          {[...x.templates, { id: 'neu1', title: '', text: '', use: 'message' as const }, { id: 'neu2', title: '', text: '', use: 'reject' as const }].map((t, i) => (
+            <fieldset key={t.id + i} className="tpl-row" disabled={ro}>
+              <input name={`t_title_${i}`} defaultValue={t.title} placeholder="Titel, z. B. Schlüsselübergabe" aria-label="Titel" maxLength={60} />
+              <select name={`t_use_${i}`} defaultValue={t.use} aria-label="Verwendung"><option value="reject">Ablehnen / Stornieren</option><option value="message">Nachricht</option><option value="both">Beides</option></select>
+              <textarea name={`t_text_${i}`} defaultValue={t.text} placeholder="Text (leer lassen zum Löschen)" aria-label="Text" rows={2} maxLength={1000} />
+            </fieldset>
+          ))}
+          <input type="hidden" name="count" value={x.templates.length + 2} />
+        </div>
+        <div className="card-foot inline"><button className="btn btn-primary" type="submit" disabled={ro}>Textbausteine speichern</button></div>
       </form>
 
       <form action={textsAction} className="card" id="texte">

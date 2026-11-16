@@ -14,6 +14,7 @@ import { afterDecision, afterSeriesDecision, notifyWaitlist } from '@/lib/notify
 import { Freq, describeSeries, seriesDates } from '@/lib/series';
 import { addDays, berlinToUtc } from '@/lib/time';
 import { pollInbox } from '@/lib/inbox';
+import type { ReplyTemplate } from '@/lib/templates';
 import { clearGoogleCache, syncToGoogle, testConnection } from '@/lib/gcal';
 import { db } from '@/lib/db';
 const DAY_MS = 86400e3;
@@ -252,6 +253,7 @@ export async function operatorAction(fd: FormData) {
   await saveSettings(admin.name, { operator: {
     name: str(fd, 'opName', 120), address: String(fd.get('opAddress') ?? '').trim().slice(0, 300), email: str(fd, 'opEmail', 120),
     phone: str(fd, 'opPhone', 40), responsible: str(fd, 'opResponsible', 200),
+    roomAddress: String(fd.get('opRoomAddress') ?? '').trim().slice(0, 200), roomHint: str(fd, 'opRoomHint', 200),
   } }, []);
   revalidatePath('/', 'layout');
   go('/admin/einstellungen#betreiber', 'ok', 'Betreiberangaben gespeichert. Impressum und Datenschutz sind aktualisiert.');
@@ -413,4 +415,17 @@ export async function decideSeriesAction(fd: FormData) {
   const list = await decideSeries(seriesId, action, admin.name, action === 'reject' ? reason : undefined);
   await afterSeriesDecision(list);
   go(`/admin/buchung/${id}`, 'ok', list.length ? `${list.length} Termine ${action === 'confirm' ? 'bestätigt' : 'abgelehnt'}.${list[0].silent ? '' : ' Der Bucher bekommt eine Mail mit allen Terminen.'}` : 'Keine offenen Termine mehr in der Serie.');
+}
+
+export async function templatesAction(fd: FormData) {
+  const admin = await requireAdmin('admin');
+  const n = Math.min(40, Number(fd.get('count')) || 0);
+  const list: ReplyTemplate[] = [];
+  for (let i = 0; i < n; i++) {
+    const title = str(fd, `t_title_${i}`, 60), text = String(fd.get(`t_text_${i}`) ?? '').trim().slice(0, 1000);
+    const use = String(fd.get(`t_use_${i}`)); if (!title || !text) continue;
+    list.push({ id: `t${i}`, title, text, use: use === 'reject' || use === 'both' ? use : 'message' });
+  }
+  await saveSettings(admin.name, { templates: list }, []);
+  go('/admin/einstellungen#bausteine', 'ok', `${list.length} Textbausteine gespeichert.`);
 }

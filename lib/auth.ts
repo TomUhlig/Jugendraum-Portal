@@ -112,3 +112,10 @@ export function parseShareFeed(token: string): ShareFeed | null {
   if (!payload || !sig || sig !== sign('share:' + payload).slice(0, 20)) return null;
   try { const f = JSON.parse(Buffer.from(payload, 'base64url').toString()); return ['all', 'parties', 'team', 'cat'].includes(f.k) ? f : null; } catch { return null; }
 }
+
+/** Link für die Gäste-Karte einer Buchung (nur Termin, Ort und Hausregeln, keine Verwaltung). */
+export const guestToken = (bookingId: string) => `${bookingId}.${sign('guest:' + bookingId).slice(0, 16)}`;
+export function bookingIdFromGuestToken(token: string): string | null {
+  const [id, sig] = token.split('.');
+  return id && sig && /^[0-9a-f-]{36}$/.test(id) && sig === sign('guest:' + id).slice(0, 16) ? id : null;
+}

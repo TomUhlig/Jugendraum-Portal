@@ -1,8 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, BellRing, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, Ellipsis,
-  GraduationCap, Megaphone, PartyPopper, Shirt, Users, XCircle,
+  AlertTriangle, ArrowLeft, ArrowRight, BellRing, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, Ellipsis, GraduationCap, Megaphone, PartyPopper, Share2, Shirt, Users, XCircle,
 } from 'lucide-react';
 import { Turnstile } from './Turnstile';
 import { Blackout, Category, CheckResult, Settings, Slot, blackoutWhen, checkBooking, partyWeekendOf } from '@/lib/rules';
@@ -47,7 +46,7 @@ function mailApp(email: string): { name: string; url: string } | null {
   return null;
 }
 
-export type Prefill = { date?: string; start?: string; end?: string; categoryId?: string; title?: string; guests?: string; equipment?: string[] };
+export type Prefill = { date?: string; start?: string; end?: string; categoryId?: string; title?: string; guests?: string; equipment?: string[]; note?: string };
 const WAITABLE = new Set(['overlap', 'buffer', 'party-weekend', 'blackout']);
 
 export default function BookingApp({ initial, initialMonth, contactNote, prefill = {}, turnstileKey = '', lang = 'de', serverNow }: { serverNow?: number; initial: Occupancy; initialMonth: string; contactNote: string; prefill?: Prefill; turnstileKey?: string; lang?: Lang }) {
@@ -70,7 +69,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   const [monthDir, setMonthDir] = useState<'fwd' | 'back'>('fwd');
   const [reached, setReached] = useState(0);
   const [catId, setCatId] = useState<string | null>(prefill.categoryId ?? null);
-  const [f, setF] = useState({ title: prefill.title ?? '', guests: prefill.guests ?? '20', note: '', date: prefill.date ?? '', start: prefill.start ?? '18:00', end: prefill.end ?? '22:00', name: '', team: '', email: '', phone: '', website: '' });
+  const [f, setF] = useState({ title: prefill.title ?? '', guests: prefill.guests ?? '20', note: prefill.note ?? '', date: prefill.date ?? '', start: prefill.start ?? '18:00', end: prefill.end ?? '22:00', name: '', team: '', email: '', phone: '', website: '' });
   const [wait, setWait] = useState<{ open: boolean; state: 'idle' | 'busy' | 'done' | 'error'; msg: string }>({ open: false, state: 'idle', msg: '' });
   const [equipment, setEquipment] = useState<string[]>(prefill.equipment ?? []);
   // Kontaktdaten auf diesem Gerät merken (nur im Browser, nie auf dem Server)
@@ -200,6 +199,19 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   const x = (t: number) => Math.max(0, Math.min(100, ((t - w0) / span) * 100));
   const availability = !result || done ? null : result.level;
 
+  // Entwurf ohne persönliche Daten als Link teilen, z. B. zum Abstimmen im Team oder mit den Eltern
+  const [shared, setShared] = useState(false);
+  async function shareDraft() {
+    const d = { c: catId ?? undefined, t: f.title || undefined, g: f.guests, n: f.note || undefined, e: equipment.length ? equipment : undefined, d: f.date || undefined, s: f.start, b: f.end };
+    const json = JSON.stringify(d), b64 = btoa(String.fromCharCode(...new TextEncoder().encode(json))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const url = `${location.origin}/?entwurf=${b64}#anfrage`;
+    const text = `${T.draftText} ${f.title ? `„${f.title}“` : ''}${f.date ? ` · ${dayLabel(f.date)} ${f.start}–${f.end}` : ''}`;
+    try {
+      if (navigator.share) { await navigator.share({ title: 'Jugendraum', text, url }); return; }
+      await navigator.clipboard.writeText(`${text}\n${url}`); setShared(true); setTimeout(() => setShared(false), 2500);
+    } catch {}
+  }
+
   // ---------- Darstellung ----------
   const Summary = (
     <aside className="aside">
@@ -219,6 +231,12 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
             {(fees.rent > 0 || fees.deposit > 0) && <div className="item"><dt>{T.costs}</dt><dd style={{ fontWeight: 400 }}>{fees.rent > 0 && <>{T.rent} {eur(fees.rent)}<br /></>}{fees.deposit > 0 && <>{T.deposit} {eur(fees.deposit)} <span className="muted small">{T.depositBack}</span></>}</dd></div>}
           </dl>
         </div>
+        {!done && (f.title || f.date) && (
+          <div className="card-foot share-draft">
+            <button type="button" className="btn btn-sm" onClick={shareDraft}><Share2 className="icon-sm" />{shared ? T.draftCopied : T.draftShare}</button>
+            <span className="muted small">{T.draftHint}</span>
+          </div>
+        )}
       </section>
       <section className="card card-body stack">
         <h2 className="section-title">{T.contacts}</h2>

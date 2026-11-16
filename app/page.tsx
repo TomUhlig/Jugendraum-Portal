@@ -28,7 +28,16 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const lang = await getLang();
   const I = t(lang).intro;
   const ok = (v: string | undefined, re: RegExp) => (v && re.test(v) ? v : undefined);
+  // Geteilter Entwurf (?entwurf=…): enthält nur Angaben zum Termin, keine Kontaktdaten
+  let draft: Record<string, unknown> = {};
+  if (sp.entwurf && sp.entwurf.length < 3000) { try { draft = JSON.parse(Buffer.from(sp.entwurf, 'base64url').toString('utf8')); } catch {} }
+  const ds = (k: string, max = 80) => (typeof draft[k] === 'string' ? (draft[k] as string).slice(0, max) : undefined);
   const prefill = { date: ok(sp.datum, /^\d{4}-\d\d-\d\d$/), start: ok(sp.von, /^\d\d:[0-5]\d$/), end: ok(sp.bis, /^\d\d:[0-5]\d$/), categoryId: ok(sp.art, /^[a-z]{2,20}$/), title: sp.titel?.slice(0, 80), guests: ok(sp.personen, /^\d{1,3}$/), equipment: sp.ausstattung ? sp.ausstattung.split(',').slice(0, 10) : undefined };
+  if (sp.entwurf) Object.assign(prefill, {
+    date: ok(ds('d', 10), /^\d{4}-\d\d-\d\d$/) ?? prefill.date, start: ok(ds('s', 5), /^\d\d:[0-5]\d$/) ?? prefill.start, end: ok(ds('b', 5), /^\d\d:[0-5]\d$/) ?? prefill.end,
+    categoryId: ok(ds('c', 20), /^[a-z]{2,20}$/) ?? prefill.categoryId, title: ds('t') ?? prefill.title, guests: ok(ds('g', 3), /^\d{1,3}$/) ?? prefill.guests,
+    note: ds('n', 500), equipment: Array.isArray(draft.e) ? (draft.e as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 10) : prefill.equipment,
+  });
   const month = (prefill.date ?? berlinYmd(Date.now())).slice(0, 8) + '01';
   const [initial, extras, photos, free] = await Promise.all([
     getPublicOccupancy(berlinToUtc(addDays(month, -7), '00:00'), berlinToUtc(addDays(month, 45), '00:00')),

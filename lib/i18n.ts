@@ -30,6 +30,7 @@ const de = {
   dow: ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'],
   oclock: 'Uhr',
   app: {
+    draftShare: 'Entwurf teilen', draftCopied: 'Link kopiert', draftHint: 'zum Abstimmen, ohne deine Kontaktdaten', draftText: 'Kannst du mal draufschauen? Unsere Anfrage für den Jugendraum:',
     repeatLabel: 'Regelmäßig wiederholen', repeatHint: 'z. B. Training oder Sitzungen, bis zu 12 Termine', weekly: 'jede Woche', biweekly: 'alle 2 Wochen', dates: 'Termine',
     repeatTaken: 'belegt, wird übersprungen', repeatCheck: 'wird beim Absenden geprüft', repeatNote: 'Serien prüft immer das Orga-Team.',
     doneSeries: (n: number, k: number) => `Angefragt: ${n} Termine${k ? `, ${k} belegte übersprungen` : ''}.`,
@@ -101,7 +102,7 @@ const de = {
     privateLink: 'Diese Seite ist nur über deinen persönlichen Link erreichbar. Bitte gib ihn nicht weiter. Alle deine Buchungen findest du unter',
     messages: 'Nachrichten', messagesLead: 'Fragen zur Buchung? Schreib dem Orga-Team direkt hier.', noMessages: 'Noch keine Nachrichten.', msgSent: 'Nachricht gesendet. Die Antwort bekommst du per Mail.',
     msgMany: 'Du hast in der letzten Stunde schon viele Nachrichten geschickt. Bitte warte kurz.', msgPh: 'Deine Nachricht an das Orga-Team', msgEmpty: 'Bitte schreib eine Nachricht.', send: 'Senden', orgaTeam: 'Orga-Team',
-    rebook: 'Erneut buchen', receipt: 'Zahlungsbestätigung', rulesPdf: 'Hausordnung (PDF)', protocol: 'Übergabeprotokoll',
+    rebook: 'Erneut buchen', receipt: 'Zahlungsbestätigung', rulesPdf: 'Hausordnung (PDF)', guestTitle: 'Gäste einladen', guestText: 'Eine Karte mit Termin, Ort, Anfahrt und den wichtigsten Regeln. Ohne deine Kontaktdaten, ideal für WhatsApp.', guestOpen: 'Ansehen', guestShare: 'Einladung teilen', protocol: 'Übergabeprotokoll',
     facts: { occasion: 'Anlass', kind: 'Art', appointment: 'Termin', people: 'Personen', equipment: 'Ausstattung', agreed: 'Abgesprochen mit', costs: 'Kosten', rent: 'Nutzungsentgelt', deposit: 'Kaution' },
   },
   pay: {
@@ -148,6 +149,7 @@ const en: Dict = {
   dow: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
   oclock: '',
   app: {
+    draftShare: 'Share draft', draftCopied: 'Link copied', draftHint: 'to agree on it, without your contact details', draftText: 'Can you take a look? Our request for the youth room:',
     repeatLabel: 'Repeat regularly', repeatHint: 'e.g. training or meetings, up to 12 dates', weekly: 'every week', biweekly: 'every 2 weeks', dates: 'dates',
     repeatTaken: 'taken, will be skipped', repeatCheck: 'checked when you send', repeatNote: 'The team always reviews series.',
     doneSeries: (n: number, k: number) => `Requested: ${n} dates${k ? `, ${k} taken dates skipped` : ''}.`,
@@ -219,7 +221,7 @@ const en: Dict = {
     privateLink: 'This page can only be reached via your personal link. Please do not share it. You can find all your bookings under',
     messages: 'Messages', messagesLead: 'Questions about the booking? Write to the organising team here.', noMessages: 'No messages yet.', msgSent: 'Message sent. You will receive the reply by email.',
     msgMany: 'You have already sent many messages in the last hour. Please wait a moment.', msgPh: 'Your message to the organising team', msgEmpty: 'Please write a message.', send: 'Send', orgaTeam: 'organising team',
-    rebook: 'Book again', receipt: 'Payment receipt', rulesPdf: 'House rules (PDF)', protocol: 'Handover record',
+    rebook: 'Book again', receipt: 'Payment receipt', rulesPdf: 'House rules (PDF)', guestTitle: 'Invite your guests', guestText: 'A card with date, place, directions and the key rules. Without your contact details, ideal for WhatsApp.', guestOpen: 'View', guestShare: 'Share invitation', protocol: 'Handover record',
     facts: { occasion: 'Occasion', kind: 'Type', appointment: 'Date', people: 'People', equipment: 'Equipment', agreed: 'Agreed with', costs: 'Costs', rent: 'Usage fee', deposit: 'Deposit' },
   },
   pay: {
@@ -264,6 +266,7 @@ const tr: Dict = {
   dow: ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pz'],
   oclock: '',
   app: {
+    draftShare: 'Taslağı paylaş', draftCopied: 'Bağlantı kopyalandı', draftHint: 'birlikte karar vermek için, iletişim bilgilerin olmadan', draftText: 'Bakabilir misin? Gençlik salonu talebimiz:',
     repeatLabel: 'Düzenli tekrarla', repeatHint: 'ör. antrenman veya toplantılar, en fazla 12 tarih', weekly: 'her hafta', biweekly: '2 haftada bir', dates: 'tarih',
     repeatTaken: 'dolu, atlanacak', repeatCheck: 'gönderirken kontrol edilecek', repeatNote: 'Serileri her zaman ekip inceler.',
     doneSeries: (n: number, k: number) => `Talep edildi: ${n} tarih${k ? `, ${k} dolu tarih atlandı` : ''}.`,
@@ -335,7 +338,7 @@ const tr: Dict = {
     privateLink: 'Bu sayfaya yalnızca kişisel bağlantınızla ulaşılabilir. Lütfen paylaşmayın. Tüm rezervasyonlarınızı burada bulabilirsiniz:',
     messages: 'Mesajlar', messagesLead: 'Rezervasyonla ilgili sorunuz mu var? Organizasyon ekibine buradan yazın.', noMessages: 'Henüz mesaj yok.', msgSent: 'Mesaj gönderildi. Yanıtı e-posta ile alacaksınız.',
     msgMany: 'Son bir saatte çok sayıda mesaj gönderdiniz. Lütfen biraz bekleyin.', msgPh: 'Organizasyon ekibine mesajınız', msgEmpty: 'Lütfen bir mesaj yazın.', send: 'Gönder', orgaTeam: 'organizasyon ekibi',
-    rebook: 'Yeniden rezervasyon yap', receipt: 'Ödeme makbuzu', rulesPdf: 'Ev kuralları (PDF)', protocol: 'Teslim tutanağı',
+    rebook: 'Yeniden rezervasyon yap', receipt: 'Ödeme makbuzu', rulesPdf: 'Ev kuralları (PDF)', guestTitle: 'Misafirleri davet et', guestText: 'Tarih, yer, yol tarifi ve önemli kuralları içeren bir kart. İletişim bilgilerin olmadan, WhatsApp için ideal.', guestOpen: 'Görüntüle', guestShare: 'Daveti paylaş', protocol: 'Teslim tutanağı',
     facts: { occasion: 'Etkinlik', kind: 'Tür', appointment: 'Tarih', people: 'Kişi', equipment: 'Donanım', agreed: 'Görüşülen kişi', costs: 'Ücretler', rent: 'Kullanım ücreti', deposit: 'Depozito' },
   },
   pay: {

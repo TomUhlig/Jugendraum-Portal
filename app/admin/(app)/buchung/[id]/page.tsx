@@ -1,5 +1,7 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, FileDown, Hourglass, Mail, MailX, MessageCircle, PenLine, Pencil, Phone, Printer, Repeat } from 'lucide-react';
 import Link from 'next/link';
+import { TemplatePicker } from '@/components/TemplatePicker';
+import { fillTemplate } from '@/lib/templates';
 import { telHref, waNumber } from '@/lib/util/phone';
 import { notFound } from 'next/navigation';
 import { Flash } from '@/components/Flash';
@@ -54,6 +56,8 @@ export default async function Detail({ params, searchParams }: { params: Promise
   const dayDiff = Math.round((berlinToUtc(berlinYmd(b.start), '00:00') - berlinToUtc(berlinYmd(Date.now()), '00:00')) / 864e5);
   const rel = Date.now() >= b.start && Date.now() < b.end ? { text: 'läuft gerade', cls: 'now' } : b.end <= Date.now() ? { text: dayDiff === 0 ? 'heute vorbei' : `vor ${-dayDiff} ${dayDiff === -1 ? 'Tag' : 'Tagen'}`, cls: 'past' }
     : { text: dayDiff === 0 ? `heute, ${berlinHm(b.start)} Uhr` : dayDiff === 1 ? 'morgen' : `in ${dayDiff} Tagen`, cls: dayDiff <= 2 ? 'soon' : '' };
+  const tpl = (use: 'reject' | 'message') => extras.templates.filter((t) => t.use === use || t.use === 'both')
+    .map((t) => ({ title: t.title, text: fillTemplate(t.text, { name: b.name, title: b.title, date: fmtDay(b.start), time: `${berlinHm(b.start)}–${berlinHm(b.end)} Uhr`, agreedWith: b.agreedWith }) }));
   const hidden = (action: string) => <><input type="hidden" name="id" value={b.id} /><input type="hidden" name="action" value={action} /><input type="hidden" name="back" value={`/admin/buchung/${b.id}`} /></>;
   const skipped: [number, string][] = sp.uebersprungen ? (() => { try { return JSON.parse(sp.uebersprungen); } catch { return []; } })() : [];
   const history = [
@@ -137,7 +141,8 @@ export default async function Detail({ params, searchParams }: { params: Promise
                 <form action={decideAction} className="stack-sm">
                   {hidden(b.status === 'confirmed' ? 'cancel' : 'reject')}
                   <div className="field"><label htmlFor="reason">{b.status === 'confirmed' ? 'Stornieren' : 'Ablehnen'}: Begründung für {b.name}</label>
-                    <textarea id="reason" name="reason" required minLength={3} style={{ minHeight: 70 }} placeholder="z. B. An diesem Wochenende findet das Vereinsfest statt." /></div>
+                    <textarea id="reason" name="reason" required minLength={3} style={{ minHeight: 70 }} placeholder="z. B. An diesem Wochenende findet das Vereinsfest statt." />
+                    <TemplatePicker target="reason" items={tpl('reject')} /></div>
                   <button className="btn btn-danger" type="submit" style={{ justifySelf: 'start' }}>{b.status === 'confirmed' ? 'Buchung stornieren' : 'Anfrage ablehnen'}</button>
                 </form>
               </div>
@@ -186,6 +191,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
                   <input type="hidden" name="id" value={b.id} />
                   <label htmlFor="reply" className="hp">Antwort</label>
                   <textarea id="reply" name="body" required minLength={2} maxLength={2000} placeholder={`Nachricht an ${b.name}`} style={{ minHeight: 70 }} />
+                  <TemplatePicker target="reply" items={tpl('message')} />
                   <div className="inline">
                     <button className="btn btn-primary" type="submit">Senden</button>
                     <label className="check-inline small"><input type="checkbox" name="mail" defaultChecked={!b.silent} /> per Mail an {b.email} schicken</label>
