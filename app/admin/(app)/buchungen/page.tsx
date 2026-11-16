@@ -8,6 +8,8 @@ import { parseFilter } from '@/lib/filters';
 import { STATUS_LABEL } from '@/lib/labels';
 import { berlinHm, fmtDay } from '@/lib/time';
 
+export const metadata = { title: 'Buchungen' };
+
 export default async function Buchungen({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   await requireAdmin();
   const sp = await searchParams;

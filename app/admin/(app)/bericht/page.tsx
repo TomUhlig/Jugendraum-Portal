@@ -6,6 +6,8 @@ import { requireAdmin } from '@/lib/auth';
 import { getCategories, getExtras, getYearReport } from '@/lib/data';
 import { eur } from '@/lib/labels';
 
+export const metadata = { title: 'Jahresübersicht' };
+
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
 export default async function Bericht({ searchParams }: { searchParams: Promise<Record<string, string>> }) {

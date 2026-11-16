@@ -5,6 +5,8 @@ import { requireAdmin } from '@/lib/auth';
 import { MAX_PHOTOS, listPhotos } from '@/lib/data';
 import { photoCaptionAction, photoDeleteAction, photoMoveAction } from '../../actions';
 
+export const metadata = { title: 'Fotos' };
+
 export default async function Fotos({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin();
   const sp = await searchParams;

@@ -4,6 +4,8 @@ import { getCategories, getExtras } from '@/lib/data';
 import { addDays, berlinYmd } from '@/lib/time';
 import { createAction } from '../../actions';
 
+export const metadata = { title: 'Termin eintragen' };
+
 export default async function Neu({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin('manager');
   const sp = await searchParams;

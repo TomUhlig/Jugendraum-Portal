@@ -4,6 +4,8 @@ import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAudit } from '@/lib/data';
 
+export const metadata = { title: 'Protokoll' };
+
 const fmtTs = (d: Date) => d.toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'short', timeStyle: 'short' });
 const ACTION: Record<string, string> = {
   created: 'Anfrage gestellt', verified: 'E-Mail bestätigt', 'verified+auto-confirmed': 'automatisch eingetragen', 'admin-created': 'eingetragen', confirm: 'bestätigt',

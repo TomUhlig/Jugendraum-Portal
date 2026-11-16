@@ -13,6 +13,8 @@ import type { MailTextKey } from '@/lib/data';
 import { calendarId, googleConfigured, googleSettings, serviceEmail } from '@/lib/gcal';
 import { inboxAction, googleResyncAction, googleSettingsAction, googleTestAction, offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
 
+export const metadata = { title: 'Einstellungen' };
+
 const de = (n: number) => n.toString().replace('.', ',');
 
 export default async function Einstellungen({ searchParams }: { searchParams: Promise<Record<string, string>> }) {

@@ -4,6 +4,8 @@ import { requireAdmin } from '@/lib/auth';
 import { getCategories, listFeedback } from '@/lib/data';
 import { fmtDay } from '@/lib/time';
 
+export const metadata = { title: 'Rückmeldungen' };
+
 export default async function Rueckmeldungen() {
   await requireAdmin();
   const [cats, list] = await Promise.all([getCategories(), listFeedback()]);

@@ -7,6 +7,8 @@ import { WEEKDAY_SHORT, blackoutWhen, describeRecurring } from '@/lib/rules';
 import { addDays, berlinYmd, fmtDay, weekdayOf } from '@/lib/time';
 import { addBlackoutAction, addRecurringAction, deleteBlackoutAction, deleteRecurringAction } from '../../actions';
 
+export const metadata = { title: 'Sperrzeiten' };
+
 /** Schnellauswahl für häufige Zeiträume (Wochenende = Freitag bis Sonntag). */
 function presets(today: string) {
   const wd = weekdayOf(today);

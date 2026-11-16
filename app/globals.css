@@ -406,7 +406,7 @@ a.kpi:hover { border-color: var(--line-strong) }
 .prose { max-width: 70ch; display: grid; gap: 14px }
 .prose h2 { font-size: 1.25rem; margin-top: 18px; scroll-margin-top: 90px }
 .prose ul, .prose ol { margin: 0; padding-left: 20px; display: grid; gap: 6px }
-.facts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px }
+.facts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px }
 .fact { padding: 14px 16px; display: grid; gap: 6px }
 .fact svg { color: var(--brand-ink) }
 .fact b { font-size: 1rem }
@@ -705,3 +705,24 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .seg-radio input:focus-visible + span { outline: 2px solid var(--brand-ink) }
 .handover .choice { padding: 12px 14px }
 .sig-value { position: absolute; left: 50%; top: 50%; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0 }
+/* ---------- Feinschliff ---------- */
+@media (max-width: 560px) {
+  .steps { overflow: visible }
+  .steps li { min-width: 0; flex: 0 0 auto }
+  .steps li:has([aria-current="step"]) { flex: 1 }
+  .steps button { padding: 12px 10px 10px; gap: 8px }
+  .steps button:not([aria-current="step"]) .lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0) }
+}
+.flash { position: relative; padding-right: 44px }
+.flash-x { position: absolute; right: 8px; top: 8px; width: 28px; height: 28px; display: grid; place-items: center; border: 0; background: transparent; color: inherit; opacity: .6; border-radius: 6px; cursor: pointer }
+.flash-x:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent) }
+.sig-info { display: flex; flex-wrap: wrap; gap: 10px; padding-bottom: 0 }
+.sig-chip { display: flex; gap: 10px; align-items: center; padding: 6px 12px 6px 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); font-size: .88rem }
+.sig-chip img { width: 84px; height: 40px; object-fit: contain; background: #fff; border-radius: 6px; border: 1px solid var(--line) }
+.btn.is-busy { position: relative; color: transparent !important; pointer-events: none }
+.btn.is-busy > * { visibility: hidden }
+.btn.is-busy::after { content: ""; position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; border: 2px solid currentColor; border-color: var(--busy-c, var(--ink-2)) transparent var(--busy-c, var(--ink-2)) var(--busy-c, var(--ink-2)); animation: spin .7s linear infinite; color: initial }
+.btn-primary.is-busy, .btn-ok.is-busy { --busy-c: #fff }
+.btn-gelb.is-busy { --busy-c: #1b1f4b }
+@keyframes spin { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) { .btn.is-busy::after { animation-duration: 2s } }

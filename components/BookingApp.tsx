@@ -262,7 +262,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
           {T.steps.map((s, i) => (
             <li key={s}>
               <button type="button" disabled={i > reached} onClick={() => go(i)} aria-current={i === step ? 'step' : undefined} className={i < step ? 'done' : ''}>
-                <span className="n">{i < step ? <Check className="icon-sm" /> : i + 1}</span>{s}
+                <span className="n">{i < step ? <Check className="icon-sm" /> : i + 1}</span><span className="lbl">{s}</span>
               </button>
             </li>
           ))}

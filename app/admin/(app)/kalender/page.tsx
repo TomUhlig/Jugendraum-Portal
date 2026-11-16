@@ -7,6 +7,8 @@ import { getAllBlocks, getCategories, listBookings } from '@/lib/data';
 import { blackoutWhen } from '@/lib/rules';
 import { MIN, addDays, berlinHm, berlinToUtc, berlinYmd, weekdayOf } from '@/lib/time';
 
+export const metadata = { title: 'Kalender' };
+
 const ACTIVE = ['pending_email', 'requested', 'confirmed'] as const;
 const monday = (d: string) => addDays(d, -((weekdayOf(d) + 6) % 7));
 const dLabel = (d: string, o: Intl.DateTimeFormatOptions) => new Date(d + 'T12:00:00Z').toLocaleDateString('de-DE', { ...o, timeZone: 'UTC' });

@@ -7,6 +7,8 @@ import { PushToggle } from '@/components/PushToggle';
 import { countSubscriptions, vapidKeys } from '@/lib/push';
 import { removeAdminAction, upsertAdminAction } from '../../actions';
 
+export const metadata = { title: 'Team' };
+
 const ROLE = { admin: 'Admin', manager: 'Verwalter', viewer: 'Lesezugriff' };
 const ROLE_HINT = { admin: 'alles, inkl. Einstellungen und Team', manager: 'Anfragen entscheiden, Termine pflegen', viewer: 'nur ansehen' };
 

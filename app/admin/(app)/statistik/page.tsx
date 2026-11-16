@@ -5,6 +5,8 @@ import { getCategories, getStats } from '@/lib/data';
 import { eur } from '@/lib/labels';
 import { addDays, berlinParts, berlinToUtc, berlinYmd } from '@/lib/time';
 
+export const metadata = { title: 'Statistik' };
+
 const monthKey = (y: number, m: number) => `${y}-${String(m).padStart(2, '0')}`;
 const mLabel = (k: string, long = false) => new Date(k + '-15T12:00:00Z').toLocaleDateString('de-DE', { month: long ? 'long' : 'short', ...(long ? { year: 'numeric' } : {}), timeZone: 'UTC' }).replace('.', '');
 

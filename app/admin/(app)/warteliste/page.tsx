@@ -4,6 +4,8 @@ import { getCategories, listWaitlist } from '@/lib/data';
 import { berlinHm, fmtDay } from '@/lib/time';
 import { removeWaitAction } from '../../actions';
 
+export const metadata = { title: 'Warteliste' };
+
 const fmtTs = (t: number) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'short', timeStyle: 'short' });
 
 export default async function Warteliste({ searchParams }: { searchParams: Promise<Record<string, string>> }) {

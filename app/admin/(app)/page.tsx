@@ -10,6 +10,8 @@ import { eur } from '@/lib/labels';
 import { DAY, addDays, berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong, fmtRange } from '@/lib/time';
 import { decideAction } from '../actions';
 
+export const metadata = { title: { absolute: 'Übersicht · Verwaltung Jugendraum' } };
+
 export default async function Dashboard({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin();
   const sp = await searchParams;

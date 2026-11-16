@@ -5,11 +5,13 @@ import { Flash } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
+import { getSignatures, checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
 import { MessageThread } from '@/components/MessageThread';
 import { eur } from '@/lib/labels';
 import { berlinHm, berlinYmd, fmtDay, fmtLong } from '@/lib/time';
 import { decideSeriesAction, cancelSeriesAction, changeAction, decideAction, handoverAction, messageAction, moneyAction, noteAction, refundAction, silentAction } from '../../../actions';
+
+export const metadata = { title: 'Buchung' };
 
 const fmtTs = (d: Date | number) => new Date(d).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'medium', timeStyle: 'short' });
 const ACTION: Record<string, string> = {
@@ -33,10 +35,10 @@ export default async function Detail({ params, searchParams }: { params: Promise
   const { id } = await params; const sp = await searchParams;
   const b = await getBooking(id);
   if (!b) notFound();
-  const [cats, extras, check, audit, mailLog, fb, series] = await Promise.all([
+  const [cats, extras, check, audit, mailLog, fb, series, sigs] = await Promise.all([
     getCategories(), getExtras(), checkExisting(b), getAudit(b.id, 100),
     db()`select kind, recipient, subject, ok, created_at from mail_log where booking_id = ${b.id} order by created_at desc`,
-    getFeedback(b.id), b.seriesId ? listSeries(b.seriesId) : Promise.resolve([]),
+    getFeedback(b.id), b.seriesId ? listSeries(b.seriesId) : Promise.resolve([]), getSignatures(b.id),
   ]);
   const c = cats.find((x) => x.id === b.categoryId);
   const [payments, messages] = await Promise.all([listPayments(b.id), listMessages(b.id)]);
@@ -138,6 +140,10 @@ export default async function Detail({ params, searchParams }: { params: Promise
                   {b.returnAt || b.keyHandedOut ? <Link className="btn btn-sm" href={`/admin/uebergabe/${b.id}/protokoll`} target="_blank"><FileDown className="icon-sm" />Protokoll</Link> : null}
                   <Link className="btn btn-sm btn-primary" href={`/admin/uebergabe/${b.id}?art=${b.keyHandedOut && !b.returnAt ? 'rueckgabe' : 'uebergabe'}`}><PenLine className="icon-sm" />{b.keyHandedOut && !b.returnAt ? 'Rückgabe mit Unterschrift' : 'Mit Unterschrift übergeben'}</Link>
                 </div>}</div>
+              {sigs.length > 0 && <div className="card-body sig-info">{sigs.map((sg) => (
+                <div key={sg.kind} className="sig-chip"><img src={`data:image/png;base64,${sg.png.toString('base64')}`} alt={`Unterschrift ${sg.signer}`} />
+                  <span><b>{sg.kind === 'out' ? 'Übergabe' : 'Rückgabe'} unterschrieben</b><br /><span className="muted small">{sg.signer} · {fmtTs(sg.createdAt)} · mit {sg.staff}</span></span></div>
+              ))}</div>}
               <div className="card-body grid-2b">
                 <fieldset disabled={!can} style={{ border: 0, padding: 0, margin: 0 }} className="stack-sm">
                   <span className="eyebrow">Übergabe</span>
