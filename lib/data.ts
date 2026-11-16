@@ -710,3 +710,20 @@ export async function nextFreeEvenings(n = 6, from = '18:00', to = '22:00'): Pro
   }
   return out;
 }
+
+// ---------- Digitale Übergabe ----------
+export type Signature = { kind: 'out' | 'in'; signer: string; png: Buffer; checklist: string[]; staff: string; createdAt: number };
+export async function getSignatures(bookingId: string): Promise<Signature[]> {
+  const rows = await db()`select * from signatures where booking_id = ${bookingId} order by created_at`;
+  return rows.map((r) => ({ kind: r.kind, signer: r.signer, png: r.png as Buffer, checklist: (r.checklist as string[]) ?? [], staff: r.staff, createdAt: +r.created_at }));
+}
+/** Übergabe ('out') oder Rückgabe ('in') mit Unterschrift speichern und die Felder der Buchung setzen. */
+export async function saveHandoverStep(id: string, actor: string, kind: 'out' | 'in', d: { signer: string; png: Buffer; checklist: string[]; meter: number | null; conditionOk?: boolean; damageNote?: string }) {
+  await db().begin(async (q) => {
+    await q`insert into signatures (booking_id, kind, signer, png, checklist, staff) values (${id}, ${kind}, ${d.signer}, ${d.png}, ${q.json(d.checklist)}, ${actor})
+      on conflict (booking_id, kind) do update set signer = excluded.signer, png = excluded.png, checklist = excluded.checklist, staff = excluded.staff, created_at = now()`;
+    if (kind === 'out') await q`update bookings set key_handed_out = true, handover_at = now(), handover_by = ${actor}, meter_start = ${d.meter} where id = ${id}`;
+    else await q`update bookings set return_at = now(), return_by = ${actor}, meter_end = ${d.meter}, condition_ok = ${d.conditionOk ?? null}, damage_note = ${d.damageNote ?? ''} where id = ${id}`;
+    await audit(q, actor, id, kind === 'out' ? 'handover-signed' : 'return-signed', { signer: d.signer, meter: d.meter, checklist: d.checklist });
+  });
+}

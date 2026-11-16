@@ -82,6 +82,7 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
         <div className="card-head"><div><h2>Auf der Vereinsseite einbinden</h2><p>Zeigt die Belegung der nächsten zwei Wochen ohne Namen, mit Link zur Anfrage. Diesen Code in die Vereinsseite einfügen (z. B. als „HTML-Block“).</p></div></div>
         <div className="card-body stack-sm">
           <CopyText text={`<iframe src="${appUrl()}/einbetten?tage=14" title="Belegung Jugendraum" style="width:100%;max-width:720px;height:560px;border:0" loading="lazy"></iframe>`} />
+          <p className="small"><b>Tür-Display:</b> Ein altes Tablet am Raum zeigt <a href="/anzeige" target="_blank" rel="noreferrer">{appUrl().replace(/^https?:\/\//, '')}/anzeige</a> im Vollbild: ob der Raum gerade frei ist, die heutigen Termine und einen QR-Code zum Anfragen. Ohne Namen, aktualisiert sich selbst und hält den Bildschirm an.</p>
           <p className="muted small">Varianten: <code>?tage=7</code> bis <code>?tage=28</code>, <code>&amp;theme=dark</code> für dunkle Seiten, <code>&amp;lang=en</code>. <a href="/einbetten" target="_blank" rel="noreferrer">Vorschau öffnen</a></p>
         </div>
       </section>

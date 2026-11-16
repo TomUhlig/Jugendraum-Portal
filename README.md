@@ -124,3 +124,7 @@ db/schema.sql               Tabellen, Constraints, Startwerte
 - Zahlungsbestätigung zum Drucken (`/buchung/<link>/quittung`)
 - Belegungs-Widget für die Vereinsseite (`/einbetten`, Code unter Einstellungen → Einbinden)
 - Wochenplan für Platzwart/Hausmeister (`/admin/wochenplan`)
+- Tür-Display für ein Tablet am Raum (`/anzeige`)
+- Vorschaubilder für geteilte Links (WhatsApp & Co.) und „Freie Abende per WhatsApp teilen“
+- Digitale Schlüsselübergabe und Rückgabe mit Unterschrift, Protokoll als PDF per Mail
+- Hausordnung als PDF, Serienanfragen, Antworten per Mail im Nachrichtenverlauf

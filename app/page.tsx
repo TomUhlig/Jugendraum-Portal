@@ -1,4 +1,5 @@
-import { ArrowRight, CalendarClock, PartyPopper, Users } from 'lucide-react';
+import { ArrowRight, CalendarClock, PartyPopper, Share2, Users } from 'lucide-react';
+import { appUrl } from '@/lib/url';
 import Link from 'next/link';
 import BookingApp from '@/components/BookingApp';
 import { turnstileEnabled, turnstileSiteKey } from '@/lib/antispam';
@@ -6,9 +7,21 @@ import { getLang } from '@/lib/lang';
 import { t } from '@/lib/i18n';
 import { getExtras, getPublicOccupancy, listPhotos, nextFreeEvenings } from '@/lib/data';
 import { Gallery } from '@/components/Gallery';
-import { addDays, berlinParts, berlinToUtc, berlinYmd, hmRange } from '@/lib/time';
+import { addDays, berlinParts, berlinToUtc, berlinYmd, fmtLong, hmRange } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
+
+/** Geteilte Links auf einen bestimmten Abend bekommen ein eigenes Vorschaubild. */
+export async function generateMetadata({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  const sp = await searchParams;
+  if (!/^\d{4}-\d\d-\d\d$/.test(sp.datum ?? '')) return {};
+  const q = new URLSearchParams({ datum: sp.datum, ...(sp.von ? { von: sp.von } : {}), ...(sp.bis ? { bis: sp.bis } : {}) });
+  const when = `${fmtLong(berlinToUtc(sp.datum, '12:00'))}${sp.von && sp.bis ? `, ${sp.von}–${sp.bis} Uhr` : ''}`;
+  return {
+    title: `Frei am ${when}`,
+    openGraph: { title: `Jugendraum frei: ${when}`, description: 'Jetzt anfragen beim SV Heepen.', images: [{ url: `/og?${q}`, width: 1200, height: 630 }] },
+  };
+}
 
 export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
@@ -61,7 +74,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
                 ))}
               </ul>
             )}
-            <a className="hero-card-foot" href="#anfrage">{I.otherDay}</a>
+            <div className="hero-card-foot">
+              <a href="#anfrage">{I.otherDay}</a>
+              {free.length > 0 && <a className="wa" target="_blank" rel="noopener" href={`https://wa.me/?text=${encodeURIComponent(`${I.nextFree} – Jugendraum SV Heepen:\n${free.map((f) => `• ${wd.format(f.start).replace('.', '')} ${berlinParts(f.start).day}. ${mo.format(f.start).replace('.', '')}, ${hmRange(f.start, f.end, lang)}: ${appUrl()}/?datum=${f.date}&von=18:00&bis=22:00`).join('\n')}`)}`}><Share2 className="icon-sm" aria-hidden />{I.share}</a>}
+            </div>
           </aside>
         </div>
       </section>

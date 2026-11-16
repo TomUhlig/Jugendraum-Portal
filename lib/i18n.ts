@@ -21,7 +21,7 @@ const de = {
     text: 'Für Trainerbesprechungen, Mannschaftsabende, Vereinsveranstaltungen und private Feiern. Freie Zeiten siehst du direkt, das Orga-Team bestätigt deine Anfrage per E-Mail.',
     capacity: (n: number) => `bis ${n} Personen`, oneParty: 'eine Feier pro Wochenende', lead: (d: number) => `Feiern mind. ${d} Tage vorher anfragen`,
     nextFree: 'Nächste freie Abende', nextFreeHint: 'Antippen und direkt anfragen',
-    eyebrow: 'SV Heepen · Jugendraum', cta: 'Jetzt anfragen', more: 'Raum & Regeln', noneFree: 'In den nächsten Wochen sind die Abende ausgebucht. Wähle unten im Kalender einen anderen Zeitraum.', evening: 'Abend', otherDay: 'Anderen Tag wählen',
+    eyebrow: 'SV Heepen · Jugendraum', cta: 'Jetzt anfragen', more: 'Raum & Regeln', noneFree: 'In den nächsten Wochen sind die Abende ausgebucht. Wähle unten im Kalender einen anderen Zeitraum.', evening: 'Abend', otherDay: 'Anderen Tag wählen', share: 'Per WhatsApp teilen',
   },
   cats: {
     meet: ['Besprechung', 'Trainer, Vorstand'], team: ['Mannschaftssitzung', 'Teamabend'], event: ['Vereinsveranstaltung', 'Elternabend, Ehrung'],
@@ -101,7 +101,7 @@ const de = {
     privateLink: 'Diese Seite ist nur über deinen persönlichen Link erreichbar. Bitte gib ihn nicht weiter. Alle deine Buchungen findest du unter',
     messages: 'Nachrichten', messagesLead: 'Fragen zur Buchung? Schreib dem Orga-Team direkt hier.', noMessages: 'Noch keine Nachrichten.', msgSent: 'Nachricht gesendet. Die Antwort bekommst du per Mail.',
     msgMany: 'Du hast in der letzten Stunde schon viele Nachrichten geschickt. Bitte warte kurz.', msgPh: 'Deine Nachricht an das Orga-Team', msgEmpty: 'Bitte schreib eine Nachricht.', send: 'Senden', orgaTeam: 'Orga-Team',
-    rebook: 'Erneut buchen', receipt: 'Zahlungsbestätigung', rulesPdf: 'Hausordnung (PDF)',
+    rebook: 'Erneut buchen', receipt: 'Zahlungsbestätigung', rulesPdf: 'Hausordnung (PDF)', protocol: 'Übergabeprotokoll',
     facts: { occasion: 'Anlass', kind: 'Art', appointment: 'Termin', people: 'Personen', equipment: 'Ausstattung', agreed: 'Abgesprochen mit', costs: 'Kosten', rent: 'Nutzungsentgelt', deposit: 'Kaution' },
   },
   pay: {
@@ -137,7 +137,7 @@ const en: Dict = {
     text: 'For coaches’ meetings, team evenings, club events and private parties. You can see free times right away; the organising team confirms your request by email.',
     capacity: (n) => `up to ${n} people`, oneParty: 'one party per weekend', lead: (d) => `request parties at least ${d} days ahead`,
     nextFree: 'Next free evenings', nextFreeHint: 'Tap to request directly',
-    eyebrow: 'SV Heepen · Youth room', cta: 'Request now', more: 'Room & rules', noneFree: 'The evenings in the coming weeks are booked. Pick another time in the calendar below.', evening: 'evening', otherDay: 'Choose another day',
+    eyebrow: 'SV Heepen · Youth room', cta: 'Request now', more: 'Room & rules', noneFree: 'The evenings in the coming weeks are booked. Pick another time in the calendar below.', evening: 'evening', otherDay: 'Choose another day', share: 'Share via WhatsApp',
   },
   cats: {
     meet: ['Meeting', 'Coaches, board'], team: ['Team meeting', 'Team evening'], event: ['Club event', 'Parents’ evening, awards'],
@@ -217,7 +217,7 @@ const en: Dict = {
     privateLink: 'This page can only be reached via your personal link. Please do not share it. You can find all your bookings under',
     messages: 'Messages', messagesLead: 'Questions about the booking? Write to the organising team here.', noMessages: 'No messages yet.', msgSent: 'Message sent. You will receive the reply by email.',
     msgMany: 'You have already sent many messages in the last hour. Please wait a moment.', msgPh: 'Your message to the organising team', msgEmpty: 'Please write a message.', send: 'Send', orgaTeam: 'organising team',
-    rebook: 'Book again', receipt: 'Payment receipt', rulesPdf: 'House rules (PDF)',
+    rebook: 'Book again', receipt: 'Payment receipt', rulesPdf: 'House rules (PDF)', protocol: 'Handover record',
     facts: { occasion: 'Occasion', kind: 'Type', appointment: 'Date', people: 'People', equipment: 'Equipment', agreed: 'Agreed with', costs: 'Costs', rent: 'Usage fee', deposit: 'Deposit' },
   },
   pay: {
@@ -251,7 +251,7 @@ const tr: Dict = {
     text: 'Antrenör toplantıları, takım akşamları, kulüp etkinlikleri ve özel kutlamalar için. Boş saatleri hemen görürsünüz; organizasyon ekibi talebinizi e-posta ile onaylar.',
     capacity: (n) => `en fazla ${n} kişi`, oneParty: 'hafta sonu başına bir kutlama', lead: (d) => `kutlamaları en az ${d} gün önceden talep edin`,
     nextFree: 'Sıradaki boş akşamlar', nextFreeHint: 'Dokunun ve hemen talep edin',
-    eyebrow: 'SV Heepen · Gençlik salonu', cta: 'Hemen talep et', more: 'Salon ve kurallar', noneFree: 'Önümüzdeki haftalarda akşamlar dolu. Aşağıdaki takvimden başka bir zaman seçin.', evening: 'akşam', otherDay: 'Başka bir gün seç',
+    eyebrow: 'SV Heepen · Gençlik salonu', cta: 'Hemen talep et', more: 'Salon ve kurallar', noneFree: 'Önümüzdeki haftalarda akşamlar dolu. Aşağıdaki takvimden başka bir zaman seçin.', evening: 'akşam', otherDay: 'Başka bir gün seç', share: 'WhatsApp ile paylaş',
   },
   cats: {
     meet: ['Toplantı', 'Antrenörler, yönetim'], team: ['Takım toplantısı', 'Takım akşamı'], event: ['Kulüp etkinliği', 'Veli toplantısı, ödül töreni'],
@@ -331,7 +331,7 @@ const tr: Dict = {
     privateLink: 'Bu sayfaya yalnızca kişisel bağlantınızla ulaşılabilir. Lütfen paylaşmayın. Tüm rezervasyonlarınızı burada bulabilirsiniz:',
     messages: 'Mesajlar', messagesLead: 'Rezervasyonla ilgili sorunuz mu var? Organizasyon ekibine buradan yazın.', noMessages: 'Henüz mesaj yok.', msgSent: 'Mesaj gönderildi. Yanıtı e-posta ile alacaksınız.',
     msgMany: 'Son bir saatte çok sayıda mesaj gönderdiniz. Lütfen biraz bekleyin.', msgPh: 'Organizasyon ekibine mesajınız', msgEmpty: 'Lütfen bir mesaj yazın.', send: 'Gönder', orgaTeam: 'organizasyon ekibi',
-    rebook: 'Yeniden rezervasyon yap', receipt: 'Ödeme makbuzu', rulesPdf: 'Ev kuralları (PDF)',
+    rebook: 'Yeniden rezervasyon yap', receipt: 'Ödeme makbuzu', rulesPdf: 'Ev kuralları (PDF)', protocol: 'Teslim tutanağı',
     facts: { occasion: 'Etkinlik', kind: 'Tür', appointment: 'Tarih', people: 'Kişi', equipment: 'Donanım', agreed: 'Görüşülen kişi', costs: 'Ücretler', rent: 'Kullanım ücreti', deposit: 'Depozito' },
   },
   pay: {

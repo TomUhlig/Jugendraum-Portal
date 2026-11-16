@@ -105,11 +105,13 @@ export default async function Page({ params, searchParams }: { params: Promise<{
             <div className="card-foot inline"><a className="btn" href={`/buchung/${token}/kalender`}><CalendarPlus className="icon-sm" />{B.toCalendar}</a>
               <a className="btn" target="_blank" rel="noopener" href={googleCalendarLink({ title: `Jugendraum: ${b.title}`, start: b.start, end: b.end, details: `${b.number} · ${appUrl()}/buchung/${token}`, location: 'Jugendraum SV Heepen' })}><CalendarPlus className="icon-sm" />{B.toGoogle}</a>
               <a className="btn" href={`/buchung/${token}/hausordnung`} target="_blank" rel="noopener"><FileText className="icon-sm" />{B.rulesPdf}</a>
+              {b.keyHandedOut && <a className="btn" href={`/buchung/${token}/protokoll`} target="_blank" rel="noopener"><FileText className="icon-sm" />{B.protocol}</a>}
               {(b.rentPaid || b.depositPaid) && <a className="btn" href={`/buchung/${token}/quittung`}><Receipt className="icon-sm" />{B.receipt}</a>}</div>
           )}
           {!(b.status === 'confirmed' && future) && (b.status !== 'pending_email' && b.status !== 'requested') && (
             <div className="card-foot inline">
               <a className="btn btn-primary" href={rebookHref(b, hmOf)}><RotateCcw className="icon-sm" />{B.rebook}</a>
+              {b.keyHandedOut && <a className="btn" href={`/buchung/${token}/protokoll`} target="_blank" rel="noopener"><FileText className="icon-sm" />{B.protocol}</a>}
               {(b.rentPaid || b.depositPaid) && <a className="btn" href={`/buchung/${token}/quittung`}><Receipt className="icon-sm" />{B.receipt}</a>}
             </div>
           )}

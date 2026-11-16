@@ -296,6 +296,18 @@ create table if not exists inbound_mail (
   created_at timestamptz not null default now()
 );
 
+-- ---------- Version 13: Digitale Übergabe mit Unterschrift ----------
+create table if not exists signatures (
+  booking_id uuid not null references bookings(id) on delete cascade,
+  kind text not null check (kind in ('out', 'in')),
+  signer text not null,
+  png bytea not null,
+  checklist jsonb not null default '[]',
+  staff text not null default '',
+  created_at timestamptz not null default now(),
+  primary key (booking_id, kind)
+);
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -316,5 +328,6 @@ do $$ begin
     execute 'alter table photos enable row level security';
     execute 'alter table push_subscriptions enable row level security';
     execute 'alter table inbound_mail enable row level security';
+    execute 'alter table signatures enable row level security';
   end if;
 end $$;

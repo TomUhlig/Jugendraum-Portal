@@ -3,8 +3,8 @@ import { inboxEnabled, plusAddress } from './inbox-parse';
 import { decisionToken } from './auth';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { db } from './db';
-import { hausordnungPdf } from './pdf';
-import { amountsDue, getExtras, getSettings, type Booking, type MailTextKey } from './data';
+import { hausordnungPdf, protocolPdf } from './pdf';
+import { amountsDue, getCategories, getExtras, getSettings, getSignatures, type Booking, type MailTextKey } from './data';
 import { dueDate } from './payment';
 import type { Category } from './rules';
 import { bookingIcs } from './ics';
@@ -120,6 +120,14 @@ function build(o: Mailout) {
 }
 
 
+const PROTO_TX = {
+  de: { out: { subject: (t: string) => `Schlüssel übergeben: ${t}`, heading: 'Schlüssel übergeben', text: 'danke, der Schlüssel ist übergeben. Das unterschriebene Protokoll findest du im Anhang. Viel Spaß im Jugendraum!' },
+        in: { subject: (t: string) => `Rückgabe bestätigt: ${t}`, heading: 'Rückgabe bestätigt', text: 'danke für die Rückgabe. Das unterschriebene Protokoll mit Zählerstand und Zustand findest du im Anhang.' } },
+  en: { out: { subject: (t: string) => `Key handed over: ${t}`, heading: 'Key handed over', text: 'thank you, the key has been handed over. The signed record is attached. Enjoy the youth room!' },
+        in: { subject: (t: string) => `Return confirmed: ${t}`, heading: 'Return confirmed', text: 'thank you for returning the room. The signed record with meter reading and condition is attached.' } },
+  tr: { out: { subject: (t: string) => `Anahtar teslim edildi: ${t}`, heading: 'Anahtar teslim edildi', text: 'teşekkürler, anahtar teslim edildi. İmzalı tutanak ektedir. Gençlik salonunda iyi eğlenceler!' },
+        in: { subject: (t: string) => `İade onaylandı: ${t}`, heading: 'İade onaylandı', text: 'iade için teşekkürler. Sayaç ve durum bilgisini içeren imzalı tutanak ektedir.' } },
+};
 const SERIES_TX = {
   de: { title: (n: number) => `Alle ${n} Termine der Serie`, skipped: 'Diese Termine waren schon belegt und wurden nicht angefragt:' },
   en: { title: (n: number) => `All ${n} dates of the series`, skipped: 'These dates were already taken and were not requested:' },
@@ -206,6 +214,15 @@ export const mails = {
     const blocks = [P(hello(b)), P(C.text(when(before.start, before.end, b.lang))), ...(note ? [P(`<b>${C.note}</b> ${esc(note)}`)] : []), details(b, c, [], b.lang), SMALL(C.small)];
     return sendMail({ kind: 'changed', to: bookerTo(b), bookingId: b.id, number: b.number, subject: C.subject(b.title, fmtDay(b.start, b.lang)), attachments: b.status === 'confirmed' ? ics(b, c) : undefined,
       ...build({ lang: b.lang, preheader: C.pre(when(b.start, b.end, b.lang)), heading: C.heading, blocks, cta: { href: manageLink(b), label: M.view } }) });
+  },
+  /** Übergabe-/Rückgabeprotokoll als PDF an den Bucher. */
+  protocol: async (b: Booking, kind: 'out' | 'in') => {
+    const [cats, sigs, x] = await Promise.all([getCategories(), getSignatures(b.id), getExtras()]);
+    const c = cats.find((k) => k.id === b.categoryId);
+    const pdf = await protocolPdf(b, c, sigs, x.operator);
+    const T = PROTO_TX[b.lang][kind];
+    return sendMail({ kind: 'protocol', to: bookerTo(b), bookingId: b.id, number: b.number, subject: T.subject(b.title), attachments: [pdf],
+      ...build({ lang: b.lang, preheader: T.text, heading: T.heading, blocks: [P(hello(b)), P(T.text), details(b, c, [], b.lang)], cta: { href: manageLink(b), label: MAIL_TEXT[b.lang].view } }) });
   },
   rejected: async (b: Booking, c?: Category, series: Booking[] = []) => {
     const R = MAIL_TEXT[b.lang].rejected;

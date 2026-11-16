@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import type { Booking, Operator } from './data';
+import type { Booking, Operator, Signature } from './data';
 import type { Category } from './rules';
 import { catLabel, type Lang } from './i18n';
 import { hausordnung, KEY_RULES } from './hausordnung';
@@ -114,4 +114,56 @@ export async function hausordnungPdf(b: Booking, cat: Category | undefined, capa
   }
   const bytes = await doc.save();
   return { filename: `${T.file}-${b.number}.pdf`, content: Buffer.from(bytes).toString('base64') };
+}
+
+/** Übergabe- und Rückgabeprotokoll mit Unterschriften (deutsch, wie die Nutzungsvereinbarung). */
+export async function protocolPdf(b: Booking, cat: Category | undefined, sigs: Signature[], op: Operator): Promise<{ filename: string; content: string }> {
+  const a = await assets();
+  const doc = await PDFDocument.create();
+  doc.registerFontkit(fontkit);
+  doc.setTitle(`Übergabeprotokoll ${b.number}`); doc.setAuthor(op.name || 'SV Heepen'); doc.setLanguage('de');
+  const reg = await doc.embedFont(a.reg, { subset: true }), bold = await doc.embedFont(a.bold, { subset: true });
+  const W = 595.28, H = 841.89, M = 56, CW = W - 2 * M;
+  const page = doc.addPage([W, H]);
+  let y = H - M;
+  if (a.logo) { const img = await doc.embedPng(a.logo); page.drawImage(img, { x: M, y: y - 44, width: 44, height: 44 }); }
+  page.drawText('Jugendraum des SV Heepen', { x: M + 58, y: y - 14, size: 10, font: reg, color: MUTED });
+  page.drawText('Übergabeprotokoll', { x: M + 58, y: y - 36, size: 19, font: bold, color: INK });
+  page.drawText(b.number, { x: W - M - bold.widthOfTextAtSize(b.number, 11), y: y - 36, size: 11, font: bold, color: INK });
+  y -= 52;
+  page.drawRectangle({ x: M, y: y - 4, width: CW, height: 3, color: YELLOW });
+  y -= 26;
+  const kv = (k: string, v: string) => { page.drawText(k, { x: M, y, size: 10, font: reg, color: MUTED }); page.drawText(wrap(v, bold, 10.5, CW - 130)[0] ?? '', { x: M + 130, y, size: 10.5, font: bold, color: INK }); y -= 17; };
+  kv('Anlass', `${b.title}${cat ? ` (${cat.name})` : ''}`);
+  kv('Termin', `${fmtLong(b.start)}, ${berlinHm(b.start)}–${berlinHm(b.end)} Uhr`);
+  kv('Gebucht von', `${b.name}${b.team ? ` · ${b.team}` : ''}${b.phone ? ` · ${b.phone}` : ''}`);
+  kv('Personen', String(b.guests));
+  y -= 10;
+  for (const kind of ['out', 'in'] as const) {
+    const s = sigs.find((x) => x.kind === kind);
+    page.drawText(kind === 'out' ? 'Übergabe' : 'Rückgabe', { x: M, y, size: 13, font: bold, color: NAVY });
+    y -= 20;
+    if (!s) { page.drawText('noch offen', { x: M, y, size: 10.5, font: reg, color: MUTED }); y -= 30; continue; }
+    const when = `${fmtLong(s.createdAt)}, ${berlinHm(s.createdAt)} Uhr`;
+    kv('Zeitpunkt', when);
+    kv('Vereinsseite', s.staff);
+    const meter = kind === 'out' ? b.meterStart : b.meterEnd;
+    if (meter != null) kv('Stromzähler', `${meter.toLocaleString('de-DE')} kWh${kind === 'in' && b.meterStart != null ? `  (verbraucht: ${(meter - b.meterStart).toLocaleString('de-DE', { maximumFractionDigits: 1 })} kWh)` : ''}`);
+    if (kind === 'in') kv('Zustand', b.conditionOk === false ? 'Mängel festgestellt' : 'in Ordnung');
+    if (kind === 'in' && b.damageNote) for (const l of wrap(`Mängel: ${b.damageNote}`, reg, 10, CW)) { page.drawText(l, { x: M, y, size: 10, font: reg, color: INK }); y -= 14; }
+    if (s.checklist.length) { for (const c of s.checklist) { page.drawText(`✓  ${c}`, { x: M + 4, y, size: 10, font: reg, color: INK }); y -= 14; } }
+    y -= 6;
+    const img = await doc.embedPng(s.png);
+    const sw = 200, sh = Math.min(70, (img.height / img.width) * sw);
+    page.drawImage(img, { x: M, y: y - sh, width: sw, height: sh });
+    y -= sh + 4;
+    page.drawLine({ start: { x: M, y }, end: { x: M + 230, y }, thickness: 0.7, color: INK });
+    y -= 12;
+    page.drawText(`${s.signer}${kind === 'out' ? ' (Empfang des Schlüssels, Hausordnung anerkannt)' : ' (Rückgabe)'}`, { x: M, y, size: 8.5, font: reg, color: MUTED });
+    y -= 30;
+  }
+  const foot = [op.name, op.address.replace(/\n/g, ', '), op.email].filter(Boolean).join(' · ');
+  page.drawLine({ start: { x: M, y: M - 6 }, end: { x: W - M, y: M - 6 }, thickness: 0.6, color: LINE });
+  page.drawText(wrap(`${foot ? foot + ' · ' : ''}Digital unterschrieben im Jugendraum-Portal`, reg, 8.5, CW)[0], { x: M, y: M - 20, size: 8.5, font: reg, color: MUTED });
+  return { filename: `Uebergabeprotokoll-${b.number}.pdf`, content: Buffer.from(await doc.save()).toString('base64') };
 }

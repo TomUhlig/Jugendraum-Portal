@@ -1,4 +1,4 @@
-import { ArrowLeft, Hourglass, Mail, MailX, Pencil, Phone, Printer, Repeat } from 'lucide-react';
+import { ArrowLeft, FileDown, Hourglass, Mail, MailX, PenLine, Pencil, Phone, Printer, Repeat } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Flash } from '@/components/Flash';
@@ -133,7 +133,11 @@ export default async function Detail({ params, searchParams }: { params: Promise
 
           {b.status === 'confirmed' && (
             <form action={handoverAction} className="card">
-              <div className="card-head"><div><h2>Übergabe und Rückgabe</h2><p>Schlüssel, Zählerstand und Zustand des Raums</p></div></div>
+              <div className="card-head"><div><h2>Übergabe und Rückgabe</h2><p>Schlüssel, Zählerstand und Zustand des Raums</p></div>
+                {can && <div className="inline" style={{ flexWrap: 'wrap' }}>
+                  {b.returnAt || b.keyHandedOut ? <Link className="btn btn-sm" href={`/admin/uebergabe/${b.id}/protokoll`} target="_blank"><FileDown className="icon-sm" />Protokoll</Link> : null}
+                  <Link className="btn btn-sm btn-primary" href={`/admin/uebergabe/${b.id}?art=${b.keyHandedOut && !b.returnAt ? 'rueckgabe' : 'uebergabe'}`}><PenLine className="icon-sm" />{b.keyHandedOut && !b.returnAt ? 'Rückgabe mit Unterschrift' : 'Mit Unterschrift übergeben'}</Link>
+                </div>}</div>
               <div className="card-body grid-2b">
                 <fieldset disabled={!can} style={{ border: 0, padding: 0, margin: 0 }} className="stack-sm">
                   <span className="eyebrow">Übergabe</span>

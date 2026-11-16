@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   description: 'Den Jugendraum des SV Heepen für Besprechungen, Mannschaftsabende und Feiern online anfragen.',
   icons: { icon: '/logo.png', apple: '/icon-192.png' },
   manifest: '/manifest.webmanifest',
+  metadataBase: new URL(process.env.APP_URL?.trim() || 'http://localhost:3000'),
+  openGraph: { type: 'website', siteName: 'Jugendraum SV Heepen', locale: 'de_DE', images: [{ url: '/og', width: 1200, height: 630 }] },
+  twitter: { card: 'summary_large_image' },
 };
 export const viewport: Viewport = {
   themeColor: [{ media: '(prefers-color-scheme: light)', color: '#FFFFFF' }, { media: '(prefers-color-scheme: dark)', color: '#151931' }],
