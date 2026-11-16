@@ -66,7 +66,7 @@ export default async function Raum() {
 
           {H(4)}
           {hasFees ? (
-            <div className="card table-wrap"><table><thead><tr>{T.feeHead.map((h, i) => <th key={i}>{h}</th>)}</tr></thead><tbody>
+            <div className="card table-wrap"><table><thead><tr>{T.feeHead.map((h, i) => <th key={i}>{h || <span className="sr-only">{T.kind}</span>}</th>)}</tr></thead><tbody>
               <tr><td>{T.feeRows[0]}</td><td className="num">{eur(x.feesExternal.rent)}</td><td className="num">{eur(x.feesExternal.deposit)}</td></tr>
               <tr><td>{T.feeRows[1]}</td><td className="num">{eur(x.feesMemberParty.rent)}</td><td className="num">{eur(x.feesMemberParty.deposit)}</td></tr>
               <tr><td>{T.feeRows[2]}</td><td>{T.free}</td><td>–</td></tr>

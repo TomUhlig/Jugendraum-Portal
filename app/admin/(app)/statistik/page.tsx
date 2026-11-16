@@ -59,7 +59,7 @@ function Heatmap({ m }: { m: number[][] }) {
   const lvl = (v: number) => (v <= 0 ? -1 : Math.min(4, Math.floor((v / max) * 5 - 1e-9)));
   return (
     <div className="heat" role="table" aria-label="Belegte Stunden nach Wochentag und Tageszeit">
-      <div role="row" className="heat-row head"><span role="columnheader" />{BANDS.map((b) => <span role="columnheader" key={b.l}>{b.l}</span>)}</div>
+      <div role="row" className="heat-row head"><span role="columnheader"><span className="sr-only">Wochentag</span></span>{BANDS.map((b) => <span role="columnheader" key={b.l}>{b.l}</span>)}</div>
       {m.map((row, i) => (
         <div role="row" className="heat-row" key={WD[i]}>
           <span role="rowheader">{WD[i]}</span>

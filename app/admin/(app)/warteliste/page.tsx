@@ -20,7 +20,7 @@ export default async function Warteliste({ searchParams }: { searchParams: Promi
       <section className="card">
         {list.length === 0 ? <div className="empty">Niemand auf der Warteliste. Ist ein Termin belegt, können sich Interessierte auf der Buchungsseite eintragen.</div> : (
           <div className="table-wrap"><table>
-            <thead><tr><th>Wunschtermin</th><th>Art</th><th>Person</th><th>Eingetragen</th><th>Status</th><th /></tr></thead>
+            <thead><tr><th>Wunschtermin</th><th>Art</th><th>Person</th><th>Eingetragen</th><th>Status</th><th><span className="sr-only">Aktionen</span></th></tr></thead>
             <tbody>{list.map((w) => (
               <tr key={w.id}>
                 <td className="num" style={{ whiteSpace: 'nowrap' }}>{fmtDay(w.start)}<br /><span className="muted">{berlinHm(w.start)}–{berlinHm(w.end)}</span></td>

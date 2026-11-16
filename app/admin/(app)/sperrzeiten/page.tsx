@@ -58,7 +58,7 @@ export default async function Sperrzeiten({ searchParams }: { searchParams: Prom
             <div className="stack-sm">
               <span className="eyebrow">Schnellauswahl</span>
               <div className="chips">{presets(today).map((p) => (
-                <Link key={p.label} className="chip" aria-pressed={von === p.von && bis === p.bis} href={`/admin/sperrzeiten?von=${p.von}&bis=${p.bis}#neu`} style={{ textDecoration: 'none' }}>
+                <Link key={p.label} className="chip" aria-current={von === p.von && bis === p.bis ? 'true' : undefined} href={`/admin/sperrzeiten?von=${p.von}&bis=${p.bis}#neu`} style={{ textDecoration: 'none' }}>
                   {p.label}<span className="muted small num">{span(p.von, p.bis)}</span></Link>
               ))}</div>
             </div>
@@ -105,7 +105,7 @@ export default async function Sperrzeiten({ searchParams }: { searchParams: Prom
             <div className="stack-sm">
               <span className="eyebrow">Vorlagen</span>
               <div className="chips">{Object.entries(TEMPLATES).map(([k, t]) => (
-                <Link key={k} className="chip" aria-pressed={sp.vorlage === k} href={`/admin/sperrzeiten?vorlage=${k}#regelmaessig`} style={{ textDecoration: 'none' }}>{t.label}</Link>
+                <Link key={k} className="chip" aria-current={sp.vorlage === k ? 'true' : undefined} href={`/admin/sperrzeiten?vorlage=${k}#regelmaessig`} style={{ textDecoration: 'none' }}>{t.label}</Link>
               ))}</div>
             </div>
             <div className="field"><span className="label">Wochentage</span>

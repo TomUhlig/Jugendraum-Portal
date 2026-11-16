@@ -65,7 +65,7 @@ export default async function Druck({ params }: { params: Promise<{ id: string }
 
         <h2>{b.rent > 0 || b.deposit > 0 ? '5' : '4'}. Übergabe und Rückgabe</h2>
         <table className="pd-grid">
-          <thead><tr><th /><th>Übergabe</th><th>Rückgabe</th></tr></thead>
+          <thead><tr><th><span className="sr-only">Punkt</span></th><th>Übergabe</th><th>Rückgabe</th></tr></thead>
           <tbody>
             <tr><th>Datum, Uhrzeit</th><td>{b.handoverAt ? `${fmtDay(b.handoverAt)}, ${berlinHm(b.handoverAt)}` : ''}</td><td>{b.returnAt ? `${fmtDay(b.returnAt)}, ${berlinHm(b.returnAt)}` : ''}</td></tr>
             <tr><th>Schlüssel (Anzahl)</th><td /><td /></tr>

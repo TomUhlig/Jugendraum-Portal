@@ -64,6 +64,8 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   const [month, setMonth] = useState(initialMonth);
   const [now, setNow] = useState(() => Date.now());
   const [step, setStep] = useState(0);
+  const [dir, setDir] = useState<'fwd' | 'back'>('fwd');
+  const [monthDir, setMonthDir] = useState<'fwd' | 'back'>('fwd');
   const [reached, setReached] = useState(0);
   const [catId, setCatId] = useState<string | null>(prefill.categoryId ?? null);
   const [f, setF] = useState({ title: prefill.title ?? '', guests: prefill.guests ?? '20', note: '', date: prefill.date ?? '', start: prefill.start ?? '18:00', end: prefill.end ?? '22:00', name: '', team: '', email: '', phone: '', website: '' });
@@ -143,7 +145,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   function go(to: number) {
     if (to > step && Object.keys(stepErrors[step]).length) { setTouched(true); return; }
     setTouched(false); setServerError('');
-    setStep(to); setReached((r) => Math.max(r, to));
+    setDir(to >= step ? 'fwd' : 'back'); setStep(to); setReached((r) => Math.max(r, to));
     topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -237,7 +239,8 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
       <div className="wrap booking-layout" ref={topRef}>
         <section className="card fade-in">
           <div className="done-view">
-            <span className="seal"><CheckCircle2 className="icon" /></span>
+            <span className="seal pop"><CheckCircle2 className="icon" />
+              <span className="burst" aria-hidden>{Array.from({ length: 12 }, (_, i) => <i key={i} style={{ '--a': `${i * 30}deg`, '--d': `${i % 3 * 40}ms` } as React.CSSProperties} />)}</span></span>
             <div><span className="eyebrow">{T.requestNo} <span className="refno">{done.number}</span></span><h2>{T.confirmEmail}</h2></div>
             <p>{T.sentTo(done.email)}</p>
             {done.count && done.count > 1 ? <p className="badge b-info no-dot" style={{ whiteSpace: 'normal' }}>{T.doneSeries(done.count, done.skipped ?? 0)}</p> : null}
@@ -269,7 +272,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
         </ol>
 
         {step === 0 && (
-          <div className="step-body fade-in">
+          <div className={`step-body slide-${dir}`}>
             <div><h2>{T.whatTitle}</h2><p className="lead">{T.whatLead}</p></div>
             <div className="options" role="group" aria-label={T.kindOfUse}>
               {data.categories.map((c) => {
@@ -303,17 +306,17 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
         )}
 
         {step === 1 && (
-          <div className="step-body fade-in">
+          <div className={`step-body slide-${dir}`}>
             <div><h2>{T.whenTitle}</h2><p className="lead">{T.whenLead}</p></div>
             {serverError && <div className="alert alert-bad"><XCircle className="icon" /><div>{serverError}</div></div>}
             <div className="when">
               <div>
                 <div className="cal-nav">
-                  <button type="button" className="iconbtn" onClick={() => setMonth(shiftMonth(month, -1))} disabled={month <= monthStart(todayKey)} aria-label={T.prevMonth}><ChevronLeft className="icon" /></button>
+                  <button type="button" className="iconbtn" onClick={() => { setMonthDir('back'); setMonth(shiftMonth(month, -1)); }} disabled={month <= monthStart(todayKey)} aria-label={T.prevMonth}><ChevronLeft className="icon" /></button>
                   <h3>{monthLabel(month)}</h3>
-                  <button type="button" className="iconbtn" onClick={() => setMonth(shiftMonth(month, 1))} aria-label={T.nextMonth}><ChevronRight className="icon" /></button>
+                  <button type="button" className="iconbtn" onClick={() => { setMonthDir('fwd'); setMonth(shiftMonth(month, 1)); }} aria-label={T.nextMonth}><ChevronRight className="icon" /></button>
                 </div>
-                <div className="month" role="grid" aria-label={monthLabel(month)}>
+                <div className={`month month-${monthDir}`} key={month} role="grid" aria-label={monthLabel(month)}>
                   {D.dow.map((d) => <div className="dow" key={d}>{d}</div>)}
                   {cells.map((k) => {
                     const list = daySlots(k);
@@ -443,7 +446,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
         )}
 
         {step === 2 && (
-          <div className="step-body fade-in">
+          <div className={`step-body slide-${dir}`}>
             <div><h2>{T.whoTitle}</h2><p className="lead">{T.whoLead}</p></div>
             <div className="segmented" role="group" aria-label={T.memberOrExt}>
               <button type="button" aria-pressed={bookerType === 'member'} onClick={() => setBookerType('member')}>{T.member}</button>
@@ -463,7 +466,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
         )}
 
         {step === 3 && (
-          <div className="step-body fade-in">
+          <div className={`step-body slide-${dir}`}>
             <div><h2>{T.checkTitle}</h2><p className="lead">{T.checkLead}</p></div>
             {cat && draft && (
               <dl className="kv">

@@ -822,3 +822,41 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .now-line { position: absolute; left: -1px; right: 0; height: 0; border-top: 2px solid #E5484D; z-index: 4; pointer-events: none }
 .now-line::before { content: ""; position: absolute; left: -5px; top: -6px; width: 10px; height: 10px; border-radius: 50%; background: #E5484D }
 .now-line span { position: absolute; right: 4px; top: -16px; font-size: .65rem; font-weight: 700; color: #E5484D; background: var(--surface); padding: 0 3px; border-radius: 3px }
+/* ---------- Fehler- und Wartungsseiten ---------- */
+.error-page { padding-block: 56px 72px; display: grid; justify-items: center; text-align: center; gap: 14px }
+.error-page h1 { font-size: clamp(1.6rem, 4vw, 2.2rem) }
+.error-page p { max-width: 46ch; color: var(--ink-2) }
+.door-art { width: 220px; height: auto; margin-bottom: 8px }
+.door-art g { transform-box: fill-box }
+@media (prefers-reduced-motion: no-preference) { .door-art > g { animation: wiggle 3.2s ease-in-out infinite; transform-origin: center } }
+@keyframes wiggle { 0%, 80%, 100% { rotate: 0deg } 85% { rotate: -8deg } 90% { rotate: 6deg } 95% { rotate: -3deg } }
+/* ---------- Bewegung (nur wenn nicht reduziert) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .slide-fwd { animation: slideFwd .32s cubic-bezier(.2, .8, .2, 1) }
+  .slide-back { animation: slideBack .32s cubic-bezier(.2, .8, .2, 1) }
+  @keyframes slideFwd { from { opacity: 0; transform: translateX(18px) } }
+  @keyframes slideBack { from { opacity: 0; transform: translateX(-18px) } }
+  .month-fwd { animation: slideFwd .28s ease-out } .month-back { animation: slideBack .28s ease-out }
+  .hero-copy > * { animation: rise .6s cubic-bezier(.2, .8, .2, 1) both }
+  .hero-copy > :nth-child(2) { animation-delay: .06s } .hero-copy > :nth-child(3) { animation-delay: .12s }
+  .hero-copy > :nth-child(4) { animation-delay: .18s } .hero-copy > :nth-child(5) { animation-delay: .24s }
+  .hero-card { animation: rise .7s .2s cubic-bezier(.2, .8, .2, 1) both }
+  .free-list li { animation: rise .5s cubic-bezier(.2, .8, .2, 1) both }
+  .free-list li:nth-child(1) { animation-delay: .35s } .free-list li:nth-child(2) { animation-delay: .4s } .free-list li:nth-child(3) { animation-delay: .45s }
+  .free-list li:nth-child(4) { animation-delay: .5s } .free-list li:nth-child(5) { animation-delay: .55s }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px) } }
+  .seal.pop { animation: pop .5s cubic-bezier(.3, 1.6, .5, 1) both }
+  @keyframes pop { from { transform: scale(.3); opacity: 0 } }
+  .burst i { animation: burst .9s var(--d) cubic-bezier(.1, .8, .3, 1) both }
+  @keyframes burst { 0% { transform: rotate(var(--a)) translateY(0) scale(1); opacity: 1 } 100% { transform: rotate(var(--a)) translateY(-46px) scale(.4); opacity: 0 } }
+  .card, .btn, .option, .free-list a { transition: border-color .15s, background-color .15s, box-shadow .2s, transform .15s }
+  .btn:active:not(:disabled) { transform: translateY(1px) }
+  .option:hover { transform: translateY(-1px) }
+}
+.seal { position: relative }
+.burst { position: absolute; inset: 0; pointer-events: none }
+.burst i { position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px; border-radius: 2px; opacity: 0; background: var(--gelb) }
+.burst i:nth-child(3n+2) { background: var(--brand-ink) } .burst i:nth-child(3n) { background: var(--ok); border-radius: 50% }
+@media (prefers-reduced-motion: reduce) { .burst { display: none } }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0 }
+.now-line span { color: #fff !important; background: #C4262E !important }

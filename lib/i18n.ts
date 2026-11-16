@@ -125,7 +125,8 @@ const de = {
   api: { check: 'Bitte prüfe deine Angaben.', notFree: 'Der Zeitraum ist nicht frei.', tooMany: 'Zu viele Anfragen in kurzer Zeit. Bitte später noch einmal versuchen.',
     tooFast: 'Das ging etwas zu schnell. Bitte versuch es in ein paar Sekunden noch einmal.', captcha: 'Bitte bestätige kurz, dass du kein Roboter bist.', captchaExpired: 'Die Sicherheitsprüfung ist abgelaufen. Bitte noch einmal bestätigen.',
     waitInput: 'Bitte Name und eine gültige E-Mail-Adresse angeben.', past: 'Der Termin liegt in der Vergangenheit.' },
-  error: { title: 'Hier ist etwas schiefgelaufen', text: 'Die Seite konnte gerade nicht geladen werden. Bitte versuch es in einem Moment noch einmal.', retry: 'Erneut versuchen' },
+  error: { title: 'Hier ist etwas schiefgelaufen', text: 'Die Seite konnte gerade nicht geladen werden. Bitte versuch es in einem Moment noch einmal.', retry: 'Erneut versuchen',
+    nfTitle: 'Diese Tür ist leider zu', nfText: 'Die Seite gibt es nicht (mehr). Vielleicht wurde der Link falsch kopiert oder die Buchung ist schon gelöscht.', home: 'Zur Startseite', maintTitle: 'Wir räumen kurz auf', maintText: 'Die Seite wird gerade gewartet und ist gleich wieder da. Dringende Fragen bitte direkt an Michael Grieswelle oder Sigrid Brodig.' },
 };
 
 type Dict = typeof de;
@@ -241,7 +242,8 @@ const en: Dict = {
   api: { check: 'Please check your details.', notFree: 'This time is not available.', tooMany: 'Too many requests in a short time. Please try again later.',
     tooFast: 'That was a bit too fast. Please try again in a few seconds.', captcha: 'Please briefly confirm that you are not a robot.', captchaExpired: 'The security check has expired. Please confirm again.',
     waitInput: 'Please enter a name and a valid email address.', past: 'This date is in the past.' },
-  error: { title: 'Something went wrong', text: 'The page could not be loaded just now. Please try again in a moment.', retry: 'Try again' },
+  error: { title: 'Something went wrong', text: 'The page could not be loaded just now. Please try again in a moment.', retry: 'Try again',
+    nfTitle: 'This door is closed', nfText: 'This page does not exist (any more). Maybe the link was copied incorrectly or the booking has been deleted.', home: 'Go to start page', maintTitle: 'We are tidying up', maintText: 'The site is under maintenance and will be back shortly. For urgent questions please contact Michael Grieswelle or Sigrid Brodig.' },
 };
 
 const tr: Dict = {
@@ -355,7 +357,8 @@ const tr: Dict = {
   api: { check: 'Lütfen bilgilerinizi kontrol edin.', notFree: 'Bu saat müsait değil.', tooMany: 'Kısa sürede çok fazla talep. Lütfen daha sonra tekrar deneyin.',
     tooFast: 'Biraz fazla hızlı oldu. Lütfen birkaç saniye sonra tekrar deneyin.', captcha: 'Lütfen robot olmadığınızı kısaca onaylayın.', captchaExpired: 'Güvenlik kontrolünün süresi doldu. Lütfen tekrar onaylayın.',
     waitInput: 'Lütfen bir ad ve geçerli bir e-posta adresi girin.', past: 'Bu tarih geçmişte kalıyor.' },
-  error: { title: 'Bir şeyler ters gitti', text: 'Sayfa şu anda yüklenemedi. Lütfen birazdan tekrar deneyin.', retry: 'Tekrar dene' },
+  error: { title: 'Bir şeyler ters gitti', text: 'Sayfa şu anda yüklenemedi. Lütfen birazdan tekrar deneyin.', retry: 'Tekrar dene',
+    nfTitle: 'Bu kapı kapalı', nfText: 'Bu sayfa yok (artık). Bağlantı yanlış kopyalanmış ya da rezervasyon silinmiş olabilir.', home: 'Ana sayfaya git', maintTitle: 'Kısa bir bakım', maintText: 'Site şu anda bakımda ve birazdan geri dönecek. Acil sorular için Michael Grieswelle veya Sigrid Brodig ile iletişime geçin.' },
 };
 
 export const DICT: Record<Lang, Dict> = { de, en, tr };

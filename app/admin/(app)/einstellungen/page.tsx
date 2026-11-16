@@ -142,7 +142,7 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
           <div className="field"><label htmlFor="eq">Ausstattung (eine pro Zeile)</label><textarea id="eq" name="equipment" defaultValue={x.equipment.join('\n')} style={{ minHeight: 160 }} /></div>
           <div className="stack">
             <div className="table-wrap"><table>
-              <thead><tr><th /><th>Entgelt (€)</th><th>Kaution (€)</th></tr></thead>
+              <thead><tr><th><span className="sr-only">Gruppe</span></th><th>Entgelt (€)</th><th>Kaution (€)</th></tr></thead>
               <tbody>
                 <tr><td>Nicht im Verein</td><td><input name="extRent" type="text" inputMode="decimal" defaultValue={de(x.feesExternal.rent)} aria-label="Entgelt extern" /></td><td><input name="extDeposit" type="text" inputMode="decimal" defaultValue={de(x.feesExternal.deposit)} aria-label="Kaution extern" /></td></tr>
                 <tr><td>Mitglieder, Feier</td><td><input name="memRent" type="text" inputMode="decimal" defaultValue={de(x.feesMemberParty.rent)} aria-label="Entgelt Mitglieder Feier" /></td><td><input name="memDeposit" type="text" inputMode="decimal" defaultValue={de(x.feesMemberParty.deposit)} aria-label="Kaution Mitglieder Feier" /></td></tr>

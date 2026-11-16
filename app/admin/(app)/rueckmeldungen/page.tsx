@@ -17,7 +17,7 @@ export default async function Rueckmeldungen() {
       <section className="card">
         {list.length === 0 ? <div className="empty">Noch keine Rückmeldungen. Nach jedem Termin bekommt der Bucher eine Mail mit der Bitte um Rückmeldung.</div> : (
           <div className="table-wrap"><table>
-            <thead><tr><th>Bewertung</th><th>Termin</th><th>Kommentar</th><th /></tr></thead>
+            <thead><tr><th>Bewertung</th><th>Termin</th><th>Kommentar</th><th><span className="sr-only">Buchung</span></th></tr></thead>
             <tbody>{list.map((f) => (
               <tr key={f.booking_id}>
                 <td className="num" style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{f.rating} / 5</td>
