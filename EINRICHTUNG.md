@@ -169,6 +169,10 @@ Damit erscheinen bestätigte Buchungen automatisch in einem Google-Kalender (Än
 
 Termine, bei denen in Google „Anzeigen als: Verfügbar“ eingestellt ist, sperren den Raum nicht. Im öffentlichen Kalender steht für Google-Termine nur „Vereinstermin“, außer du schaltest „Titel öffentlich zeigen“ ein.
 
+## Wartungsmodus
+
+Wenn du etwas Größeres umbaust: in Vercel `WARTUNG=1` eintragen und neu veröffentlichen. Besucher sehen dann eine freundliche Hinweisseite, die Verwaltung und `/status` funktionieren weiter. Zum Beenden die Variable löschen und neu veröffentlichen.
+
 ## Später: Updates einspielen
 
 Neue Versionen landen per Pull Request auf `main`. Vercel veröffentlicht sie automatisch (Änderungen auf anderen Zweigen bekommen nur eine Vorschau-Adresse). Wenn sich `db/schema.sql` geändert hat, das Skript wie in Schritt 2.4 einmal erneut im SQL Editor ausführen.

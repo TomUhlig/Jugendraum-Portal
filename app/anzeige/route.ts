@@ -1,3 +1,4 @@
+import { esc } from '@/lib/util/html';
 import QRCode from 'qrcode';
 import { getAllBlocks, getCategories, getSettings, listBookings } from '@/lib/data';
 import { appUrl } from '@/lib/url';
@@ -5,7 +6,6 @@ import { addDays, berlinHm, berlinParts, berlinToUtc, berlinYmd } from '@/lib/ti
 
 export const dynamic = 'force-dynamic';
 
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const WD = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const WDS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 

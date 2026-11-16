@@ -167,3 +167,7 @@ export async function protocolPdf(b: Booking, cat: Category | undefined, sigs: S
   page.drawText(wrap(`${foot ? foot + ' · ' : ''}Digital unterschrieben im Jugendraum-Portal`, reg, 8.5, CW)[0], { x: M, y: M - 20, size: 8.5, font: reg, color: MUTED });
   return { filename: `Uebergabeprotokoll-${b.number}.pdf`, content: Buffer.from(await doc.save()).toString('base64') };
 }
+
+/** PDF im Browser anzeigen (nicht zwischenspeichern, enthält persönliche Daten). */
+export const pdfResponse = (pdf: { filename: string; content: string }) =>
+  new Response(Buffer.from(pdf.content, 'base64'), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${pdf.filename}"`, 'Cache-Control': 'private, no-store' } });

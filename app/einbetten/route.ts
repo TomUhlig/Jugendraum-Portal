@@ -1,3 +1,4 @@
+import { esc } from '@/lib/util/html';
 import { getPublicOccupancy } from '@/lib/data';
 import { appUrl } from '@/lib/url';
 import { addDays, berlinParts, berlinToUtc, berlinYmd } from '@/lib/time';
@@ -5,7 +6,6 @@ import { isLang, t, type Lang } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const TX = {
   de: { title: 'Belegung Jugendraum', free: 'Abend frei', busy: 'Abend belegt', part: 'teilweise belegt', cta: 'Jetzt anfragen', legend: ['bestätigt', 'angefragt', 'gesperrt'], blocked: 'gesperrt' },
   en: { title: 'Youth room availability', free: 'evening free', busy: 'evening booked', part: 'partly booked', cta: 'Request now', legend: ['confirmed', 'requested', 'blocked'], blocked: 'blocked' },

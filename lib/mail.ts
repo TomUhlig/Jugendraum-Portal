@@ -1,4 +1,5 @@
 import 'server-only';
+import { esc } from './util/html';
 import { googleCalendarLink } from './gcal-link';
 import { inboxEnabled, plusAddress } from './inbox-parse';
 import { decisionToken } from './auth';
@@ -16,7 +17,6 @@ import { berlinHm, berlinYmd, fmtDay, fmtLong } from './time';
 import { appUrl } from './url';
 
 export { appUrl };
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 type Attachment = { filename: string; content: string }; // base64
 type Mail = { to: string | string[]; subject: string; html: string; text: string; kind: string; bookingId?: string; attachments?: Attachment[]; replyTo?: string; number?: string };

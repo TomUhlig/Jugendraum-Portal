@@ -1,5 +1,5 @@
 import { getBookingByToken, getCategories, getExtras, getSignatures } from '@/lib/data';
-import { protocolPdf } from '@/lib/pdf';
+import { protocolPdf, pdfResponse } from '@/lib/pdf';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,5 +9,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   const [cats, sigs, x] = await Promise.all([getCategories(), getSignatures(b.id), getExtras()]);
   if (!sigs.length) return new Response('Noch kein Protokoll', { status: 404 });
   const pdf = await protocolPdf(b, cats.find((c) => c.id === b.categoryId), sigs, x.operator);
-  return new Response(Buffer.from(pdf.content, 'base64'), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${pdf.filename}"`, 'Cache-Control': 'private, no-store' } });
+  return pdfResponse(pdf);
 }

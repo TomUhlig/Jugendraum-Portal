@@ -2,11 +2,10 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { currentAdmin } from '@/lib/auth';
 import { addPhoto } from '@/lib/data';
+import { imageType } from '@/lib/util/image';
 
 const MAX_BYTES = 1_500_000;
-const isJpeg = (b: Buffer) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
-const isWebp = (b: Buffer) => b.length > 12 && b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP';
-const isImage = (b: Buffer) => isJpeg(b) || isWebp(b);
+const isImage = (b: Buffer) => imageType(b) !== null;
 
 /** Upload eines (im Browser bereits verkleinerten) Fotos: Großbild + Vorschau als WebP oder JPEG. */
 export async function POST(req: Request) {

@@ -50,7 +50,7 @@ function mailApp(email: string): { name: string; url: string } | null {
 export type Prefill = { date?: string; start?: string; end?: string; categoryId?: string; title?: string; guests?: string; equipment?: string[] };
 const WAITABLE = new Set(['overlap', 'buffer', 'party-weekend', 'blackout']);
 
-export default function BookingApp({ initial, initialMonth, contactNote, prefill = {}, turnstileKey = '', lang = 'de' }: { initial: Occupancy; initialMonth: string; contactNote: string; prefill?: Prefill; turnstileKey?: string; lang?: Lang }) {
+export default function BookingApp({ initial, initialMonth, contactNote, prefill = {}, turnstileKey = '', lang = 'de', serverNow }: { serverNow?: number; initial: Occupancy; initialMonth: string; contactNote: string; prefill?: Prefill; turnstileKey?: string; lang?: Lang }) {
   const T = t(lang).app, D = t(lang);
   const eur = (n: number) => eurL(n, lang);
   const monthLabel = (k: string) => monthLabelL(k, lang);
@@ -62,7 +62,9 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   const onCaptcha = useCallback((t: string) => setCaptcha(t), []);
   const [data, setData] = useState(initial);
   const [month, setMonth] = useState(initialMonth);
-  const [now, setNow] = useState(() => Date.now());
+  // Startzeit vom Server, damit Server- und Browser-Darstellung übereinstimmen (sonst Fehler an Minutengrenzen)
+  const [now, setNow] = useState(() => serverNow ?? Date.now());
+  useEffect(() => { setNow(Date.now()); }, []);
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState<'fwd' | 'back'>('fwd');
   const [monthDir, setMonthDir] = useState<'fwd' | 'back'>('fwd');

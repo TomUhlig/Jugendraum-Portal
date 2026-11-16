@@ -1,5 +1,6 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, FileDown, Hourglass, Mail, MailX, MessageCircle, PenLine, Pencil, Phone, Printer, Repeat } from 'lucide-react';
 import Link from 'next/link';
+import { telHref, waNumber } from '@/lib/util/phone';
 import { notFound } from 'next/navigation';
 import { Flash } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -29,13 +30,6 @@ const describe = (a: { action: string; detail: Record<string, unknown> }) => {
   if (Array.isArray(d.overridden) && d.overridden.length) return 'Regeln bewusst übergangen';
   return '';
 };
-
-/** Telefonnummer für wa.me: deutsche Nummern ohne führende 0 mit 49. */
-function waNumber(phone: string): string | null {
-  let d = phone.replace(/[^\d+]/g, '');
-  if (d.startsWith('+')) d = d.slice(1); else if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0')) d = '49' + d.slice(1);
-  return d.length >= 10 && /^491[5-7]/.test(d) ? d : null; // nur Handynummern
-}
 
 export default async function Detail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin();
@@ -219,9 +213,9 @@ export default async function Detail({ params, searchParams }: { params: Promise
             <div className="card-body stack-sm">
               <b>{b.name}</b>{b.team && <span className="muted">{b.team}</span>}
               <a href={`mailto:${b.email}`} className="inline"><Mail className="icon-sm" />{b.email}</a>
-              {b.phone && <a href={`tel:${b.phone.replace(/[^\d+]/g, '')}`} className="inline"><Phone className="icon-sm" />{b.phone}</a>}
+              {b.phone && <a href={telHref(b.phone)} className="inline"><Phone className="icon-sm" />{b.phone}</a>}
               {!b.email.endsWith('@invalid') && <div className="contact-actions">
-                {b.phone && <a className="btn btn-sm" href={`tel:${b.phone.replace(/[^\d+]/g, '')}`}><Phone className="icon-sm" />Anrufen</a>}
+                {b.phone && <a className="btn btn-sm" href={telHref(b.phone)}><Phone className="icon-sm" />Anrufen</a>}
                 {waNumber(b.phone) && <a className="btn btn-sm wa-btn" target="_blank" rel="noopener" href={`https://wa.me/${waNumber(b.phone)}?text=${encodeURIComponent(`Hallo ${b.name.split(' ')[0]}, hier ist ${me.name} vom Jugendraum SV Heepen wegen „${b.title}“ am ${fmtDay(b.start)}.`)}`}><MessageCircle className="icon-sm" />WhatsApp</a>}
                 <a className="btn btn-sm" href={`mailto:${b.email}?subject=${encodeURIComponent(`${b.title} (${b.number})`)}`}><Mail className="icon-sm" />Mail</a>
               </div>}

@@ -1,5 +1,5 @@
 import { getBookingByToken, getCategories, getExtras, getSettings } from '@/lib/data';
-import { hausordnungPdf } from '@/lib/pdf';
+import { hausordnungPdf, pdfResponse } from '@/lib/pdf';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,5 +8,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   if (!b) return new Response('Nicht gefunden', { status: 404 });
   const [cats, s, x] = await Promise.all([getCategories(), getSettings(), getExtras()]);
   const pdf = await hausordnungPdf(b, cats.find((c) => c.id === b.categoryId), s.capacity, x.operator);
-  return new Response(Buffer.from(pdf.content, 'base64'), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${pdf.filename}"`, 'Cache-Control': 'private, no-store' } });
+  return pdfResponse(pdf);
 }

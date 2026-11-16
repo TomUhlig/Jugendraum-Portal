@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { Move } from 'lucide-react';
 import { moveAction } from '@/app/admin/actions';
+import { lanesFor } from '@/lib/util/lanes';
 import { DAY, MIN, berlinHm, berlinToUtc, fmtDay } from '@/lib/time';
 
 export type WeekEvent = { id: string; title: string; name: string; start: number; end: number; status: string; color: string; before: number; after: number; silent: boolean };
@@ -12,22 +13,6 @@ export type WeekBlock = { id: string; start: number; end: number; scope?: 'all' 
 const H0 = 8, SPAN = 18, PX_PER_HOUR = 42, HEIGHT = SPAN * PX_PER_HOUR; // 08:00 bis 02:00
 const MOVABLE = new Set(['requested', 'confirmed', 'pending_email']);
 
-/** Überlappende Einträge eines Tages nebeneinander statt übereinander (Spalten wie in Kalender-Apps). */
-function lanesFor(items: { id: string; start: number; end: number }[]): Map<string, { lane: number; lanes: number }> {
-  const sorted = [...items].sort((a, b) => a.start - b.start || b.end - a.end);
-  const out = new Map<string, { lane: number; lanes: number }>();
-  let cluster: { id: string; lane: number }[] = [], laneEnds: number[] = [], clusterEnd = -Infinity;
-  const flush = () => { for (const c of cluster) out.set(c.id, { lane: c.lane, lanes: laneEnds.length }); cluster = []; laneEnds = []; };
-  for (const it of sorted) {
-    if (it.start >= clusterEnd) { flush(); clusterEnd = -Infinity; }
-    let lane = laneEnds.findIndex((e) => e <= it.start);
-    if (lane < 0) { lane = laneEnds.length; laneEnds.push(it.end); } else laneEnds[lane] = it.end;
-    cluster.push({ id: it.id, lane });
-    clusterEnd = Math.max(clusterEnd, it.end);
-  }
-  flush();
-  return out;
-}
 const laneStyle = (l?: { lane: number; lanes: number }): React.CSSProperties => (l && l.lanes > 1 ? { left: `calc(${(l.lane / l.lanes) * 100}% + 2px)`, right: 'auto', width: `calc(${100 / l.lanes}% - 4px)` } : {});
 const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 

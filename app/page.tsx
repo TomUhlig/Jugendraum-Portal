@@ -83,7 +83,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       </section>
       {photos.length > 0 && <section className="wrap photos-band" aria-label="Fotos"><Gallery photos={photos} variant="strip" /></section>}
       <div id="anfrage" className="anchor" />
-      <BookingApp initial={initial} initialMonth={month} contactNote={extras.contactNote} prefill={prefill} turnstileKey={turnstileEnabled() ? turnstileSiteKey() : ''} lang={lang} />
+      <BookingApp serverNow={Date.now()} initial={initial} initialMonth={month} contactNote={extras.contactNote} prefill={prefill} turnstileKey={turnstileEnabled() ? turnstileSiteKey() : ''} lang={lang} />
     </main>
   );
 }
