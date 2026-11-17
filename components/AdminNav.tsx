@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { QuickSearch } from './QuickSearch';
-import { Contact, BarChart3, FileSpreadsheet, CalendarDays, CalendarOff, ClipboardList, History, Hourglass, Image as ImageIcon, LayoutDashboard, MessageSquareText, PlusCircle, Search, Settings, Users } from 'lucide-react';
+import { Wrench, Contact, BarChart3, FileSpreadsheet, CalendarDays, CalendarOff, ClipboardList, History, Hourglass, Image as ImageIcon, LayoutDashboard, MessageSquareText, PlusCircle, Search, Settings, Users } from 'lucide-react';
 
 const GROUPS = [
   { name: 'Betrieb', items: [
@@ -20,6 +20,7 @@ const GROUPS = [
     { href: '/admin/rueckmeldungen', label: 'Rückmeldungen', icon: MessageSquareText },
   ] },
   { name: 'Verwaltung', items: [
+    { href: '/admin/raumbuch', label: 'Raumbuch', icon: Wrench },
     { href: '/admin/sperrzeiten', label: 'Sperrzeiten', icon: CalendarOff },
     { href: '/admin/fotos', label: 'Fotos', icon: ImageIcon },
     { href: '/admin/einstellungen', label: 'Einstellungen', icon: Settings },

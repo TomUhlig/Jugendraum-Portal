@@ -45,7 +45,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     getPublicOccupancy(berlinToUtc(addDays(month, -7), '00:00'), berlinToUtc(addDays(month, 45), '00:00'), roomParam),
     getExtras(),
     listPhotos(),
-    nextFreeEvenings(5).catch(() => []),
+    nextFreeEvenings(5, '18:00', '22:00', roomParam).catch(() => []),
   ]);
   const hero = photos[0];
   const LOC = { de: 'de-DE', en: 'en-GB', tr: 'tr-TR' }[lang];
@@ -70,13 +70,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
             </ul>
           </div>
           <aside className="hero-card" aria-labelledby="free-h">
-            <h2 id="free-h">{I.nextFree}</h2>
+            <h2 id="free-h">{I.nextFree}{allRooms.length > 1 && <span className="muted small"> · {allRooms.find((r) => r.id === roomParam)?.name}</span>}</h2>
             <p>{free.length ? I.nextFreeHint : I.noneFree}</p>
             {free.length > 0 && (
               <ul className="free-list">
                 {free.map((f) => (
                   <li key={f.date}>
-                    <a href={`/?datum=${f.date}&von=18:00&bis=22:00#anfrage`}>
+                    <a href={`/?${allRooms.length > 1 ? `raum=${roomParam}&` : ''}datum=${f.date}&von=18:00&bis=22:00#anfrage`}>
                       <span className="fd"><small>{wd.format(f.start).replace('.', '')}</small><b>{berlinParts(f.start).day}</b><small>{mo.format(f.start).replace('.', '')}</small></span>
                       <span className="ft">{hmRange(f.start, f.end, lang)}</span>
                       <ArrowRight className="icon" aria-hidden />
@@ -87,7 +87,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
             )}
             <div className="hero-card-foot">
               <a href="#anfrage">{I.otherDay}</a>
-              {free.length > 0 && <a className="wa" target="_blank" rel="noopener" href={`https://wa.me/?text=${encodeURIComponent(`${I.nextFree} – Jugendraum SV Heepen:\n${free.map((f) => `• ${wd.format(f.start).replace('.', '')} ${berlinParts(f.start).day}. ${mo.format(f.start).replace('.', '')}, ${hmRange(f.start, f.end, lang)}: ${appUrl()}/?datum=${f.date}&von=18:00&bis=22:00`).join('\n')}`)}`}><Share2 className="icon-sm" aria-hidden />{I.share}</a>}
+              {free.length > 0 && <a className="wa" target="_blank" rel="noopener" href={`https://wa.me/?text=${encodeURIComponent(`${I.nextFree} – Jugendraum SV Heepen:\n${free.map((f) => `• ${wd.format(f.start).replace('.', '')} ${berlinParts(f.start).day}. ${mo.format(f.start).replace('.', '')}, ${hmRange(f.start, f.end, lang)}: ${appUrl()}/?${allRooms.length > 1 ? `raum=${roomParam}&` : ''}datum=${f.date}&von=18:00&bis=22:00`).join('\n')}`)}`}><Share2 className="icon-sm" aria-hidden />{I.share}</a>}
             </div>
           </aside>
         </div>

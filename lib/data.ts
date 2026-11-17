@@ -18,7 +18,7 @@ export type Booking = {
   start: number; end: number; guests: number; bookerType: 'member' | 'external'; team: string;
   name: string; email: string; phone: string; agreedWith: string; manageToken: string; equipment: string[];
   rejectReason: string | null; internalNote: string; decidedBy: string | null; createdAt: number;
-  seriesId: string | null; createdBy: string | null; silent: boolean; lang: Lang; alternatives: { start: number; end: number }[]; roomId: string;
+  seriesId: string | null; createdBy: string | null; silent: boolean; lang: Lang; alternatives: { start: number; end: number }[]; roomId: string; checklist: string[];
   rent: number; deposit: number; rentPaid: boolean; depositPaid: boolean; depositReturned: boolean; depositWithheld: number;
   keyHandedOut: boolean; handoverAt: number | null; handoverBy: string | null; meterStart: number | null;
   returnAt: number | null; returnBy: string | null; meterEnd: number | null; conditionOk: boolean | null; damageNote: string;
@@ -35,7 +35,7 @@ export const toBooking = (r: Row): Booking => ({
   name: r.name as string, email: r.email as string, phone: r.phone as string, agreedWith: r.agreed_with as string,
   manageToken: r.manage_token as string, equipment: (r.equipment as string[]) ?? [], rejectReason: (r.reject_reason as string) ?? null,
   internalNote: r.internal_note as string, decidedBy: (r.decided_by as string) ?? null, createdAt: +(r.created_at as Date),
-  seriesId: (r.series_id as string) ?? null, createdBy: (r.created_by as string) ?? null, silent: !!r.silent, lang: isLang(r.lang) ? r.lang : 'de', alternatives: Array.isArray(r.alternatives) ? (r.alternatives as { start: number; end: number }[]) : [], roomId: (r.room_id as string) ?? 'jugendraum',
+  seriesId: (r.series_id as string) ?? null, createdBy: (r.created_by as string) ?? null, silent: !!r.silent, lang: isLang(r.lang) ? r.lang : 'de', alternatives: Array.isArray(r.alternatives) ? (r.alternatives as { start: number; end: number }[]) : [], roomId: (r.room_id as string) ?? 'jugendraum', checklist: (r.checklist as string[]) ?? [],
   rent: num(r.rent_eur), deposit: num(r.deposit_eur), rentPaid: !!r.rent_paid, depositPaid: !!r.deposit_paid, depositReturned: !!r.deposit_returned, depositWithheld: num(r.deposit_withheld_eur),
   keyHandedOut: !!r.key_handed_out, handoverAt: ts(r.handover_at), handoverBy: (r.handover_by as string) ?? null, meterStart: numOrNull(r.meter_start),
   returnAt: ts(r.return_at), returnBy: (r.return_by as string) ?? null, meterEnd: numOrNull(r.meter_end),
@@ -857,3 +857,29 @@ export async function undo(auditId: string, actor: string): Promise<{ ok: true; 
   queueGoogle([booking]);
   return { ok: true, booking, before, text: `${UNDOABLE[a.action]} zurückgenommen: „${booking.title}“ ist wieder ${prev === 'confirmed' ? 'bestätigt' : 'angefragt'}.` };
 }
+
+// ---------- Checkliste ----------
+export async function toggleChecklist(manageToken: string, item: string, done: boolean): Promise<string[] | null> {
+  const q = db();
+  const [row] = done
+    ? await q`update bookings set checklist = array_append(array_remove(checklist, ${item}), ${item}) where manage_token = ${manageToken} returning checklist`
+    : await q`update bookings set checklist = array_remove(checklist, ${item}) where manage_token = ${manageToken} returning checklist`;
+  return row ? (row.checklist as string[]) : null;
+}
+
+// ---------- Mängel- und Einkaufsbuch ----------
+export type RoomNote = { id: string; kind: 'defect' | 'shopping' | 'todo'; text: string; roomId: string | null; bookingId: string | null; assignee: string; createdBy: string; createdAt: number; doneBy: string | null; doneAt: number | null };
+const toNote = (r: Row): RoomNote => ({ id: r.id as string, kind: r.kind as RoomNote['kind'], text: r.text as string, roomId: (r.room_id as string) ?? null, bookingId: (r.booking_id as string) ?? null,
+  assignee: (r.assignee as string) ?? '', createdBy: r.created_by as string, createdAt: +(r.created_at as Date), doneBy: (r.done_by as string) ?? null, doneAt: ts(r.done_at) });
+export async function listNotes(showDone = false): Promise<RoomNote[]> {
+  const rows = await db()`select * from room_notes where ${showDone ? db()`done_at > now() - interval '60 days'` : db()`done_at is null`} order by done_at desc nulls first, created_at desc limit 300`;
+  return rows.map(toNote);
+}
+export async function addNote(actor: string, n: { kind: RoomNote['kind']; text: string; roomId?: string | null; bookingId?: string | null; assignee?: string }) {
+  await db()`insert into room_notes (kind, text, room_id, booking_id, assignee, created_by) values (${n.kind}, ${n.text}, ${n.roomId ?? null}, ${n.bookingId ?? null}, ${n.assignee ?? ''}, ${actor})`;
+}
+export async function setNoteDone(id: string, actor: string, done: boolean) {
+  await db()`update room_notes set done_at = ${done ? new Date() : null}, done_by = ${done ? actor : null} where id = ${id}`;
+}
+export async function deleteNote(id: string) { await db()`delete from room_notes where id = ${id}`; }
+export async function openNotesCount(): Promise<number> { const [r] = await db()`select count(*)::int as n from room_notes where done_at is null`; return r?.n ?? 0; }

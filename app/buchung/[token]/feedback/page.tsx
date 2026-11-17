@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { getBookingByToken, getFeedback, notifyRecipients, saveFeedback } from '@/lib/data';
+import { addNote, getBookingByToken, getFeedback, notifyRecipients, saveFeedback } from '@/lib/data';
 import { teamMails } from '@/lib/mail';
 import { pushTeam } from '@/lib/push';
 import { fmtLong } from '@/lib/time';
@@ -17,6 +17,7 @@ async function send(fd: FormData) {
   const b = await saveFeedback(token, rating, comment, damage);
   if (b && damage) {
     try { await teamMails.damage(await notifyRecipients(), b, comment); } catch (e) { console.error(e); }
+    await addNote(b.name, { kind: 'defect', text: `Schaden gemeldet: ${comment || 'ohne Beschreibung'}`.slice(0, 300), roomId: b.roomId, bookingId: b.id }).catch(() => {});
     await pushTeam({ title: `Schaden gemeldet: ${b.title}`, body: comment.slice(0, 140) || 'Ohne Beschreibung', url: `/admin/buchung/${b.id}` });
   }
   redirect(`/buchung/${token}?danke=1`);

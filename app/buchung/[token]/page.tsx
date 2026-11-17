@@ -1,4 +1,6 @@
 import { InstallHint } from '@/components/InstallHint';
+import { Checklist } from '@/components/Checklist';
+import { CHECKLIST_TEXT, itemsFor } from '@/lib/checklist';
 import { PartyPopper, CalendarPlus, CheckCircle2, FileText, MessageSquareText, Receipt, RotateCcw } from 'lucide-react';
 import { rebookHref } from '@/lib/gcal-link';
 import { berlinHm as hmOf, berlinHm, fmtDay } from '@/lib/time';
@@ -121,6 +123,11 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           )}
         </section>
 
+        {b.status === 'confirmed' && b.end > Date.now() - 3 * 864e5 && (() => {
+          const CT = CHECKLIST_TEXT[lang];
+          const items = itemsFor(!!cat?.isParty, b.rent + b.deposit > 0).map((i) => ({ id: i.id, label: CT.items[i.id], when: i.when }));
+          return <Checklist token={token} items={items} initial={b.checklist} t={{ title: CT.title, hint: CT.hint, before: CT.before, after: CT.after, doneOf: CT.done('{a}' as unknown as number, '{b}' as unknown as number) }} />;
+        })()}
         {['pending_email', 'requested'].includes(b.status) && b.alternatives.length > 0 && (
           <section className="card card-body stack-sm"><b>{t(lang).app.altTitle}</b>
             <ul className="list" style={{ margin: 0 }}>{b.alternatives.map((a) => <li key={a.start} className="num">{fmtDay(a.start, lang)}, {berlinHm(a.start)}–{berlinHm(a.end)}</li>)}</ul></section>

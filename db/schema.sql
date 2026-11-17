@@ -339,6 +339,21 @@ create unique index if not exists bookings_one_party_per_weekend_room
   on bookings (room_id, party_weekend)
   where party_weekend is not null and status in ('pending_email', 'requested', 'confirmed');
 
+-- ---------- Version 17: Checkliste, Mängelbuch ----------
+alter table bookings add column if not exists checklist text[] not null default '{}';
+create table if not exists room_notes (
+  id          uuid primary key default gen_random_uuid(),
+  kind        text not null check (kind in ('defect', 'shopping', 'todo')),
+  text        text not null,
+  room_id     text references rooms(id) on delete cascade,
+  booking_id  uuid references bookings(id) on delete set null,
+  assignee    text not null default '',
+  created_by  text not null,
+  created_at  timestamptz not null default now(),
+  done_by     text,
+  done_at     timestamptz
+);
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -362,5 +377,6 @@ do $$ begin
     execute 'alter table signatures enable row level security';
     execute 'alter table booker_profiles enable row level security';
     execute 'alter table rooms enable row level security';
+    execute 'alter table room_notes enable row level security';
   end if;
 end $$;

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { TemplatePicker } from '@/components/TemplatePicker';
 import { RoomSelect } from '@/components/RoomSelect';
 import { fillTemplate } from '@/lib/templates';
+import { CHECKLIST_TEXT, itemsFor } from '@/lib/checklist';
 import { telHref, waNumber } from '@/lib/util/phone';
 import { notFound } from 'next/navigation';
 import { Flash } from '@/components/Flash';
@@ -172,6 +173,11 @@ export default async function Detail({ params, searchParams }: { params: Promise
                   {b.returnAt || b.keyHandedOut ? <Link className="btn btn-sm" href={`/admin/uebergabe/${b.id}/protokoll`} target="_blank"><FileDown className="icon-sm" />Protokoll</Link> : null}
                   <Link className="btn btn-sm btn-primary" href={`/admin/uebergabe/${b.id}?art=${b.keyHandedOut && !b.returnAt ? 'rueckgabe' : 'uebergabe'}`}><PenLine className="icon-sm" />{b.keyHandedOut && !b.returnAt ? 'Rückgabe mit Unterschrift' : 'Mit Unterschrift übergeben'}</Link>
                 </div>}</div>
+              {(() => { const its = itemsFor(!!cats.find((x) => x.id === b.categoryId)?.isParty, b.rent + b.deposit > 0); const open = its.filter((i) => !b.checklist.includes(i.id)); return (
+                <div className="card-body cl-admin"><b className="small">Checkliste des Buchers: {its.length - open.length} von {its.length} erledigt</b>
+                  <div className="cl-bar" aria-hidden><i style={{ width: `${Math.round(((its.length - open.length) / its.length) * 100)}%` }} /></div>
+                  {open.length > 0 && <span className="muted small">Offen: {open.map((i) => CHECKLIST_TEXT.de.items[i.id]).join(' · ')}</span>}</div>
+              ); })()}
               {sigs.length > 0 && <div className="card-body sig-info">{sigs.map((sg) => (
                 <div key={sg.kind} className="sig-chip"><img src={`data:image/png;base64,${sg.png.toString('base64')}`} alt={`Unterschrift ${sg.signer}`} />
                   <span><b>{sg.kind === 'out' ? 'Übergabe' : 'Rückgabe'} unterschrieben</b><br /><span className="muted small">{sg.signer} · {fmtTs(sg.createdAt)} · mit {sg.staff}</span></span></div>

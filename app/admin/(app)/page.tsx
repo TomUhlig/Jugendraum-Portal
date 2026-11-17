@@ -4,7 +4,7 @@ import { Flash, PageHead } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { checkExisting, getAllBlocks, getCategories, getExtras, listBookings, operatorComplete, unreadMessages } from '@/lib/data';
+import { openNotesCount, checkExisting, getAllBlocks, getCategories, getExtras, listBookings, operatorComplete, unreadMessages } from '@/lib/data';
 import { mailMode } from '@/lib/mail';
 import { eur } from '@/lib/labels';
 import { DAY, addDays, berlinParts, berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong, fmtRange } from '@/lib/time';
@@ -48,7 +48,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const canDecide = me.role !== 'viewer';
   const hour = berlinParts(now).hour;
   const greet = hour < 5 ? 'Gute Nacht' : hour < 11 ? 'Guten Morgen' : hour < 17 ? 'Hallo' : 'Guten Abend';
-  const todo = clashes.length + setup.length + unread.length + unpaid.length + keysOut.length + deposits.length + damages.length + keysDue.length + (failed[0].n ? 1 : 0);
+  const notesOpen = await openNotesCount();
+  const todo = (notesOpen ? 1 : 0) + clashes.length + setup.length + unread.length + unpaid.length + keysOut.length + deposits.length + damages.length + keysDue.length + (failed[0].n ? 1 : 0);
 
   return (
     <>
@@ -90,6 +91,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <div className="card-head"><h2>Zu erledigen</h2>{todo > 0 && <span className="badge b-warn">{todo}</span>}</div>
             {todo === 0 ? <div className="empty">Nichts offen. Schlüssel, Kautionen und Schadensmeldungen sind erledigt.</div> : (
               <ul className="list">
+                {notesOpen > 0 && <li className="todo"><Wrench className="icon" style={{ color: 'var(--warn)' }} /><span><Link href="/admin/raumbuch">{notesOpen} offene {notesOpen === 1 ? 'Eintrag' : 'Einträge'} im Raumbuch</Link> <span className="muted">(Mängel, Einkauf, Aufgaben)</span></span></li>}
                 {clashes.map(({ b, x }) => <li key={'c' + b.id} className="todo"><AlertTriangle className="icon" style={{ color: 'var(--bad)' }} /><span>Überschneidung: <Link href={`/admin/buchung/${b.id}`}>{b.title}</Link> <span className="muted">({fmtDay(b.start)}, {b.name})</span> trifft auf {x.id.startsWith('g:') ? 'Google-Termin' : 'Sperre'} „{x.reason || 'gesperrt'}“</span></li>)}
                 {setup.map((t) => <li key={t} className="todo"><Settings2 className="icon" style={{ color: 'var(--bad)' }} /><span><Link href={t.startsWith('Mail') ? '/admin/einstellungen#mail' : '/admin/einstellungen#betreiber'}>{t}</Link> <span className="muted">(Einrichtung)</span></span></li>)}
                 {unread.map((m) => <li key={'m' + m.booking_id} className="todo"><MessageSquareText className="icon" style={{ color: 'var(--info)' }} /><span>{m.n === 1 ? 'Neue Nachricht' : `${m.n} neue Nachrichten`} von {m.name}: <Link href={`/admin/buchung/${m.booking_id}#nachrichten`}>{m.title}</Link></span></li>)}

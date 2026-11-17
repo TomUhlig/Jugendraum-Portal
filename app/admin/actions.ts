@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
   Admin, MailTextKey, addBlackout, deletePhoto, movePhoto, updatePhoto, addMessage, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
-  saveRoom, undo, undoInfo, PROFILE_TAGS, emailFromBookerKey, saveProfile, confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
+  addNote, setNoteDone, deleteNote, saveRoom, undo, undoInfo, PROFILE_TAGS, emailFromBookerKey, saveProfile, confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
 } from '@/lib/data';
 import { mailMode, mails, teamMails } from '@/lib/mail';
 import { isValidIban, normalizeIban } from '@/lib/payment';
@@ -479,4 +479,27 @@ export async function roomsAction(fd: FormData) {
   }
   revalidatePath('/', 'layout');
   go('/admin/einstellungen#raeume', 'ok', `${saved} ${saved === 1 ? 'Raum' : 'Räume'} gespeichert.`);
+}
+
+// ---------- Raumbuch ----------
+export async function addNoteAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  const kind = ['defect', 'shopping', 'todo'].includes(String(fd.get('kind'))) ? (String(fd.get('kind')) as 'defect') : 'defect';
+  const text = str(fd, 'text', 300);
+  if (text.length < 2) go('/admin/raumbuch', 'fehler', 'Bitte etwas eintragen.');
+  await addNote(admin.name, { kind, text, roomId: str(fd, 'roomId', 40) || null, assignee: str(fd, 'assignee', 80) });
+  revalidatePath('/admin', 'layout');
+  go('/admin/raumbuch', 'ok', 'Eingetragen.');
+}
+export async function toggleNoteAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  await setNoteDone(str(fd, 'id', 40), admin.name, fd.get('done') === '1');
+  revalidatePath('/admin', 'layout');
+  go('/admin/raumbuch', 'ok', fd.get('done') === '1' ? 'Erledigt.' : 'Wieder offen.');
+}
+export async function deleteNoteAction(fd: FormData) {
+  await requireAdmin('manager');
+  await deleteNote(str(fd, 'id', 40));
+  revalidatePath('/admin', 'layout');
+  go('/admin/raumbuch', 'ok', 'Gelöscht.');
 }

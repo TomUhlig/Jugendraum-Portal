@@ -3,9 +3,10 @@ import { db } from '@/lib/db';
 import { Booking, getBooking, getCategories, listBookings, notifyRecipients, toBooking } from '@/lib/data';
 import { syncToGoogle } from '@/lib/gcal';
 import { pollInbox } from '@/lib/inbox';
+import { pushTeam } from '@/lib/push';
 import { mails, teamMails } from '@/lib/mail';
 import { notifyWaitlist } from '@/lib/notify';
-import { DAY, addDays, berlinParts, berlinToUtc, berlinYmd } from '@/lib/time';
+import { DAY, addDays, berlinHm, berlinParts, berlinToUtc, berlinYmd } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,7 +70,15 @@ export async function GET(req: Request) {
   // auch im Google-Kalender die Namen entfernen
   for (const r of anon.filter((x) => x.google_event_id).slice(0, 50)) await syncToGoogle(toBooking(r));
 
-  // 7. Antworten per Mail abholen
+  // 7. Morgens aufs Handy: wer ist heute im Raum?
+  const todayList = (await listBookings({ status: ['confirmed'], from: berlinToUtc(today, '05:00'), to: berlinToUtc(addDays(today, 1), '03:00') })).filter((b) => b.start >= berlinToUtc(today, '05:00'));
+  if (todayList.length) {
+    await pushTeam({ title: `Heute im Raum: ${todayList.length} ${todayList.length === 1 ? 'Termin' : 'Termine'}`, url: '/admin/kalender?ansicht=woche', tag: 'heute-' + today,
+      body: todayList.map((b) => `${berlinHm(b.start)} ${b.team || b.title}${b.keyHandedOut ? '' : ' (Schlüssel offen)'}`).join(' · ').slice(0, 180) }).catch(() => {});
+    report.morningPush = todayList.length;
+  }
+
+  // 8. Antworten per Mail abholen
   const inbox = await pollInbox();
   report.inbox = inbox.added;
 

@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { ArrowLeft, Check, FileDown, KeyRound } from 'lucide-react';
 import { SignaturePad } from '@/components/SignaturePad';
 import { requireAdmin } from '@/lib/auth';
-import { getBooking, getCategories, getSignatures, saveHandoverStep } from '@/lib/data';
+import { addNote, getBooking, getCategories, getSignatures, saveHandoverStep } from '@/lib/data';
 import { mails } from '@/lib/mail';
 import { berlinHm, fmtLong } from '@/lib/time';
 
@@ -31,6 +31,7 @@ async function save(fd: FormData) {
     conditionOk: kind === 'in' ? cond !== 'issues' : undefined, damageNote: kind === 'in' ? String(fd.get('damageNote') ?? '').trim().slice(0, 1000) : undefined,
   });
   const b = await getBooking(id);
+  if (b && kind === 'in' && cond === 'issues') await addNote(admin.name, { kind: 'defect', text: `Mangel bei Rückgabe „${b.title}“: ${String(fd.get('damageNote') ?? '').trim() || 'ohne Beschreibung'}`.slice(0, 300), roomId: b.roomId, bookingId: b.id });
   if (b && !b.silent) await mails.protocol(b, kind).catch((e) => console.error('Protokoll-Mail:', e));
   redirect(`/admin/uebergabe/${id}?fertig=${kind}`);
 }
