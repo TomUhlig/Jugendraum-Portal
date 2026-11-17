@@ -23,6 +23,7 @@ export default async function Bericht({ searchParams }: { searchParams: Promise<
   return (
     <div className="report">
       <PageHead eyebrow="Für Vorstand, Kassenprüfung und Jahreshauptversammlung" title={`Jahresübersicht ${year}`}>
+        <a className="btn" href={`/rueckblick/${year}`} target="_blank" rel="noreferrer">Rückblick zum Teilen</a>
         <div className="segmented no-print">{[now - 2, now - 1, now].map((y) => <Link key={y} href={`?jahr=${y}`} aria-current={y === year ? 'page' : undefined}>{y}</Link>)}</div>
         <a className="btn no-print" href={`/admin/bericht/export?jahr=${year}`}><Download className="icon-sm" />Excel-Liste</a>
         <span className="no-print"><PrintButton /></span>

@@ -965,3 +965,28 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .note-check { width: 28px; height: 28px; border-radius: 8px; border: 2px solid var(--line-strong); background: var(--surface); display: grid; place-items: center; cursor: pointer; color: var(--muted) }
 .note-check:hover { border-color: var(--ok); color: var(--ok) }
 .done .note-check { background: var(--ok-bg); border-color: transparent }
+/* ---------- Jahresrückblick ---------- */
+.rb-hero { background: var(--intro); color: #fff; padding: 56px 0 72px; background-image: repeating-linear-gradient(115deg, transparent 0 22px, rgba(255, 216, 0, .08) 22px 23px) }
+.rb-kicker { font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--gelb) }
+.rb-hero h1 { color: #fff; font-size: clamp(2.2rem, 7vw, 3.6rem); line-height: 1; margin: 12px 0; letter-spacing: -.02em }
+.rb-hero h1 span { color: var(--gelb) }
+.rb-hero p { color: rgba(255,255,255,.85); font-size: 1.1rem; max-width: 52ch }
+.rb-body { display: grid; gap: 18px; margin-top: -40px; padding-bottom: 56px }
+.rb-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px }
+.rb-stat { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 2px; box-shadow: 0 10px 30px -20px rgba(10,14,40,.4) }
+.rb-stat .icon { color: var(--brand-ink) }
+.rb-stat b { font-family: var(--f-display); font-size: 2rem; line-height: 1.1 }
+.rb-stat span { color: var(--muted); font-size: .85rem }
+.rb-months { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; height: 180px; align-items: end; margin-top: 12px }
+.rb-months > div { display: grid; grid-template-rows: 18px 1fr 18px; height: 100%; align-items: end; justify-items: center }
+.rb-months i { width: 70%; background: color-mix(in srgb, var(--brand-ink) 55%, var(--surface)); border-radius: 4px 4px 0 0; align-self: end }
+.rb-months .peak i { background: var(--brand-ink) }
+.rb-months small { font-size: .7rem; color: var(--muted) }
+.rb-val { font-size: .8rem; font-weight: 700; color: var(--ink-2) }
+.rb-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px }
+.rb-facts .card-body { display: grid; gap: 2px }
+.rb-facts b { font-family: var(--f-display); font-size: 1.25rem }
+.rb-thanks { text-align: center; display: grid; gap: 12px; justify-items: center; padding: 18px 0 }
+.rb-thanks p { max-width: 50ch; color: var(--ink-2) }
+@media (min-width: 640px) { .rb-stats { grid-template-columns: repeat(3, 1fr) } .rb-facts { grid-template-columns: repeat(2, 1fr) } }
+.rb-body h2 { margin-bottom: 14px }
