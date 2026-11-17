@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronLeft, ChevronRight, FileDown, Hourglass, Mail, MailX, MessageCircle, PenLine, Pencil, Phone, Printer, Repeat } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, FileDown, Hourglass, Mail, MailX, MessageCircle, PenLine, Pencil, Phone, Printer, Repeat, Undo2 } from 'lucide-react';
 import Link from 'next/link';
 import { TemplatePicker } from '@/components/TemplatePicker';
 import { fillTemplate } from '@/lib/templates';
@@ -8,11 +8,11 @@ import { Flash } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { bookerKey, profileTags, checkOptions, getSignatures, checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
+import { undoInfo, bookerKey, profileTags, checkOptions, getSignatures, checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
 import { MessageThread } from '@/components/MessageThread';
 import { eur } from '@/lib/labels';
 import { berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong } from '@/lib/time';
-import { confirmAltAction, decideSeriesAction, cancelSeriesAction, changeAction, decideAction, handoverAction, messageAction, moneyAction, noteAction, refundAction, silentAction } from '../../../actions';
+import { undoAction, confirmAltAction, decideSeriesAction, cancelSeriesAction, changeAction, decideAction, handoverAction, messageAction, moneyAction, noteAction, refundAction, silentAction } from '../../../actions';
 
 export const metadata = { title: 'Buchung' };
 
@@ -20,7 +20,7 @@ const fmtTs = (d: Date | number) => new Date(d).toLocaleString('de-DE', { timeZo
 const ACTION: Record<string, string> = {
   created: 'Anfrage gestellt', verified: 'E-Mail-Adresse bestätigt', 'verified+auto-confirmed': 'E-Mail bestätigt, automatisch eingetragen', 'admin-created': 'Vom Orga-Team eingetragen',
   confirm: 'Bestätigt', reject: 'Abgelehnt', cancel: 'Storniert', 'cancelled-by-booker': 'Vom Bucher abgesagt', 'internal-note': 'Interne Notiz geändert', 'mails-off': 'E-Mails an den Bucher ausgeschaltet', 'mails-on': 'E-Mails an den Bucher eingeschaltet',
-  handover: 'Übergabeprotokoll aktualisiert', money: 'Kosten aktualisiert', 'paid-online': 'Online bezahlt', refund: 'Kaution erstattet', 'message-team': 'Nachricht an den Bucher', 'message-booker': 'Nachricht vom Bucher', changed: 'Termin geändert', expired: 'Verfallen (E-Mail nicht bestätigt)', feedback: 'Rückmeldung erhalten',
+  handover: 'Übergabeprotokoll aktualisiert', money: 'Kosten aktualisiert', 'paid-online': 'Online bezahlt', refund: 'Kaution erstattet', 'message-team': 'Nachricht an den Bucher', 'message-booker': 'Nachricht vom Bucher', changed: 'Termin geändert', expired: 'Verfallen (E-Mail nicht bestätigt)', feedback: 'Rückmeldung erhalten', undo: 'Rückgängig gemacht', 'handover-signed': 'Übergabe unterschrieben', 'return-signed': 'Rückgabe unterschrieben', 'google-error': 'Google-Kalender: Fehler',
 };
 const describe = (a: { action: string; detail: Record<string, unknown> }) => {
   const d = a.detail ?? {};
@@ -57,6 +57,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
   const rel = Date.now() >= b.start && Date.now() < b.end ? { text: 'läuft gerade', cls: 'now' } : b.end <= Date.now() ? { text: dayDiff === 0 ? 'heute vorbei' : `vor ${-dayDiff} ${dayDiff === -1 ? 'Tag' : 'Tagen'}`, cls: 'past' }
     : { text: dayDiff === 0 ? `heute, ${berlinHm(b.start)} Uhr` : dayDiff === 1 ? 'morgen' : `in ${dayDiff} Tagen`, cls: dayDiff <= 2 ? 'soon' : '' };
   const tags = await profileTags(b.email);
+  const lastUndo = await undoInfo(b.id);
   const options = b.status === 'requested' && b.alternatives.length ? await checkOptions(b) : [];
   const tpl = (use: 'reject' | 'message') => extras.templates.filter((t) => t.use === use || t.use === 'both')
     .map((t) => ({ title: t.title, text: fillTemplate(t.text, { name: b.name, title: b.title, date: fmtDay(b.start), time: `${berlinHm(b.start)}–${berlinHm(b.end)} Uhr`, agreedWith: b.agreedWith }) }));
@@ -214,6 +215,14 @@ export default async function Detail({ params, searchParams }: { params: Promise
 
           <section className="card">
             <div className="card-head"><h2>Verlauf</h2></div>
+            {lastUndo && can && (
+              <form action={undoAction} className="card-body undo-bar">
+                <input type="hidden" name="auditId" value={lastUndo.auditId} /><input type="hidden" name="back" value={`/admin/buchung/${b.id}`} />
+                <span className="small">Letzte Aktion: <b>{lastUndo.label}</b> von {lastUndo.actor}, {fmtTs(lastUndo.at)}</span>
+                <span className="inline"><label className="check-inline small"><input type="checkbox" name="notify" value="on" defaultChecked={!b.silent} /> Bucher informieren</label>
+                  <button className="btn btn-sm" type="submit"><Undo2 className="icon-sm" />Rückgängig</button></span>
+              </form>
+            )}
             <div className="table-wrap"><table><tbody>
               {history.map((h, i) => (
                 <tr key={i}><td className="num muted" style={{ whiteSpace: 'nowrap', width: 1 }}>{fmtTs(h.at)}</td>

@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
   Admin, MailTextKey, addBlackout, deletePhoto, movePhoto, updatePhoto, addMessage, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
-  PROFILE_TAGS, emailFromBookerKey, saveProfile, confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
+  undo, undoInfo, PROFILE_TAGS, emailFromBookerKey, saveProfile, confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
 } from '@/lib/data';
 import { mailMode, mails, teamMails } from '@/lib/mail';
 import { isValidIban, normalizeIban } from '@/lib/payment';
@@ -19,10 +19,12 @@ import { clearGoogleCache, syncToGoogle, testConnection } from '@/lib/gcal';
 import { db } from '@/lib/db';
 const DAY_MS = 86400e3;
 
-const go = (url: string, key: 'ok' | 'fehler', msg: string): never => {
+const go = (url: string, key: 'ok' | 'fehler', msg: string, undoId?: string): never => {
   const [path, hash] = url.split('#');
-  return redirect(path + (path.includes('?') ? '&' : '?') + key + '=' + encodeURIComponent(msg) + (hash ? '#' + hash : ''));
+  return redirect(path + (path.includes('?') ? '&' : '?') + key + '=' + encodeURIComponent(msg) + (undoId ? `&undo=${undoId}` : '') + (hash ? '#' + hash : ''));
 };
+/** Audit-Eintrag der letzten Aktion, falls sie sich zurücknehmen lässt (für den Knopf „Rückgängig“ in der Meldung). */
+const undoIdOf = async (bookingId: string) => (await undoInfo(bookingId))?.auditId;
 const backOf = (fd: FormData, fallback = '/admin') => { const b = String(fd.get('back') ?? fallback); return b.startsWith('/admin') ? b : fallback; };
 const str = (fd: FormData, k: string, max = 500) => String(fd.get(k) ?? '').trim().slice(0, max);
 const money = (fd: FormData, k: string) => Math.max(0, Math.round((Number(String(fd.get(k) ?? '0').replace(',', '.')) || 0) * 100) / 100);
@@ -46,7 +48,7 @@ export async function decideAction(fd: FormData) {
   if (!b) go(backOf(fd), 'fehler', 'Die Buchung wurde inzwischen schon bearbeitet.');
   await afterDecision(b!);
   revalidatePath('/admin', 'layout');
-  go(backOf(fd), 'ok', { confirm: `„${b!.title}“ ist bestätigt.`, reject: `„${b!.title}“ wurde abgelehnt.`, cancel: `„${b!.title}“ wurde storniert.` }[action] + (b!.silent ? ' Es wurde keine Mail verschickt.' : ` ${b!.name} wird per Mail informiert.`));
+  go(backOf(fd), 'ok', { confirm: `„${b!.title}“ ist bestätigt.`, reject: `„${b!.title}“ wurde abgelehnt.`, cancel: `„${b!.title}“ wurde storniert.` }[action] + (b!.silent ? ' Es wurde keine Mail verschickt.' : ` ${b!.name} wird per Mail informiert.`), await undoIdOf(id));
 }
 
 export async function cancelSeriesAction(fd: FormData) {
@@ -123,7 +125,7 @@ export async function changeAction(fd: FormData) {
   }
   revalidatePath('/admin', 'layout'); revalidatePath('/');
   const informed = fd.get('notify') === 'on' && res.ok && !res.booking.silent;
-  go(`/admin/buchung/${id}`, 'ok', (moved ? 'Termin verschoben.' : 'Änderungen gespeichert.') + (informed ? ' Der Bucher wurde informiert.' : ''));
+  go(`/admin/buchung/${id}`, 'ok', (moved ? 'Termin verschoben.' : 'Änderungen gespeichert.') + (informed ? ' Der Bucher wurde informiert.' : ''), await undoIdOf(id));
 }
 
 export async function silentAction(fd: FormData) {
@@ -447,4 +449,21 @@ export async function profileAction(fd: FormData) {
   const tags = fd.getAll('tags').map(String).filter((t) => (PROFILE_TAGS as readonly string[]).includes(t));
   await saveProfile(email!, admin.name, String(fd.get('note') ?? '').trim().slice(0, 2000), tags);
   go(`/admin/bucher/${key}`, 'ok', 'Profil gespeichert.');
+}
+
+export async function undoAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  const auditId = str(fd, 'auditId', 20), back = backOf(fd);
+  const notify = fd.get('notify') === 'on' || fd.get('notify') === null && fd.get('fromFlash') === '1';
+  const r = await undo(auditId, admin.name);
+  if (!r.ok) go(back, 'fehler', r.text);
+  const res = r as Extract<typeof r, { ok: true }>;
+  let mailNote = '';
+  if (notify && !res.booking.silent) {
+    const cat = (await getCategories()).find((c) => c.id === res.booking.categoryId);
+    if (res.before.start !== res.booking.start || res.before.end !== res.booking.end) { await mails.changed(res.booking, res.before, cat).catch(() => {}); mailNote = ` ${res.booking.name} wurde informiert.`; }
+    else if (res.booking.status === 'confirmed' && res.before.status !== 'confirmed') { await mails.confirmed(res.booking, cat).catch(() => {}); mailNote = ` ${res.booking.name} bekommt die Bestätigung erneut.`; }
+  }
+  revalidatePath('/admin', 'layout');
+  go(back.startsWith('/admin/buchung/') || back === '/admin/protokoll' ? back : `/admin/buchung/${res.booking.id}`, 'ok', res.text + mailNote);
 }

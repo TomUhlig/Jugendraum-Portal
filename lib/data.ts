@@ -315,9 +315,11 @@ export async function decide(id: string, action: 'confirm' | 'reject' | 'cancel'
   const q = db();
   const next = { confirm: 'confirmed', reject: 'rejected', cancel: 'cancelled' }[action];
   const allowed = action === 'confirm' ? ['requested'] : ['requested', 'confirmed', 'pending_email'];
+  const [cur] = await q`select status from bookings where id = ${id}`;
+  if (!cur || !allowed.includes(cur.status)) return null;
   const [row] = await q`update bookings set status = ${next}, decided_by = ${actor}, decided_at = now(),
-    reject_reason = ${reason ?? null} where id = ${id} and status in ${q(allowed)} returning *`;
-  if (row) { await audit(q, actor, id, action, { reason: reason ?? null }); queueGoogle([toBooking(row)]); }
+    reject_reason = ${reason ?? null} where id = ${id} and status = ${cur.status} returning *`;
+  if (row) { await audit(q, actor, id, action, { reason: reason ?? null, prev: cur.status }); queueGoogle([toBooking(row)]); }
   return row ? toBooking(row) : null;
 }
 
@@ -788,4 +790,44 @@ export async function saveProfile(email: string, actor: string, note: string, ta
 export async function profileTags(email: string): Promise<string[]> {
   const [p] = await db()`select tags from booker_profiles where email = ${email.toLowerCase()}`;
   return (p?.tags as string[]) ?? [];
+}
+
+// ---------- Rückgängig ----------
+const UNDOABLE: Record<string, string> = { cancel: 'Stornierung', reject: 'Ablehnung', confirm: 'Bestätigung', changed: 'Änderung', 'cancelled-by-booker': 'Absage des Buchers' };
+export type UndoInfo = { auditId: string; action: string; label: string; actor: string; at: number };
+/** Letzte Aktion einer Buchung, die sich noch zurücknehmen lässt (höchstens 7 Tage alt). */
+export async function undoInfo(bookingId: string): Promise<UndoInfo | null> {
+  const [a] = await db()`select id, action, actor, created_at from audit_log where booking_id = ${bookingId} order by id desc limit 1`;
+  if (!a || !UNDOABLE[a.action] || Date.now() - +a.created_at > 7 * DAY) return null;
+  return { auditId: String(a.id), action: a.action, label: UNDOABLE[a.action], actor: a.actor, at: +a.created_at };
+}
+/** Nimmt die letzte Aktion einer Buchung zurück, sofern der Termin dafür noch frei ist. */
+export async function undo(auditId: string, actor: string): Promise<{ ok: true; booking: Booking; before: Booking; text: string } | { ok: false; text: string }> {
+  const [a] = await db()`select * from audit_log where id = ${auditId}`;
+  if (!a?.booking_id) return { ok: false, text: 'Eintrag nicht gefunden.' };
+  const info = await undoInfo(a.booking_id);
+  if (!info || info.auditId !== String(a.id)) return { ok: false, text: 'Danach wurde die Buchung schon weiter bearbeitet. Bitte direkt in der Buchung ändern.' };
+  const before = (await getBooking(a.booking_id))!;
+  const d = (a.detail ?? {}) as { prev?: string; from?: { start: number; end: number; categoryId: string; title: string }; to?: { start: number; end: number } };
+  if (a.action === 'changed') {
+    if (!d.from || !d.to || before.start !== d.to.start || before.end !== d.to.end) return { ok: false, text: 'Der Termin wurde inzwischen anders geändert.' };
+    const res = await changeBooking(before.id, actor, { categoryId: d.from.categoryId, title: d.from.title, guests: before.guests, equipment: before.equipment, start: d.from.start, end: d.from.end }, false);
+    if (!res.ok) return { ok: false, text: `Der alte Termin ist nicht mehr frei: ${res.messages.map((m) => m.text).join(' ')}` };
+    await audit(db(), actor, before.id, 'undo', { of: a.action, auditId: String(a.id) });
+    return { ok: true, booking: res.booking, before, text: `Änderung zurückgenommen: wieder ${new Date(d.from.start).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} Uhr.` };
+  }
+  const expected = a.action === 'confirm' ? 'confirmed' : a.action === 'reject' ? 'rejected' : 'cancelled';
+  if (before.status !== expected) return { ok: false, text: 'Der Status hat sich inzwischen geändert.' };
+  const prev = a.action === 'confirm' ? 'requested' : (d.prev ?? (a.action === 'reject' ? 'requested' : 'confirmed'));
+  if (prev === 'confirmed' || prev === 'requested') {
+    const check = await checkExisting({ ...before, status: prev as Status });
+    const blocking = check.messages.filter((m) => m.level === 'block' && !['horizon', 'lead', 'duration'].includes(m.code));
+    if (blocking.length) return { ok: false, text: `Geht nicht mehr: ${blocking.map((m) => m.text).join(' ')}` };
+  }
+  const [row] = await db()`update bookings set status = ${prev}, reject_reason = null where id = ${before.id} and status = ${expected} returning *`;
+  if (!row) return { ok: false, text: 'Der Status hat sich inzwischen geändert.' };
+  await audit(db(), actor, before.id, 'undo', { of: a.action, auditId: String(a.id), status: prev });
+  const booking = toBooking(row);
+  queueGoogle([booking]);
+  return { ok: true, booking, before, text: `${UNDOABLE[a.action]} zurückgenommen: „${booking.title}“ ist wieder ${prev === 'confirmed' ? 'bestätigt' : 'angefragt'}.` };
 }

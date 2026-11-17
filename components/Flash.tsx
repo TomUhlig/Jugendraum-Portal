@@ -1,6 +1,7 @@
 import { FlashMsg } from './FlashMsg';
+import { undoAction } from '@/app/admin/actions';
 export function Flash({ sp }: { sp: Record<string, string | undefined> }) {
-  if (sp.ok) return <FlashMsg kind="ok" text={sp.ok} />;
+  if (sp.ok) return <FlashMsg kind="ok" text={sp.ok} undo={sp.undo && /^\d+$/.test(sp.undo) ? { auditId: sp.undo, action: undoAction } : undefined} />;
   if (sp.fehler) return <FlashMsg kind="bad" text={sp.fehler} />;
   return null;
 }

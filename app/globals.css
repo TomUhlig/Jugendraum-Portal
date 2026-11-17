@@ -929,3 +929,6 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .chip-check input:checked + span { background: var(--brand); border-color: var(--brand); color: #fff }
 .chip-check input:focus-visible + span { outline: 2px solid var(--brand-ink); outline-offset: 2px }
 @media (max-width: 700px) { .booker-row { grid-template-columns: 40px 1fr auto } .bk-dates { display: none } }
+.undo-form { display: inline-block; margin-left: 10px }
+.undo-form .btn { min-height: 28px; padding: 2px 10px; vertical-align: middle }
+.undo-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--warn-bg); border-bottom: 1px solid var(--line); padding-block: 10px }

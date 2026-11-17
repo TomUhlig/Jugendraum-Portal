@@ -11,7 +11,7 @@ const ACTION: Record<string, string> = {
   created: 'Anfrage gestellt', verified: 'E-Mail bestätigt', 'verified+auto-confirmed': 'automatisch eingetragen', 'admin-created': 'eingetragen', confirm: 'bestätigt',
   reject: 'abgelehnt', cancel: 'storniert', 'cancelled-by-booker': 'vom Bucher abgesagt', 'internal-note': 'Notiz geändert', handover: 'Übergabeprotokoll',
   money: 'Kosten geändert', changed: 'Termin geändert', expired: 'verfallen', feedback: 'Rückmeldung', settings: 'Einstellungen geändert',
-  'blackout-added': 'Sperrzeit eingetragen', 'blackout-removed': 'Sperrzeit gelöscht',
+  'blackout-added': 'Sperrzeit eingetragen', 'blackout-removed': 'Sperrzeit gelöscht', undo: 'rückgängig gemacht',
 };
 
 export default async function Protokoll({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
