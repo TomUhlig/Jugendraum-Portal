@@ -62,6 +62,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
             <div className="hero-cta">
               <a className="btn btn-gelb" href="#anfrage">{I.cta}<ArrowRight className="icon" aria-hidden /></a>
               <Link className="btn btn-glass" href="/raum">{I.more}</Link>
+              {lang === 'de' && <Link className="btn btn-glass" href="/jetzt">Heute frei?</Link>}
             </div>
             <ul className="facts">
               <li><Users className="icon" />{I.capacity(initial.settings.capacity)}</li>

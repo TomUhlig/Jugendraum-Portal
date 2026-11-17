@@ -999,3 +999,13 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .mday.school-day { background-image: linear-gradient(to bottom, color-mix(in srgb, var(--gelb) 22%, transparent) 0 3px, transparent 3px) }
 .wgrid .wh .hol-name { font-size: .62rem; color: var(--bad); font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .wgrid .wh .school-name { font-size: .62rem; color: var(--warn); font-weight: 600 }
+/* ---------- Heute frei? ---------- */
+.spontan-status { display: flex; gap: 12px; align-items: center }
+.spontan-status > div { display: grid }
+.spontan-status.free { border-left: 4px solid var(--ok) } .spontan-status.free .icon { color: var(--ok) }
+.spontan-status.busy { border-left: 4px solid var(--bad) } .spontan-status.busy .icon { color: var(--bad) }
+.spontan-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px }
+.spontan-slots button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; color: var(--ink) }
+.spontan-slots button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff }
+.spontan-done { text-align: center; justify-items: center }
+.spontan-done > .icon { width: 40px; height: 40px; color: var(--ok) }

@@ -88,7 +88,7 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
         <div className="card-body stack-sm">
           <CopyText text={`<iframe src="${appUrl()}/einbetten?tage=14" title="Belegung Jugendraum" style="width:100%;max-width:720px;height:560px;border:0" loading="lazy"></iframe>`} />
           <p className="small"><b>Belegungsampel</b> (klein, z. B. für die Startseite des Vereins): <img src="/ampel.svg" alt="Belegungsampel" height={28} style={{ verticalAlign: 'middle' }} /></p>
-          <CopyText text={`<a href="${appUrl()}/"><img src="${appUrl()}/ampel.svg" alt="Belegung Jugendraum" height="36"></a>`} />
+          <CopyText text={`<a href="${appUrl()}/jetzt"><img src="${appUrl()}/ampel.svg" alt="Belegung Jugendraum" height="36"></a>`} />
           <p className="small"><b>Tür-Display:</b> Ein altes Tablet am Raum zeigt <a href="/anzeige" target="_blank" rel="noreferrer">{appUrl().replace(/^https?:\/\//, '')}/anzeige</a> im Vollbild: ob der Raum gerade frei ist, die heutigen Termine und einen QR-Code zum Anfragen. Ohne Namen, aktualisiert sich selbst und hält den Bildschirm an.</p>
           <p className="muted small">Varianten: <code>?tage=7</code> bis <code>?tage=28</code>, <code>&amp;theme=dark</code> für dunkle Seiten, <code>&amp;lang=en</code>. <a href="/einbetten" target="_blank" rel="noreferrer">Vorschau öffnen</a></p>
         </div>
