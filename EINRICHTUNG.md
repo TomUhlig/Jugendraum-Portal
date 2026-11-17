@@ -169,6 +169,10 @@ Damit erscheinen bestätigte Buchungen automatisch in einem Google-Kalender (Än
 
 Termine, bei denen in Google „Anzeigen als: Verfügbar“ eingestellt ist, sperren den Raum nicht. Im öffentlichen Kalender steht für Google-Termine nur „Vereinstermin“, außer du schaltest „Titel öffentlich zeigen“ ein.
 
+## Mehrere Räume
+
+Unter Einstellungen → Räume kannst du weitere Räume anlegen, z. B. das Vereinsheim, jeweils mit eigener Höchstzahl an Personen. Sobald mehr als ein Raum aktiv ist, wählen Buchende zuerst den Raum, und Kalender, Sperrzeiten und Termin eintragen bekommen eine Raumauswahl. Überschneidungen und „eine Feier pro Wochenende“ gelten je Raum. Sperrzeiten können für alle Räume oder einen einzelnen gelten. Für das Tür-Display und das Widget hängst du `?raum=<id>` an, z. B. `/anzeige?raum=vereinsheim`.
+
 ## Wartungsmodus
 
 Wenn du etwas Größeres umbaust: in Vercel `WARTUNG=1` eintragen und neu veröffentlichen. Besucher sehen dann eine freundliche Hinweisseite, die Verwaltung und `/status` funktionieren weiter. Zum Beenden die Variable löschen und neu veröffentlichen.

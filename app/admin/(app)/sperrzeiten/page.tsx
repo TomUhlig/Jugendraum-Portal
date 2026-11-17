@@ -2,7 +2,8 @@ import { CalendarOff } from 'lucide-react';
 import Link from 'next/link';
 import { Flash, PageHead } from '@/components/Flash';
 import { requireAdmin } from '@/lib/auth';
-import { bookingsDuring, getBlackouts, getRecurring } from '@/lib/data';
+import { bookingsDuring, getBlackouts, getRecurring, getRooms } from '@/lib/data';
+import { RoomSelect } from '@/components/RoomSelect';
 import { WEEKDAY_SHORT, blackoutWhen, describeRecurring } from '@/lib/rules';
 import { addDays, berlinYmd, fmtDay, weekdayOf } from '@/lib/time';
 import { addBlackoutAction, addRecurringAction, deleteBlackoutAction, deleteRecurringAction } from '../../actions';
@@ -39,7 +40,7 @@ export default async function Sperrzeiten({ searchParams }: { searchParams: Prom
   const me = await requireAdmin();
   const sp = await searchParams;
   const today = berlinYmd(Date.now());
-  const [list, recurring] = await Promise.all([getBlackouts(undefined, Date.now() - 86400e3), getRecurring()]);
+  const [list, recurring, rooms] = await Promise.all([getBlackouts(undefined, Date.now() - 86400e3), getRecurring(), getRooms()]);
   const tpl = TEMPLATES[sp.vorlage ?? ''];
   const affected = await Promise.all(list.map((b) => bookingsDuring(b.start, b.end, b.scope ?? 'all')));
   const can = me.role !== 'viewer';
@@ -70,6 +71,7 @@ export default async function Sperrzeiten({ searchParams }: { searchParams: Prom
             <div className="grid-2b">
               <div className="stack-sm" role="radiogroup" aria-label="Was wird gesperrt?">
                 <span className="eyebrow">Was wird gesperrt?</span>
+                <RoomSelect rooms={rooms} id="b-room" allLabel="Alle Räume" />
                 <label className="choice"><input type="radio" name="scope" value="all" defaultChecked /><span><b>Alle Anfragen</b><br /><span className="muted small">Der Raum ist komplett zu.</span></span></label>
                 <label className="choice"><input type="radio" name="scope" value="party" /><span><b>Nur Feiern</b><br /><span className="muted small">Besprechungen und Mannschaftsabende bleiben möglich.</span></span></label>
               </div>
@@ -94,7 +96,7 @@ export default async function Sperrzeiten({ searchParams }: { searchParams: Prom
             <li key={r.id} className="between">
               <div className="stack-sm" style={{ gap: 2 }}>
                 <div className="inline"><b>{r.reason}</b><span className={`badge ${r.scope === 'party' ? 'b-warn' : 'b-bad'}`}>{r.scope === 'party' ? 'nur Feiern' : 'alles gesperrt'}</span></div>
-                <span className="muted small">{describeRecurring(r)}{r.validFrom || r.validUntil ? ` · ${r.validFrom ? 'ab ' + fmtDay(Date.parse(r.validFrom + 'T12:00:00Z')) : ''}${r.validFrom && r.validUntil ? ' ' : ''}${r.validUntil ? 'bis ' + fmtDay(Date.parse(r.validUntil + 'T12:00:00Z')) : ''}` : ' · unbefristet'}</span>
+                <span className="muted small">{rooms.length > 1 && <b>{r.roomId ? rooms.find((x) => x.id === r.roomId)?.name : 'Alle Räume'} · </b>}{describeRecurring(r)}{r.validFrom || r.validUntil ? ` · ${r.validFrom ? 'ab ' + fmtDay(Date.parse(r.validFrom + 'T12:00:00Z')) : ''}${r.validFrom && r.validUntil ? ' ' : ''}${r.validUntil ? 'bis ' + fmtDay(Date.parse(r.validUntil + 'T12:00:00Z')) : ''}` : ' · unbefristet'}</span>
               </div>
               {can && <form action={deleteRecurringAction}><input type="hidden" name="id" value={r.id} /><button className="btn btn-sm btn-danger" type="submit">Aufheben</button></form>}
             </li>
@@ -121,6 +123,7 @@ export default async function Sperrzeiten({ searchParams }: { searchParams: Prom
                 </div>
               </div>
               <div className="stack-sm" role="radiogroup" aria-label="Was wird gesperrt?">
+                <RoomSelect rooms={rooms} id="r-room" allLabel="Alle Räume" />
                 <label className="choice"><input type="radio" name="scope" value="all" defaultChecked={tpl?.scope !== 'party'} /><span><b>Alle Anfragen</b></span></label>
                 <label className="choice"><input type="radio" name="scope" value="party" defaultChecked={tpl?.scope === 'party'} /><span><b>Nur Feiern</b></span></label>
               </div>
@@ -144,7 +147,7 @@ export default async function Sperrzeiten({ searchParams }: { searchParams: Prom
               <div className="between">
                 <div className="stack-sm" style={{ gap: 2 }}>
                   <div className="inline"><b>{b.reason}</b><span className={`badge ${b.scope === 'party' ? 'b-warn' : 'b-bad'}`}>{b.scope === 'party' ? 'nur Feiern' : 'alles gesperrt'}</span></div>
-                  <span className="muted small num">{blackoutWhen(b)}</span>
+                  <span className="muted small num">{rooms.length > 1 && <b>{b.roomId ? rooms.find((x) => x.id === b.roomId)?.name : 'Alle Räume'} · </b>}{blackoutWhen(b)}</span>
                 </div>
                 {can && <form action={deleteBlackoutAction}><input type="hidden" name="id" value={b.id} /><button className="btn btn-sm btn-danger" type="submit">Aufheben</button></form>}
               </div>

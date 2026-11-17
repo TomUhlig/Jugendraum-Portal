@@ -5,7 +5,7 @@ import BookingApp from '@/components/BookingApp';
 import { turnstileEnabled, turnstileSiteKey } from '@/lib/antispam';
 import { getLang } from '@/lib/lang';
 import { t } from '@/lib/i18n';
-import { getExtras, getPublicOccupancy, listPhotos, nextFreeEvenings } from '@/lib/data';
+import { getExtras, getPublicOccupancy, getRooms, listPhotos, nextFreeEvenings } from '@/lib/data';
 import { Gallery } from '@/components/Gallery';
 import { addDays, berlinParts, berlinToUtc, berlinYmd, fmtLong, hmRange } from '@/lib/time';
 
@@ -39,8 +39,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     note: ds('n', 500), equipment: Array.isArray(draft.e) ? (draft.e as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 10) : prefill.equipment,
   });
   const month = (prefill.date ?? berlinYmd(Date.now())).slice(0, 8) + '01';
+  const allRooms = await getRooms();
+  const roomParam = allRooms.find((r) => r.id === sp.raum)?.id ?? allRooms[0].id;
   const [initial, extras, photos, free] = await Promise.all([
-    getPublicOccupancy(berlinToUtc(addDays(month, -7), '00:00'), berlinToUtc(addDays(month, 45), '00:00')),
+    getPublicOccupancy(berlinToUtc(addDays(month, -7), '00:00'), berlinToUtc(addDays(month, 45), '00:00'), roomParam),
     getExtras(),
     listPhotos(),
     nextFreeEvenings(5).catch(() => []),

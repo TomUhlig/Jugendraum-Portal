@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
   Admin, MailTextKey, addBlackout, deletePhoto, movePhoto, updatePhoto, addMessage, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
-  undo, undoInfo, PROFILE_TAGS, emailFromBookerKey, saveProfile, confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
+  saveRoom, undo, undoInfo, PROFILE_TAGS, emailFromBookerKey, saveProfile, confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
 } from '@/lib/data';
 import { mailMode, mails, teamMails } from '@/lib/mail';
 import { isValidIban, normalizeIban } from '@/lib/payment';
@@ -89,7 +89,7 @@ export async function createAction(fd: FormData) {
     categoryId, title, note: str(fd, 'note', 500), guests: Math.max(1, Number(fd.get('guests')) || 1),
     equipment: fd.getAll('equipment').map(String), bookerType: fd.get('bookerType') === 'external' ? 'external' : 'member',
     team: str(fd, 'team', 80), name: str(fd, 'name', 80) || admin.name, email: contactEmail || admin.email, phone: str(fd, 'phone', 40),
-    agreedWith: str(fd, 'agreedWith', 40) || admin.name, override: fd.get('override') === 'on', seriesRule: rule, silent,
+    agreedWith: str(fd, 'agreedWith', 40) || admin.name, override: fd.get('override') === 'on', seriesRule: rule, silent, roomId: str(fd, 'roomId', 40) || undefined,
     slots: dates.map((d) => range(d, start, end)),
   });
   if (mailMode === 'confirm' && !silent && res.created[0]) {
@@ -114,7 +114,7 @@ export async function changeAction(fd: FormData) {
   const r = range(date, start, end);
   const res = await changeBooking(id, admin.name, {
     categoryId: str(fd, 'categoryId', 20), title: str(fd, 'title', 80), guests: Math.max(1, Number(fd.get('guests')) || 1),
-    equipment: fd.getAll('equipment').map(String), ...r,
+    equipment: fd.getAll('equipment').map(String), ...r, roomId: str(fd, 'roomId', 40) || undefined,
   }, fd.get('override') === 'on');
   if (!res.ok) go(`/admin/buchung/${id}?bearbeiten=1`, 'fehler', res.messages.map((m) => m.text).join(' '));
   const moved = res.ok && (res.before.start !== res.booking.start || res.before.end !== res.booking.end);
@@ -291,7 +291,7 @@ export async function addBlackoutAction(fd: FormData) {
     end = toTime > fromTime || to > from ? berlinToUtc(to, toTime) : berlinToUtc(addDays(to, 1), toTime);
     if (end <= start) go(back, 'fehler', 'Das Ende muss nach dem Beginn liegen.');
   }
-  await addBlackout(admin.name, start, end, reason, scope);
+  await addBlackout(admin.name, start, end, reason, scope, str(fd, 'roomId', 40) || null);
   revalidatePath('/', 'layout');
   go('/admin/sperrzeiten', 'ok', scope === 'party' ? 'Gesperrt für Feiern. Andere Termine bleiben möglich.' : 'Zeitraum gesperrt. Dort sind keine neuen Anfragen mehr möglich.');
 }
@@ -316,7 +316,7 @@ export async function addRecurringAction(fd: FormData) {
   if (validFrom && validUntil && validUntil < validFrom) go('/admin/sperrzeiten#regelmaessig', 'fehler', '„Gültig bis“ liegt vor „gültig ab“.');
   await addRecurring(admin.name, {
     weekdays, fromTime: hours ? fromTime : null, toTime: hours ? toTime : null, scope: fd.get('scope') === 'party' ? 'party' : 'all', reason,
-    validFrom: isDate(validFrom) ? validFrom : null, validUntil: isDate(validUntil) ? validUntil : null,
+    validFrom: isDate(validFrom) ? validFrom : null, validUntil: isDate(validUntil) ? validUntil : null, roomId: str(fd, 'roomId', 40) || null,
   });
   revalidatePath('/', 'layout');
   go('/admin/sperrzeiten#regelmaessig', 'ok', 'Regelmäßige Sperre gespeichert. Sie gilt ab sofort auf der Buchungsseite.');
@@ -466,4 +466,17 @@ export async function undoAction(fd: FormData) {
   }
   revalidatePath('/admin', 'layout');
   go(back.startsWith('/admin/buchung/') || back === '/admin/protokoll' ? back : `/admin/buchung/${res.booking.id}`, 'ok', res.text + mailNote);
+}
+
+export async function roomsAction(fd: FormData) {
+  const admin = await requireAdmin('admin');
+  const n = Math.min(20, Number(fd.get('count')) || 0);
+  let saved = 0;
+  for (let i = 0; i < n; i++) {
+    const name = str(fd, `r_name_${i}`, 60); if (!name) continue;
+    await saveRoom(admin.name, { id: str(fd, `r_id_${i}`, 40) || undefined, name, capacity: Math.min(500, Math.max(1, Number(fd.get(`r_cap_${i}`)) || 40)), active: fd.get(`r_active_${i}`) === 'on' || i === 0 && !str(fd, `r_id_${i}`, 40), sort: i });
+    saved++;
+  }
+  revalidatePath('/', 'layout');
+  go('/admin/einstellungen#raeume', 'ok', `${saved} ${saved === 1 ? 'Raum' : 'Räume'} gespeichert.`);
 }

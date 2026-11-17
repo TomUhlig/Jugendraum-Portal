@@ -64,16 +64,9 @@ create table if not exists bookings (
 
 -- Harte Garantie 1: keine zwei aktiven Buchungen mit überlappender Kernzeit.
 -- (Die Puffer-Regel "größerer Puffer zählt" prüft die App in einer gesperrten Transaktion.)
-do $$ begin
-  alter table bookings add constraint bookings_no_overlap
-    exclude using gist (tstzrange(starts_at, ends_at) with &&)
-    where (status in ('pending_email', 'requested', 'confirmed'));
-exception when duplicate_object or duplicate_table then null; end $$;
+-- (Ab Version 16 je Raum, siehe unten.)
 
--- Harte Garantie 2: höchstens eine aktive Party pro Wochenende.
-create unique index if not exists bookings_one_party_per_weekend
-  on bookings (party_weekend)
-  where party_weekend is not null and status in ('pending_email', 'requested', 'confirmed');
+-- Harte Garantie 2: höchstens eine aktive Party pro Wochenende (ab Version 16 je Raum, siehe unten).
 
 create index if not exists bookings_starts_at on bookings (starts_at);
 
@@ -320,6 +313,32 @@ create table if not exists booker_profiles (
   updated_at timestamptz not null default now()
 );
 
+-- ---------- Version 16: Mehrere Räume ----------
+create table if not exists rooms (
+  id         text primary key,
+  name       text not null,
+  capacity   int not null default 40,
+  sort       int not null default 0,
+  active     boolean not null default true,
+  created_at timestamptz not null default now()
+);
+insert into rooms (id, name, sort) values ('jugendraum', 'Jugendraum', 0) on conflict (id) do nothing;
+alter table bookings add column if not exists room_id text not null default 'jugendraum' references rooms(id);
+alter table blackouts add column if not exists room_id text references rooms(id) on delete cascade;        -- leer = alle Räume
+alter table recurring_blocks add column if not exists room_id text references rooms(id) on delete cascade; -- leer = alle Räume
+alter table waitlist add column if not exists room_id text not null default 'jugendraum' references rooms(id) on delete cascade;
+-- Keine Überschneidung je Raum, eine Feier pro Wochenende je Raum
+alter table bookings drop constraint if exists bookings_no_overlap;
+do $$ begin
+  alter table bookings add constraint bookings_no_overlap_room
+    exclude using gist (room_id with =, tstzrange(starts_at, ends_at) with &&)
+    where (status in ('pending_email', 'requested', 'confirmed'));
+exception when duplicate_object or duplicate_table then null; end $$;
+drop index if exists bookings_one_party_per_weekend;
+create unique index if not exists bookings_one_party_per_weekend_room
+  on bookings (room_id, party_weekend)
+  where party_weekend is not null and status in ('pending_email', 'requested', 'confirmed');
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -342,5 +361,6 @@ do $$ begin
     execute 'alter table inbound_mail enable row level security';
     execute 'alter table signatures enable row level security';
     execute 'alter table booker_profiles enable row level security';
+    execute 'alter table rooms enable row level security';
   end if;
 end $$;

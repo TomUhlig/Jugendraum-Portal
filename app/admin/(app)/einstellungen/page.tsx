@@ -4,14 +4,14 @@ import { db } from '@/lib/db';
 import { CopyText } from '@/components/CopyText';
 import { Flash, PageHead } from '@/components/Flash';
 import { requireAdmin } from '@/lib/auth';
-import { getCategories, getExtras, getSettings, operatorComplete } from '@/lib/data';
+import { getCategories, getExtras, getRooms, getSettings, operatorComplete } from '@/lib/data';
 import { DEFAULT_TEXTS, TEXT_LABELS, mailFrom, mailMode } from '@/lib/mail';
 import { formatIban } from '@/lib/payment';
 import { stripeEnabled } from '@/lib/stripe';
 import { appUrl } from '@/lib/url';
 import type { MailTextKey } from '@/lib/data';
 import { calendarId, googleConfigured, googleSettings, serviceEmail } from '@/lib/gcal';
-import { templatesAction, inboxAction, googleResyncAction, googleSettingsAction, googleTestAction, offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
+import { roomsAction, templatesAction, inboxAction, googleResyncAction, googleSettingsAction, googleTestAction, offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
 
 export const metadata = { title: 'Einstellungen' };
 
@@ -20,7 +20,7 @@ const de = (n: number) => n.toString().replace('.', ',');
 export default async function Einstellungen({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin();
   const sp = await searchParams;
-  const [cats, s, x, gs] = await Promise.all([getCategories(), getSettings(), getExtras(), googleSettings()]);
+  const [cats, s, x, gs, allRooms] = await Promise.all([getCategories(), getSettings(), getExtras(), googleSettings(), getRooms(undefined, true)]);
   const gOn = googleConfigured();
   const imap = imapConfig();
   const [inboxRow] = await db()`select value from settings where key = 'inbox'`;
@@ -108,6 +108,23 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
           <span className="muted small">Hinweis: Das ist keine Rechtsberatung. Lass die Angaben im Zweifel vom Vorstand prüfen.</span>
         </fieldset>
         {!ro && <div className="card-foot"><button className="btn btn-primary" type="submit">Speichern</button></div>}
+      </form>
+
+      <form action={roomsAction} className="card" id="raeume">
+        <div className="card-head"><div><h2>Räume</h2><p>Mit mehr als einem aktiven Raum wählen Buchende zuerst den Raum. Belegung, Puffer und „eine Feier pro Wochenende“ gelten je Raum.</p></div></div>
+        <div className="card-body stack-sm">
+          {[...allRooms, { id: '', name: '', capacity: 30, sort: 99, active: true }].map((r, i) => (
+            <fieldset key={r.id || 'neu'} className="room-row" disabled={ro}>
+              <input type="hidden" name={`r_id_${i}`} value={r.id} />
+              <input name={`r_name_${i}`} defaultValue={r.name} placeholder={r.id ? '' : 'Neuer Raum, z. B. Vereinsheim'} aria-label="Name" maxLength={60} />
+              <label className="inline small">bis <input name={`r_cap_${i}`} type="number" min={1} max={500} defaultValue={r.capacity} style={{ width: 80 }} aria-label="Personen" /> Pers.</label>
+              <label className="check-inline small"><input type="checkbox" name={`r_active_${i}`} defaultChecked={r.active} /> aktiv</label>
+            </fieldset>
+          ))}
+          <input type="hidden" name="count" value={allRooms.length + 1} />
+          <span className="muted small">Ein Raum lässt sich nicht löschen, solange es Buchungen gibt. Zum Ausblenden „aktiv“ abwählen.</span>
+        </div>
+        <div className="card-foot"><button className="btn btn-primary" type="submit" disabled={ro}>Räume speichern</button></div>
       </form>
 
       <form action={settingsAction} className="card" id="regeln">

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createBooking, createSeriesRequest, getCategories } from '@/lib/data';
+import { createBooking, createSeriesRequest, getCategories, getRooms } from '@/lib/data';
 import { describeSeries, seriesDates } from '@/lib/series';
 import { mails } from '@/lib/mail';
 import { clientIp, rateLimited } from '@/lib/ratelimit';
@@ -29,6 +29,7 @@ const schema = z.object({
   elapsed: z.coerce.number().optional(),
   turnstile: z.string().max(4000).optional(),
   lang: z.enum(['de', 'en', 'tr']).default('de'),
+  roomId: z.string().max(40).optional(),
   alternatives: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), start: z.string().regex(/^\d{2}:\d{2}$/), end: z.string().regex(/^\d{2}:\d{2}$/) })).max(2).default([]),
   repeat: z.object({ freq: z.enum(['weekly', 'biweekly']), count: z.coerce.number().int().min(2).max(12) }).optional(), // Honeypot: Menschen lassen das Feld leer
 }).refine((v) => v.bookerType === 'external' || v.team.length > 0, { path: ['team'], message: 'Mannschaft/Abteilung fehlt' });
@@ -51,13 +52,15 @@ export async function POST(req: Request) {
   if (end <= start) end = berlinToUtc(addDays(v.date, 1), v.end);
 
   const cat = (await getCategories()).find((c) => c.id === v.categoryId);
+  const rooms = await getRooms();
+  const roomId = rooms.find((r) => r.id === v.roomId)?.id ?? rooms[0].id;
   if (v.repeat && cat && !cat.isParty) {
     // Serie: gleiche Uhrzeit an jedem Termin
     const days = seriesDates(v.date, v.repeat.freq, { count: v.repeat.count });
     const len = end - start;
     const slots = days.map((d) => { const s = berlinToUtc(d, v.start); return { start: s, end: s + len }; });
     const rule = describeSeries(v.date, v.repeat.freq, days[0], days[days.length - 1], days.length);
-    const res = await createSeriesRequest({ ...v, start, end, alternatives: [] }, slots, rule);
+    const res = await createSeriesRequest({ ...v, start, end, alternatives: [], roomId }, slots, rule);
     if (!res.ok) return NextResponse.json({ error: L.notFree, check: res.check }, { status: 409 });
     await mails.verify(res.booking, cat, res.verifyToken, { dates: res.dates, skipped: res.skipped });
     return NextResponse.json({ number: res.booking.number, count: res.dates.length, skipped: res.skipped }, { status: 201 });
@@ -67,7 +70,7 @@ export async function POST(req: Request) {
     const s = berlinToUtc(a.date, a.start); let e = berlinToUtc(a.date, a.end); if (e <= s) e = berlinToUtc(addDays(a.date, 1), a.end); return { start: s, end: e };
   };
   const alternatives = v.alternatives.map(toSlot).filter((a) => a.start !== start);
-  const res = await createBooking({ ...v, start, end, alternatives });
+  const res = await createBooking({ ...v, start, end, alternatives, roomId });
   if (!res.ok) return NextResponse.json({ error: L.notFree, check: res.check }, { status: 409 });
   await mails.verify(res.booking, cat, res.verifyToken);
   return NextResponse.json({ number: res.booking.number }, { status: 201 });

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { addWaitlist, getCategories } from '@/lib/data';
+import { addWaitlist, getCategories, getRooms } from '@/lib/data';
 import { bookerMails } from '@/lib/mail';
 import { clientIp, rateLimited } from '@/lib/ratelimit';
 import { checkHuman } from '@/lib/antispam';
@@ -8,7 +8,7 @@ import { isLang, t } from '@/lib/i18n';
 import { addDays, berlinToUtc } from '@/lib/time';
 
 const schema = z.object({
-  categoryId: z.string().min(1), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  categoryId: z.string().min(1), roomId: z.string().max(40).optional(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   start: z.string().regex(/^\d{2}:\d{2}$/), end: z.string().regex(/^\d{2}:\d{2}$/),
   name: z.string().trim().min(2).max(80), email: z.string().trim().email().max(120),
   website: z.string().max(0).optional(),
@@ -31,7 +31,8 @@ export async function POST(req: Request) {
   const start = berlinToUtc(v.date, v.start);
   const end = v.end > v.start ? berlinToUtc(v.date, v.end) : berlinToUtc(addDays(v.date, 1), v.end);
   if (start < Date.now()) return NextResponse.json({ error: L.past }, { status: 400 });
-  const w = await addWaitlist({ categoryId: v.categoryId, start, end, name: v.name, email: v.email, lang: v.lang });
+  const rooms = await getRooms();
+  const w = await addWaitlist({ categoryId: v.categoryId, start, end, name: v.name, email: v.email, lang: v.lang, roomId: rooms.find((r) => r.id === v.roomId)?.id ?? rooms[0].id });
   await bookerMails.waitlistJoined(w);
   return NextResponse.json({ ok: true }, { status: 201 });
 }

@@ -1,6 +1,7 @@
 import { Flash, PageHead } from '@/components/Flash';
 import { requireAdmin } from '@/lib/auth';
-import { getCategories, getExtras } from '@/lib/data';
+import { getCategories, getExtras, getRooms } from '@/lib/data';
+import { RoomSelect } from '@/components/RoomSelect';
 import { addDays, berlinYmd } from '@/lib/time';
 import { createAction } from '../../actions';
 
@@ -9,7 +10,7 @@ export const metadata = { title: 'Termin eintragen' };
 export default async function Neu({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin('manager');
   const sp = await searchParams;
-  const [cats, extras] = await Promise.all([getCategories(), getExtras()]);
+  const [cats, extras, rooms] = await Promise.all([getCategories(), getExtras(), getRooms()]);
   const tomorrow = addDays(berlinYmd(Date.now()), 1);
   return (
     <>
@@ -21,6 +22,7 @@ export default async function Neu({ searchParams }: { searchParams: Promise<Reco
             <div className="card-head"><h2>Termin</h2></div>
             <div className="card-body stack">
               <div className="row">
+                <RoomSelect rooms={rooms} value={sp.raum} id="n-room" />
                 <div className="field"><label htmlFor="n-cat" className="req">Art</label><select id="n-cat" name="categoryId" defaultValue={sp.art ?? 'meet'}>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                 <div className="field span-2"><label htmlFor="n-title" className="req">Titel</label><input id="n-title" name="title" type="text" required maxLength={80} placeholder="z. B. Vorstandssitzung" /></div>
               </div>

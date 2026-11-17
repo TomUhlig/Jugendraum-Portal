@@ -7,6 +7,7 @@ import {
   ACTIVE_STATUSES, Blackout, Category, CheckResult, DEFAULT_SETTINGS, Message, RecurringBlock, Settings, Slot, checkBooking, expandRecurring, partyWeekendOf,
 } from './rules';
 import { DAY } from './time';
+import { rememberRooms } from './room-cache';
 import { DEFAULT_TEMPLATES, type ReplyTemplate } from './templates';
 import { isLang, type Lang } from './i18n';
 import { DEFAULT_PAYMENT, type PaymentSettings } from './payment';
@@ -17,7 +18,7 @@ export type Booking = {
   start: number; end: number; guests: number; bookerType: 'member' | 'external'; team: string;
   name: string; email: string; phone: string; agreedWith: string; manageToken: string; equipment: string[];
   rejectReason: string | null; internalNote: string; decidedBy: string | null; createdAt: number;
-  seriesId: string | null; createdBy: string | null; silent: boolean; lang: Lang; alternatives: { start: number; end: number }[];
+  seriesId: string | null; createdBy: string | null; silent: boolean; lang: Lang; alternatives: { start: number; end: number }[]; roomId: string;
   rent: number; deposit: number; rentPaid: boolean; depositPaid: boolean; depositReturned: boolean; depositWithheld: number;
   keyHandedOut: boolean; handoverAt: number | null; handoverBy: string | null; meterStart: number | null;
   returnAt: number | null; returnBy: string | null; meterEnd: number | null; conditionOk: boolean | null; damageNote: string;
@@ -34,7 +35,7 @@ export const toBooking = (r: Row): Booking => ({
   name: r.name as string, email: r.email as string, phone: r.phone as string, agreedWith: r.agreed_with as string,
   manageToken: r.manage_token as string, equipment: (r.equipment as string[]) ?? [], rejectReason: (r.reject_reason as string) ?? null,
   internalNote: r.internal_note as string, decidedBy: (r.decided_by as string) ?? null, createdAt: +(r.created_at as Date),
-  seriesId: (r.series_id as string) ?? null, createdBy: (r.created_by as string) ?? null, silent: !!r.silent, lang: isLang(r.lang) ? r.lang : 'de', alternatives: Array.isArray(r.alternatives) ? (r.alternatives as { start: number; end: number }[]) : [],
+  seriesId: (r.series_id as string) ?? null, createdBy: (r.created_by as string) ?? null, silent: !!r.silent, lang: isLang(r.lang) ? r.lang : 'de', alternatives: Array.isArray(r.alternatives) ? (r.alternatives as { start: number; end: number }[]) : [], roomId: (r.room_id as string) ?? 'jugendraum',
   rent: num(r.rent_eur), deposit: num(r.deposit_eur), rentPaid: !!r.rent_paid, depositPaid: !!r.deposit_paid, depositReturned: !!r.deposit_returned, depositWithheld: num(r.deposit_withheld_eur),
   keyHandedOut: !!r.key_handed_out, handoverAt: ts(r.handover_at), handoverBy: (r.handover_by as string) ?? null, meterStart: numOrNull(r.meter_start),
   returnAt: ts(r.return_at), returnBy: (r.return_by as string) ?? null, meterEnd: numOrNull(r.meter_end),
@@ -92,45 +93,66 @@ export function feesFor(x: Extras, bookerType: 'member' | 'external', isParty: b
   return isParty ? x.feesMemberParty : { rent: 0, deposit: 0 };
 }
 
-async function getSlots(q: Q, from: number, to: number): Promise<Slot[]> {
-  const rows = await q`select id, category_id, starts_at, ends_at, status from bookings
-    where status in ${q(ACTIVE_STATUSES)} and ends_at > ${new Date(from)} and starts_at < ${new Date(to)}`;
-  return rows.map((r) => ({ id: r.id, categoryId: r.category_id, start: +r.starts_at, end: +r.ends_at, status: r.status }));
+async function getSlots(q: Q, from: number, to: number, roomId?: string): Promise<Slot[]> {
+  const rows = await q`select id, category_id, starts_at, ends_at, status, room_id from bookings
+    where status in ${q(ACTIVE_STATUSES)} and ends_at > ${new Date(from)} and starts_at < ${new Date(to)} ${roomId ? q`and room_id = ${roomId}` : q``}`;
+  return rows.map((r) => ({ id: r.id, categoryId: r.category_id, start: +r.starts_at, end: +r.ends_at, status: r.status, roomId: r.room_id }));
 }
 export async function getBlackouts(q: Q = db(), from = 0, to = Date.UTC(2100, 0, 1)): Promise<Blackout[]> {
   const rows = await q`select * from blackouts where ends_at > ${new Date(from)} and starts_at < ${new Date(to)} order by starts_at`;
-  return rows.map((r) => ({ id: r.id, start: +r.starts_at, end: +r.ends_at, reason: r.reason, scope: r.scope }));
+  return rows.map((r) => ({ id: r.id, start: +r.starts_at, end: +r.ends_at, reason: r.reason, scope: r.scope, roomId: r.room_id ?? null }));
 }
 
 // ---------- Regelmäßige Sperren ----------
 const ymdOrNull = (d: unknown) => (d ? (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10)) : null);
 export async function getRecurring(q: Q = db()): Promise<RecurringBlock[]> {
-  const rows = await q`select id, weekdays, from_time, to_time, scope, reason, valid_from::text as valid_from, valid_until::text as valid_until from recurring_blocks order by created_at`;
-  return rows.map((r) => ({ id: r.id, weekdays: r.weekdays, fromTime: r.from_time, toTime: r.to_time, scope: r.scope, reason: r.reason, validFrom: ymdOrNull(r.valid_from), validUntil: ymdOrNull(r.valid_until) }));
+  const rows = await q`select id, weekdays, from_time, to_time, scope, reason, valid_from::text as valid_from, valid_until::text as valid_until, room_id from recurring_blocks order by created_at`;
+  return rows.map((r) => ({ id: r.id, weekdays: r.weekdays, fromTime: r.from_time, toTime: r.to_time, scope: r.scope, reason: r.reason, validFrom: ymdOrNull(r.valid_from), validUntil: ymdOrNull(r.valid_until), roomId: r.room_id ?? null }));
 }
 export async function addRecurring(actor: string, r: Omit<RecurringBlock, 'id'>) {
-  await db()`insert into recurring_blocks (weekdays, from_time, to_time, scope, reason, valid_from, valid_until, created_by)
-    values (${r.weekdays}, ${r.fromTime}, ${r.toTime}, ${r.scope}, ${r.reason}, ${r.validFrom}, ${r.validUntil}, ${actor})`;
+  await db()`insert into recurring_blocks (weekdays, from_time, to_time, scope, reason, valid_from, valid_until, created_by, room_id)
+    values (${r.weekdays}, ${r.fromTime}, ${r.toTime}, ${r.scope}, ${r.reason}, ${r.validFrom}, ${r.validUntil}, ${actor}, ${r.roomId ?? null})`;
   await audit(db(), actor, null, 'recurring-added', r);
 }
 export async function deleteRecurring(actor: string, id: string) {
   await db()`delete from recurring_blocks where id = ${id}`;
   await audit(db(), actor, null, 'recurring-removed', { id });
 }
-/** Alle Sperren im Zeitraum: einzelne Sperrzeiten plus aufgelöste regelmäßige Sperren. */
-export async function getAllBlocks(q: Q = db(), from: number, to: number): Promise<Blackout[]> {
+/** Alle Sperren im Zeitraum: einzelne Sperrzeiten plus aufgelöste regelmäßige Sperren. Mit roomId nur die für diesen Raum geltenden. */
+export async function getAllBlocks(q: Q = db(), from: number, to: number, roomId?: string): Promise<Blackout[]> {
   const [single, rec, google] = await Promise.all([getBlackouts(q, from, to), getRecurring(q), googleBusy(from, to)]);
-  return [...single, ...expandRecurring(rec, from, to), ...google].sort((a, b) => a.start - b.start);
+  const all = [...single, ...expandRecurring(rec, from, to), ...google];
+  return (roomId ? all.filter((b) => !b.roomId || b.roomId === roomId) : all).sort((a, b) => a.start - b.start);
+}
+
+// ---------- Räume ----------
+export type Room = { id: string; name: string; capacity: number; sort: number; active: boolean };
+export const DEFAULT_ROOM = 'jugendraum';
+export async function getRooms(q: Q = db(), all = false): Promise<Room[]> {
+  try {
+    const rows = await q`select id, name, capacity, sort, active from rooms ${all ? q`` : q`where active`} order by sort, name`;
+    if (!all) rememberRooms(rows as unknown as Room[]);
+    return rows.length ? (rows as unknown as Room[]) : [{ id: DEFAULT_ROOM, name: 'Jugendraum', capacity: 40, sort: 0, active: true }];
+  } catch { return [{ id: DEFAULT_ROOM, name: 'Jugendraum', capacity: 40, sort: 0, active: true }]; }
+}
+/** Einstellungen mit der Personenzahl des Raums (Regeln prüfen je Raum). */
+const withRoom = (s: Settings, rooms: Room[], roomId: string): Settings => ({ ...s, capacity: rooms.find((r) => r.id === roomId)?.capacity ?? s.capacity });
+export async function saveRoom(actor: string, r: { id?: string; name: string; capacity: number; active: boolean; sort: number }) {
+  const id = r.id || r.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'raum';
+  await db()`insert into rooms (id, name, capacity, active, sort) values (${id}, ${r.name}, ${r.capacity}, ${r.active}, ${r.sort})
+    on conflict (id) do update set name = excluded.name, capacity = excluded.capacity, active = excluded.active, sort = excluded.sort`;
+  await audit(db(), actor, null, 'room-saved', r);
+  return id;
 }
 
 /** Öffentliche, anonyme Belegung für den Kalender (ohne Namen, Notizen, Kontaktdaten). */
-export async function getPublicOccupancy(from: number, to: number) {
+export async function getPublicOccupancy(from: number, to: number, roomId = DEFAULT_ROOM) {
   const q = db();
-  const [categories, settings, slots, blackouts, extras] = await Promise.all([
-    getCategories(q), getSettings(q), getSlots(q, from - 7 * DAY, to + 7 * DAY), getAllBlocks(q, from, to), getExtras(q),
+  const [categories, settings, slots, blackouts, extras, rooms] = await Promise.all([
+    getCategories(q), getSettings(q), getSlots(q, from - 7 * DAY, to + 7 * DAY, roomId), getAllBlocks(q, from, to, roomId), getExtras(q), getRooms(q),
   ]);
   return {
-    categories, settings, blackouts, slots: slots.map((s) => ({ ...s, id: s.id.slice(0, 8) })),
+    categories, settings: withRoom(settings, rooms, roomId), blackouts, slots: slots.map((s) => ({ ...s, id: s.id.slice(0, 8) })), rooms, roomId,
     equipment: extras.equipment, feesExternal: extras.feesExternal, feesMemberParty: extras.feesMemberParty,
   };
 }
@@ -140,20 +162,21 @@ export type NewBooking = {
   categoryId: string; title: string; note: string; start: number; end: number; guests: number; equipment: string[];
   bookerType: 'member' | 'external'; team: string; name: string; email: string; phone: string; agreedWith: string; lang?: Lang;
   alternatives?: { start: number; end: number }[];
+  roomId?: string;
 };
 export type CreateResult = { ok: true; booking: Booking; verifyToken: string } | { ok: false; check: CheckResult };
 
-async function lockedContext(q: postgres.TransactionSql, start: number, end: number) {
+async function lockedContext(q: postgres.TransactionSql, start: number, end: number, roomId = DEFAULT_ROOM) {
   await q`select pg_advisory_xact_lock(4242)`; // Buchungen nacheinander prüfen: keine Doppelbuchung bei gleichzeitigen Klicks
-  const [categories, settings, extras] = await Promise.all([getCategories(q), getSettings(q), getExtras(q)]);
-  const slots = await getSlots(q, start - 10 * DAY, end + 10 * DAY);
-  const blackouts = await getAllBlocks(q, start - DAY, end + DAY);
-  return { categories, settings, extras, slots, blackouts };
+  const [categories, base, extras, rooms] = await Promise.all([getCategories(q), getSettings(q), getExtras(q), getRooms(q)]);
+  const slots = await getSlots(q, start - 10 * DAY, end + 10 * DAY, roomId);
+  const blackouts = await getAllBlocks(q, start - DAY, end + DAY, roomId);
+  return { categories, settings: withRoom(base, rooms, roomId), extras, slots, blackouts };
 }
 
 export async function createBooking(b: NewBooking): Promise<CreateResult> {
   return db().begin(async (q) => {
-    const ctx = await lockedContext(q, b.start, b.end);
+    const ctx = await lockedContext(q, b.start, b.end, b.roomId);
     const check = checkBooking(b, { ...ctx, now: Date.now(), lang: b.lang });
     if (check.level === 'block') return { ok: false as const, check };
     const cat = ctx.categories.find((c) => c.id === b.categoryId)!;
@@ -164,7 +187,7 @@ export async function createBooking(b: NewBooking): Promise<CreateResult> {
       category_id: b.categoryId, title: b.title, note: b.note, starts_at: new Date(b.start), ends_at: new Date(b.end),
       guests: b.guests, booker_type: b.bookerType, team: b.team, name: b.name, email: b.email.toLowerCase(), phone: b.phone,
       agreed_with: b.agreedWith, party_weekend: partyWeekendOf(b.start, cat, ctx.settings), manage_token: token(), verify_token: verifyToken,
-      equipment, rent_eur: fees.rent, deposit_eur: fees.deposit, lang: b.lang ?? 'de',
+      equipment, rent_eur: fees.rent, deposit_eur: fees.deposit, lang: b.lang ?? 'de', room_id: b.roomId ?? DEFAULT_ROOM,
       // Ausweichtermine nur speichern, wenn sie (jetzt) frei sind; sie blockieren den Kalender nicht
       alternatives: q.json((b.alternatives ?? []).filter((a) => checkBooking({ ...b, ...a }, { ...ctx, now: Date.now(), lang: b.lang }).level !== 'block').slice(0, 2)),
     })} returning *`;
@@ -177,7 +200,7 @@ export async function createBooking(b: NewBooking): Promise<CreateResult> {
 export type SeriesCreateResult = { ok: true; booking: Booking; verifyToken: string; dates: { start: number; end: number }[]; skipped: number[] } | { ok: false; check: CheckResult };
 export async function createSeriesRequest(b: NewBooking, slots: { start: number; end: number }[], rule: string): Promise<SeriesCreateResult> {
   return db().begin(async (q) => {
-    const ctx = await lockedContext(q, slots[0].start, slots[slots.length - 1].end);
+    const ctx = await lockedContext(q, slots[0].start, slots[slots.length - 1].end, b.roomId);
     const cat = ctx.categories.find((c) => c.id === b.categoryId)!;
     const fees = feesFor(ctx.extras, b.bookerType, cat.isParty);
     const equipment = b.equipment.filter((e) => ctx.extras.equipment.includes(e));
@@ -194,7 +217,7 @@ export async function createSeriesRequest(b: NewBooking, slots: { start: number;
         category_id: b.categoryId, title: b.title, note: b.note, starts_at: new Date(sl.start), ends_at: new Date(sl.end),
         guests: b.guests, booker_type: b.bookerType, team: b.team, name: b.name, email: b.email.toLowerCase(), phone: b.phone,
         agreed_with: b.agreedWith, party_weekend: null, manage_token: token(), verify_token: vt, series_id: seriesId,
-        equipment, rent_eur: fees.rent, deposit_eur: fees.deposit, lang: b.lang ?? 'de',
+        equipment, rent_eur: fees.rent, deposit_eur: fees.deposit, lang: b.lang ?? 'de', room_id: b.roomId ?? DEFAULT_ROOM,
       })} returning *`;
       if (!firstRow) { firstRow = row; verifyToken = vt; }
       dates.push(sl);
@@ -254,7 +277,7 @@ export type AdminCreateResult = { created: Booking[]; skipped: { start: number; 
 export async function adminCreate(actor: string, b: AdminNew): Promise<AdminCreateResult> {
   const res = await db().begin(async (q) => {
     const first = b.slots[0], last = b.slots[b.slots.length - 1];
-    const ctx = await lockedContext(q, first.start, last.end);
+    const ctx = await lockedContext(q, first.start, last.end, b.roomId);
     const cat = ctx.categories.find((c) => c.id === b.categoryId)!;
     let seriesId: string | null = null;
     if (b.seriesRule && b.slots.length > 1) [{ id: seriesId }] = await q`insert into series (rule, created_by) values (${b.seriesRule}, ${actor}) returning id`;
@@ -271,7 +294,7 @@ export async function adminCreate(actor: string, b: AdminNew): Promise<AdminCrea
         guests: b.guests, booker_type: b.bookerType, team: b.team, name: b.name, email: b.email.toLowerCase(), phone: b.phone,
         agreed_with: b.agreedWith, party_weekend: overridden.includes('party-weekend') ? null : pw, manage_token: token(),
         equipment: b.equipment, created_by: actor, decided_by: actor, decided_at: new Date(), verified_at: new Date(), series_id: seriesId,
-        rent_eur: fees.rent, deposit_eur: fees.deposit, silent: b.silent,
+        rent_eur: fees.rent, deposit_eur: fees.deposit, silent: b.silent, room_id: b.roomId ?? DEFAULT_ROOM,
       })} returning *`;
       await audit(q, actor, row.id, 'admin-created', overridden.length ? { overridden } : {});
       created.push(toBooking(row));
@@ -284,21 +307,22 @@ export async function adminCreate(actor: string, b: AdminNew): Promise<AdminCrea
 }
 
 // ---------- Admin: Termin ändern / verschieben ----------
-export type Change = { categoryId: string; title: string; start: number; end: number; guests: number; equipment: string[] };
+export type Change = { categoryId: string; title: string; start: number; end: number; guests: number; equipment: string[]; roomId?: string };
 export async function changeBooking(id: string, actor: string, c: Change, override: boolean):
   Promise<{ ok: true; booking: Booking; before: Booking } | { ok: false; messages: Message[] }> {
   const res = await db().begin(async (q) => {
     const [cur] = await q`select * from bookings where id = ${id} for update`;
     if (!cur) return { ok: false as const, messages: [{ level: 'block' as const, code: 'missing', text: 'Buchung nicht gefunden.' }] };
     const before = toBooking(cur);
-    const ctx = await lockedContext(q, c.start, c.end);
+    const roomId = c.roomId ?? (cur.room_id as string);
+    const ctx = await lockedContext(q, c.start, c.end, roomId);
     const check = checkBooking({ ...c, guests: c.guests }, { ...ctx, now: Date.now(), ignoreId: id, asAdmin: true });
     const blocking = check.messages.filter((m) => m.level === 'block' && !(override && OVERRIDABLE.has(m.code)));
     if (blocking.length) return { ok: false as const, messages: blocking };
     const cat = ctx.categories.find((x) => x.id === c.categoryId)!;
     const overridden = check.messages.some((m) => m.code === 'party-weekend');
     const [row] = await q`update bookings set category_id = ${c.categoryId}, title = ${c.title}, starts_at = ${new Date(c.start)}, ends_at = ${new Date(c.end)},
-      guests = ${c.guests}, equipment = ${c.equipment}, party_weekend = ${overridden ? null : partyWeekendOf(c.start, cat, ctx.settings)},
+      guests = ${c.guests}, equipment = ${c.equipment}, party_weekend = ${overridden ? null : partyWeekendOf(c.start, cat, ctx.settings)}, room_id = ${roomId},
       reminded_3d_at = null, reminded_1d_at = null where id = ${id} returning *`;
     await audit(q, actor, id, 'changed', {
       from: { start: before.start, end: before.end, categoryId: before.categoryId, title: before.title },
@@ -380,7 +404,7 @@ export async function updateMoney(id: string, actor: string, m: Money) {
 }
 
 // ---------- Listen, Suche, Export ----------
-export type ListFilter = { status?: Status[]; from?: number; to?: number; limit?: number; categoryId?: string; search?: string; bookerType?: string };
+export type ListFilter = { status?: Status[]; from?: number; to?: number; limit?: number; categoryId?: string; search?: string; bookerType?: string; roomId?: string };
 export async function listBookings(f: ListFilter = {}): Promise<Booking[]> {
   const q = db();
   const like = f.search ? `%${f.search.replace(/[%_]/g, '')}%` : null;
@@ -390,6 +414,7 @@ export async function listBookings(f: ListFilter = {}): Promise<Booking[]> {
     ${f.to !== undefined ? q`and starts_at < ${new Date(f.to)}` : q``}
     ${f.categoryId ? q`and category_id = ${f.categoryId}` : q``}
     ${f.bookerType ? q`and booker_type = ${f.bookerType}` : q``}
+    ${f.roomId ? q`and room_id = ${f.roomId}` : q``}
     ${like ? q`and (title ilike ${like} or name ilike ${like} or team ilike ${like} or number ilike ${like} or email ilike ${like})` : q``}
     order by starts_at limit ${f.limit ?? 500}`;
   return rows.map(toBooking);
@@ -414,10 +439,10 @@ export async function countRecentBookerMessages(bookingId: string): Promise<numb
 }
 export async function checkExisting(b: Booking): Promise<CheckResult> {
   const q = db();
-  const [categories, settings, slots, blackouts] = await Promise.all([
-    getCategories(q), getSettings(q), getSlots(q, b.start - 10 * DAY, b.end + 10 * DAY), getAllBlocks(q, b.start - DAY, b.end + DAY),
+  const [categories, base, slots, blackouts, rooms] = await Promise.all([
+    getCategories(q), getSettings(q), getSlots(q, b.start - 10 * DAY, b.end + 10 * DAY, b.roomId), getAllBlocks(q, b.start - DAY, b.end + DAY, b.roomId), getRooms(q),
   ]);
-  const r = checkBooking(b, { categories, settings, slots, blackouts, now: Date.now(), ignoreId: b.id, asAdmin: true });
+  const r = checkBooking(b, { categories, settings: withRoom(base, rooms, b.roomId), slots, blackouts, now: Date.now(), ignoreId: b.id, asAdmin: true });
   // Für bestehende Buchungen ist „liegt in der Vergangenheit“ kein Konflikt.
   const messages = r.messages.filter((m) => m.code !== 'past');
   return { ...r, messages, level: messages.some((m) => m.level === 'block') ? 'block' : messages.length ? 'warn' : 'ok' };
@@ -441,8 +466,8 @@ export async function saveSettings(actor: string, settings: Record<string, unkno
     await audit(q, actor, null, 'settings', { keys: Object.keys(settings), cats: cats.length });
   });
 }
-export async function addBlackout(actor: string, start: number, end: number, reason: string, scope: 'all' | 'party' = 'all') {
-  await db()`insert into blackouts (starts_at, ends_at, reason, created_by, scope) values (${new Date(start)}, ${new Date(end)}, ${reason}, ${actor}, ${scope})`;
+export async function addBlackout(actor: string, start: number, end: number, reason: string, scope: 'all' | 'party' = 'all', roomId: string | null = null) {
+  await db()`insert into blackouts (starts_at, ends_at, reason, created_by, scope, room_id) values (${new Date(start)}, ${new Date(end)}, ${reason}, ${actor}, ${scope}, ${roomId})`;
   await audit(db(), actor, null, 'blackout-added', { start, end, reason, scope });
 }
 /** Aktive Buchungen, die in einer Sperrzeit liegen (sie bleiben gültig, das Team soll sie aber sehen). */
@@ -515,16 +540,16 @@ export async function notifyRecipients(): Promise<string[]> {
 }
 
 // ---------- Warteliste ----------
-export type WaitEntry = { id: string; token: string; categoryId: string; start: number; end: number; name: string; email: string; notifiedAt: number | null; createdAt: number; lang: Lang };
+export type WaitEntry = { id: string; token: string; categoryId: string; start: number; end: number; name: string; email: string; notifiedAt: number | null; createdAt: number; lang: Lang; roomId: string };
 const toWait = (r: Row): WaitEntry => ({ id: r.id as string, token: r.token as string, categoryId: r.category_id as string, start: +(r.starts_at as Date), end: +(r.ends_at as Date),
-  name: r.name as string, email: r.email as string, notifiedAt: ts(r.notified_at), createdAt: +(r.created_at as Date), lang: isLang(r.lang) ? r.lang : 'de' });
-export async function addWaitlist(e: { categoryId: string; start: number; end: number; name: string; email: string; lang?: Lang }): Promise<WaitEntry> {
+  name: r.name as string, email: r.email as string, notifiedAt: ts(r.notified_at), createdAt: +(r.created_at as Date), lang: isLang(r.lang) ? r.lang : 'de', roomId: (r.room_id as string) ?? DEFAULT_ROOM });
+export async function addWaitlist(e: { categoryId: string; start: number; end: number; name: string; email: string; lang?: Lang; roomId?: string }): Promise<WaitEntry> {
   const q = db();
   const mail = e.email.trim().toLowerCase();
   // Doppelte Einträge für denselben Zeitraum vermeiden
   const [dup] = await q`select * from waitlist where email = ${mail} and starts_at = ${new Date(e.start)} and ends_at = ${new Date(e.end)} and notified_at is null`;
   if (dup) return toWait(dup);
-  const [row] = await q`insert into waitlist (token, category_id, starts_at, ends_at, name, email, lang) values (${token()}, ${e.categoryId}, ${new Date(e.start)}, ${new Date(e.end)}, ${e.name}, ${mail}, ${e.lang ?? 'de'}) returning *`;
+  const [row] = await q`insert into waitlist (token, category_id, starts_at, ends_at, name, email, lang, room_id) values (${token()}, ${e.categoryId}, ${new Date(e.start)}, ${new Date(e.end)}, ${e.name}, ${mail}, ${e.lang ?? 'de'}, ${e.roomId ?? DEFAULT_ROOM}) returning *`;
   return toWait(row);
 }
 export async function getWaitByToken(t: string): Promise<WaitEntry | null> {
@@ -552,7 +577,8 @@ export async function freeWaitlistFor(freedStart: number, freedEnd: number): Pro
   ]);
   const free: WaitEntry[] = [];
   for (const e of entries) {
-    const r = checkBooking({ categoryId: e.categoryId, start: e.start, end: e.end, guests: 1 }, { categories, settings, slots, blackouts, now: Date.now() });
+    const r = checkBooking({ categoryId: e.categoryId, start: e.start, end: e.end, guests: 1 }, {
+      categories, settings, now: Date.now(), slots: slots.filter((x) => x.roomId === e.roomId), blackouts: blackouts.filter((x) => !x.roomId || x.roomId === e.roomId) });
     if (r.level === 'block') continue;
     await q`update waitlist set notified_at = now() where id = ${e.id}`;
     free.push(e);
@@ -697,7 +723,7 @@ export async function bookingsForYear(year: number): Promise<Booking[]> {
 }
 
 /** Die nächsten freien Abende (Standard 18–22 Uhr) für Besprechungen, für die Schnellauswahl auf der Startseite. */
-export async function nextFreeEvenings(n = 6, from = '18:00', to = '22:00'): Promise<{ date: string; start: number; end: number }[]> {
+export async function nextFreeEvenings(n = 6, from = '18:00', to = '22:00', roomId = DEFAULT_ROOM): Promise<{ date: string; start: number; end: number }[]> {
   const q = db();
   const { berlinYmd, berlinToUtc: b2u, addDays } = await import('./time');
   const today = berlinYmd(Date.now());
@@ -706,7 +732,7 @@ export async function nextFreeEvenings(n = 6, from = '18:00', to = '22:00'): Pro
   const cat = categories.find((c) => !c.isParty && !c.requiresApproval) ?? categories.find((c) => !c.isParty) ?? categories[0];
   if (!cat) return [];
   const rangeFrom = b2u(today, '00:00'), rangeTo = b2u(addDays(today, horizon + 1), '00:00');
-  const [slots, blackouts] = await Promise.all([getSlots(q, rangeFrom - DAY, rangeTo + DAY), getAllBlocks(q, rangeFrom - DAY, rangeTo + DAY)]);
+  const [slots, blackouts] = await Promise.all([getSlots(q, rangeFrom - DAY, rangeTo + DAY, roomId), getAllBlocks(q, rangeFrom - DAY, rangeTo + DAY, roomId)]);
   const out: { date: string; start: number; end: number }[] = [];
   for (let i = 0; i <= horizon && out.length < n; i++) {
     const date = addDays(today, i);

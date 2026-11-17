@@ -10,6 +10,7 @@ import { LOCALE, catLabel, t, type Lang } from '@/lib/i18n';
 
 type Fees = { rent: number; deposit: number };
 export type Occupancy = {
+  rooms?: { id: string; name: string; capacity: number }[]; roomId?: string;
   categories: Category[]; settings: Settings; slots: Slot[]; blackouts: Blackout[];
   equipment: string[]; feesExternal: Fees; feesMemberParty: Fees;
 };
@@ -46,7 +47,7 @@ function mailApp(email: string): { name: string; url: string } | null {
   return null;
 }
 
-export type Prefill = { date?: string; start?: string; end?: string; categoryId?: string; title?: string; guests?: string; equipment?: string[]; note?: string };
+export type Prefill = { roomId?: string; date?: string; start?: string; end?: string; categoryId?: string; title?: string; guests?: string; equipment?: string[]; note?: string };
 const WAITABLE = new Set(['overlap', 'buffer', 'party-weekend', 'blackout']);
 
 export default function BookingApp({ initial, initialMonth, contactNote, prefill = {}, turnstileKey = '', lang = 'de', serverNow }: { serverNow?: number; initial: Occupancy; initialMonth: string; contactNote: string; prefill?: Prefill; turnstileKey?: string; lang?: Lang }) {
@@ -92,12 +93,15 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   const [done, setDone] = useState<Done | null>(null);
   const topRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async (m: string) => {
+  // Mehrere Räume: Auswahl oben im ersten Schritt; der Kalender lädt dann die Belegung dieses Raums
+  const rooms = initial.rooms ?? [];
+  const [roomId, setRoomId] = useState(initial.roomId ?? rooms[0]?.id ?? 'jugendraum');
+  const load = useCallback(async (m: string, room: string) => {
     const from = berlinToUtc(addDays(m, -7), '00:00'), to = berlinToUtc(addDays(shiftMonth(m, 1), 7), '00:00');
-    const res = await fetch(`/api/belegung?from=${from}&to=${to}`, { cache: 'no-store' });
+    const res = await fetch(`/api/belegung?from=${from}&to=${to}&raum=${encodeURIComponent(room)}`, { cache: 'no-store' });
     if (res.ok) setData(await res.json());
   }, []);
-  useEffect(() => { if (month !== initialMonth) load(month); }, [month, initialMonth, load]);
+  useEffect(() => { if (month !== initialMonth || roomId !== (initial.roomId ?? roomId)) load(month, roomId); }, [month, initialMonth, load, roomId, initial.roomId]);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF((s) => ({ ...s, [k]: e.target.value }));
@@ -171,13 +175,14 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
           categoryId: catId, title: f.title.trim(), note: f.note.trim(), date: f.date, start: f.start, end: f.end, guests: +f.guests,
           equipment, bookerType, team: bookerType === 'member' ? f.team.trim() : '', name: f.name.trim(), email: f.email.trim(),
           phone: f.phone.trim(), agreedWith: who, agreed: agree, rulesAccepted: rules, lang, website: f.website, elapsed: Date.now() - loadedAt, turnstile: captcha,
+          roomId,
           ...(seriesOn ? { repeat: { freq: repeat.freq, count: repeat.count } } : {}),
           ...(!seriesOn && alts.filter(Boolean).length ? { alternatives: alts.filter((d) => d && d !== f.date).map((d) => ({ date: d, start: f.start, end: f.end })) } : {}),
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (res.ok) { try { localStorage.setItem('jr-kontakt', JSON.stringify({ name: f.name.trim(), team: f.team.trim(), email: f.email.trim(), phone: f.phone.trim(), bookerType })); } catch {} setDone({ number: json.number, email: f.email.trim(), count: json.count, skipped: json.skipped?.length }); topRef.current?.scrollIntoView({ block: 'start' }); load(month); }
-      else if (res.status === 409) { await load(month); setStep(1); setServerError(T.taken + (json.check?.messages?.[0]?.text ?? T.pickOther)); }
+      if (res.ok) { try { localStorage.setItem('jr-kontakt', JSON.stringify({ name: f.name.trim(), team: f.team.trim(), email: f.email.trim(), phone: f.phone.trim(), bookerType })); } catch {} setDone({ number: json.number, email: f.email.trim(), count: json.count, skipped: json.skipped?.length }); topRef.current?.scrollIntoView({ block: 'start' }); load(month, roomId); }
+      else if (res.status === 409) { await load(month, roomId); setStep(1); setServerError(T.taken + (json.check?.messages?.[0]?.text ?? T.pickOther)); }
       else setServerError(json.error ?? T.sendFailed);
     } catch {
       setServerError(T.offline);
@@ -232,6 +237,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
         </div>
         <div className="card-body" style={{ paddingBlock: 6 }}>
           <dl>
+            {rooms.length > 1 && <div className="item"><dt>{T.room}</dt><dd>{rooms.find((r) => r.id === roomId)?.name}</dd></div>}
             <div className="item"><dt>{T.occasion}</dt><dd className={f.title ? '' : 'tbd'}>{f.title || T.open}</dd></div>
             <div className="item"><dt>{T.kind}</dt><dd className={cat ? '' : 'tbd'}>{cat ? <span className="catdot" style={{ '--c': cat.color } as React.CSSProperties}>{cl(cat).name}</span> : T.open}</dd></div>
             <div className="item"><dt>{T.date}</dt><dd className={f.date ? '' : 'tbd'}>{f.date ? dayLabel(f.date) : T.open}</dd></div>
@@ -306,6 +312,11 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
         {step === 0 && (
           <div className={`step-body slide-${dir}`}>
             <div><h2>{T.whatTitle}</h2><p className="lead">{T.whatLead}</p></div>
+            {rooms.length > 1 && (
+              <div className="room-pick" role="group" aria-label={T.room}>
+                {rooms.map((r) => <button type="button" key={r.id} aria-pressed={r.id === roomId} onClick={() => setRoomId(r.id)}><b>{r.name}</b><small>{T.upTo(r.capacity)}</small></button>)}
+              </div>
+            )}
             <div className="options" role="group" aria-label={T.kindOfUse}>
               {data.categories.map((c) => {
                 const I = ICONS[c.id] ?? Ellipsis;
@@ -480,7 +491,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
                     <div><button type="button" className="btn btn-primary btn-sm" disabled={wait.state === 'busy'} onClick={async () => {
                       setWait((w) => ({ ...w, state: 'busy' }));
                       const res = await fetch('/api/warteliste', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ categoryId: catId, date: f.date, start: f.start, end: f.end, name: f.name.trim(), email: f.email.trim(), website: f.website, elapsed: Date.now() - loadedAt, turnstile: captcha, lang }) }).catch(() => null);
+                        body: JSON.stringify({ roomId, categoryId: catId, date: f.date, start: f.start, end: f.end, name: f.name.trim(), email: f.email.trim(), website: f.website, elapsed: Date.now() - loadedAt, turnstile: captcha, lang }) }).catch(() => null);
                       const j = res ? await res.json().catch(() => ({})) : {};
                       setWait(res?.ok ? { open: true, state: 'done', msg: '' } : { open: true, state: 'error', msg: j.error ?? T.waitFailed });
                     }}>{wait.state === 'busy' ? T.waitBusy : T.waitSubmit}</button></div>

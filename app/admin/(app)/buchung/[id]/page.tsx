@@ -1,6 +1,7 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, FileDown, Hourglass, Mail, MailX, MessageCircle, PenLine, Pencil, Phone, Printer, Repeat, Undo2 } from 'lucide-react';
 import Link from 'next/link';
 import { TemplatePicker } from '@/components/TemplatePicker';
+import { RoomSelect } from '@/components/RoomSelect';
 import { fillTemplate } from '@/lib/templates';
 import { telHref, waNumber } from '@/lib/util/phone';
 import { notFound } from 'next/navigation';
@@ -8,7 +9,7 @@ import { Flash } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { undoInfo, bookerKey, profileTags, checkOptions, getSignatures, checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
+import { getRooms, undoInfo, bookerKey, profileTags, checkOptions, getSignatures, checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
 import { MessageThread } from '@/components/MessageThread';
 import { eur } from '@/lib/labels';
 import { berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong } from '@/lib/time';
@@ -57,6 +58,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
   const rel = Date.now() >= b.start && Date.now() < b.end ? { text: 'läuft gerade', cls: 'now' } : b.end <= Date.now() ? { text: dayDiff === 0 ? 'heute vorbei' : `vor ${-dayDiff} ${dayDiff === -1 ? 'Tag' : 'Tagen'}`, cls: 'past' }
     : { text: dayDiff === 0 ? `heute, ${berlinHm(b.start)} Uhr` : dayDiff === 1 ? 'morgen' : `in ${dayDiff} Tagen`, cls: dayDiff <= 2 ? 'soon' : '' };
   const tags = await profileTags(b.email);
+  const rooms = await getRooms();
   const lastUndo = await undoInfo(b.id);
   const options = b.status === 'requested' && b.alternatives.length ? await checkOptions(b) : [];
   const tpl = (use: 'reject' | 'message') => extras.templates.filter((t) => t.use === use || t.use === 'both')
@@ -99,6 +101,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
               <div className="card-head"><h2>Termin</h2><span className={`badge b-${check.level === 'ok' ? 'ok' : check.level === 'warn' ? 'warn' : 'bad'}`}>{check.level === 'ok' ? 'Keine Konflikte' : check.level === 'warn' ? 'Hinweise' : 'Konflikt'}</span></div>
               <div className="card-body stack">
                 <dl className="kv">
+                  {rooms.length > 1 && <><dt>Raum</dt><dd><b>{rooms.find((r) => r.id === b.roomId)?.name ?? b.roomId}</b></dd></>}
                   <dt>Wann</dt><dd>{fmtLong(b.start)}<br /><span className="num">{berlinHm(b.start)}–{berlinHm(b.end)} Uhr</span>{berlinYmd(b.end) !== berlinYmd(b.start) && <span className="muted"> (bis {fmtDay(b.end)})</span>}</dd>
                   <dt>Art</dt><dd><span className="catdot" style={{ '--c': c?.color } as React.CSSProperties}>{c?.name}</span>{c && <span className="muted small"> · Puffer {c.bufferBefore}/{c.bufferAfter} Min.</span>}</dd>
                   <dt>Personen</dt><dd className="num">{b.guests}</dd>
@@ -117,6 +120,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
               <div className="card-body stack">
                 <input type="hidden" name="id" value={b.id} />
                 <div className="row">
+                  <RoomSelect rooms={rooms} value={b.roomId} id="e-room" />
                   <div className="field"><label htmlFor="e-cat">Art</label><select id="e-cat" name="categoryId" defaultValue={b.categoryId}>{cats.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></div>
                   <div className="field span-2"><label htmlFor="e-title">Titel</label><input id="e-title" name="title" type="text" defaultValue={b.title} required maxLength={80} /></div>
                 </div>

@@ -1,5 +1,5 @@
 import { esc } from '@/lib/util/html';
-import { getPublicOccupancy } from '@/lib/data';
+import { getPublicOccupancy, getRooms } from '@/lib/data';
 import { appUrl } from '@/lib/url';
 import { addDays, berlinParts, berlinToUtc, berlinYmd } from '@/lib/time';
 import { isLang, t, type Lang } from '@/lib/i18n';
@@ -22,7 +22,9 @@ export async function GET(req: Request) {
   const T = TX[lang], D = t(lang);
   const today = berlinYmd(Date.now());
   const from = berlinToUtc(today, '00:00'), to = berlinToUtc(addDays(today, days), '00:00');
-  const occ = await getPublicOccupancy(from, to);
+  const rooms = await getRooms();
+  const room = rooms.find((r) => r.id === u.searchParams.get('raum')) ?? rooms[0];
+  const occ = await getPublicOccupancy(from, to, room.id);
   const base = appUrl();
   const W0 = 8, W1 = 24; // sichtbarer Bereich 8–24 Uhr
   const LOC = { de: 'de-DE', en: 'en-GB', tr: 'tr-TR' }[lang];
@@ -40,7 +42,7 @@ export async function GET(req: Request) {
     const anyBusy = segs.length > 0;
     const we = [0, 6].includes(berlinParts(s).weekday);
     rows.push(`<li class="${we ? 'we' : ''}"><span class="d">${esc(wd.format(s).replace(/\.(?=,|\s|$)/g, ''))}</span><span class="bar">${segs.join('')}</span>` +
-      `<a class="st ${evBusy ? 'busy' : 'free'}" href="${base}/?datum=${date}&amp;von=18:00&amp;bis=22:00#anfrage" target="_blank" rel="noopener">${evBusy ? T.busy : anyBusy ? T.free : T.free}</a></li>`);
+      `<a class="st ${evBusy ? 'busy' : 'free'}" href="${base}/?raum=${room.id}&amp;datum=${date}&amp;von=18:00&amp;bis=22:00#anfrage" target="_blank" rel="noopener">${evBusy ? T.busy : anyBusy ? T.free : T.free}</a></li>`);
   }
   const ticks = [8, 12, 16, 20, 24].map((h) => `<span style="left:${(((h - W0) / (W1 - W0)) * 100).toFixed(2)}%">${h}</span>`).join('');
   const html = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${T.title}</title><meta name="robots" content="noindex">
@@ -67,7 +69,7 @@ li.we .d{font-weight:700}
 .lg b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 @media(max-width:420px){li{grid-template-columns:78px 1fr 92px;gap:8px}.ticks{margin-left:86px;margin-right:100px}.d{font-size:12px}}
 </style></head><body><div class="w">
-<h1><span>${T.title}</span><a href="${base}/" target="_blank" rel="noopener">${T.cta} →</a></h1>
+<h1><span>${T.title}${rooms.length > 1 ? ` · ${esc(room.name)}` : ''}</span><a href="${base}/?raum=${room.id}" target="_blank" rel="noopener">${T.cta} →</a></h1>
 <div class="ticks">${ticks}</div>
 <ul>${rows.join('')}</ul>
 <div class="lg"><span><b style="background:var(--c)"></b>${T.legend[0]}</span><span><b style="background:var(--r)"></b>${T.legend[1]}</span><span><b style="background:repeating-linear-gradient(135deg,var(--muted) 0 2px,transparent 2px 4px)"></b>${T.legend[2]}</span><span>${esc(D.intro.capacity(occ.settings.capacity))}</span></div>

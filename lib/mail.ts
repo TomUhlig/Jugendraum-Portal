@@ -1,5 +1,6 @@
 import 'server-only';
 import { esc } from './util/html';
+import { roomLabel } from './room-cache';
 import { googleCalendarLink } from './gcal-link';
 import { inboxEnabled, plusAddress } from './inbox-parse';
 import { decisionToken } from './auth';
@@ -167,11 +168,12 @@ function seriesBlock(dates: { start: number; end: number }[], lang: Lang, skippe
   return out;
 }
 
+const ROOM_TX: Record<Lang, string> = { de: 'Raum', en: 'Room', tr: 'Salon' };
 function details(b: Booking, c?: Category, extra: [string, string][] = [], lang: Lang = 'de'): Block {
   const L = MAIL_TEXT[lang].labels;
   const eur = (n: number) => eurL(n, lang);
   const rows: [string, string][] = [
-    [L.booking, b.number], [L.occasion, esc(b.title)], [L.date, `${fmtLong(b.start, lang)}<br>${berlinHm(b.start)}–${berlinHm(b.end)}${L.uhr}${berlinYmd(b.end) !== berlinYmd(b.start) ? ` (${L.until} ${fmtDay(b.end, lang)})` : ''}`],
+    [L.booking, b.number], ...(roomLabel(b.roomId) ? [[ROOM_TX[lang], esc(roomLabel(b.roomId)!)] as [string, string]] : []), [L.occasion, esc(b.title)], [L.date, `${fmtLong(b.start, lang)}<br>${berlinHm(b.start)}–${berlinHm(b.end)}${L.uhr}${berlinYmd(b.end) !== berlinYmd(b.start) ? ` (${L.until} ${fmtDay(b.end, lang)})` : ''}`],
     ...(c ? [[L.kind, esc(catLabel(lang, c).name)] as [string, string]] : []), [L.people, String(b.guests)],
     ...(b.equipment.length ? [[L.equipment, esc(b.equipment.join(', '))] as [string, string]] : []),
     ...(b.rent > 0 ? [[L.rent, eur(b.rent)] as [string, string]] : []), ...(b.deposit > 0 ? [[L.deposit, eur(b.deposit)] as [string, string]] : []),

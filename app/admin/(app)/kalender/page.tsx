@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { PageHead } from '@/components/Flash';
 import { WeekBoard } from '@/components/WeekBoard';
 import { requireAdmin } from '@/lib/auth';
-import { getAllBlocks, getCategories, listBookings } from '@/lib/data';
+import { getAllBlocks, getCategories, getRooms, listBookings } from '@/lib/data';
 import { blackoutWhen } from '@/lib/rules';
 import { MIN, addDays, berlinHm, berlinToUtc, berlinYmd, weekdayOf } from '@/lib/time';
 
@@ -19,21 +19,32 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
   const today = berlinYmd(Date.now());
   const week = sp.ansicht === 'woche';
   const all = sp.alle === '1';
-  const cats = await getCategories();
+  const [cats, rooms] = await Promise.all([getCategories(), getRooms()]);
   const cat = new Map(cats.map((c) => [c.id, c]));
-  const keep = (extra: Record<string, string>) => '?' + new URLSearchParams({ ...(week ? { ansicht: 'woche' } : {}), ...(all ? { alle: '1' } : {}), ...extra }).toString();
+  const room = rooms.length > 1 ? rooms.find((r) => r.id === sp.raum)?.id : undefined;
+  const roomName = new Map(rooms.map((r) => [r.id, r.name]));
+  const keep = (extra: Record<string, string>) => '?' + new URLSearchParams({ ...(week ? { ansicht: 'woche' } : {}), ...(all ? { alle: '1' } : {}), ...(room ? { raum: room } : {}), ...extra }).toString();
+  // Raumfilter (nur bei mehreren Räumen)
+  const RoomChips = rooms.length > 1 ? (
+    <nav className="status-chips" aria-label="Raum">
+      <Link href={keep({ raum: '' }).replace(/raum=&?/, '')} aria-current={!room ? 'page' : undefined}>Alle Räume</Link>
+      {rooms.map((r) => <Link key={r.id} href={keep({ raum: r.id })} aria-current={room === r.id ? 'page' : undefined}>{r.name}</Link>)}
+    </nav>
+  ) : null;
+  const label = (b: { title: string; roomId: string }) => (rooms.length > 1 && !room ? `${roomName.get(b.roomId) ?? ''}: ${b.title}` : b.title);
 
   if (week) {
     const w = monday(/^\d{4}-\d\d-\d\d$/.test(sp.w ?? '') ? sp.w : today);
     const days = Array.from({ length: 7 }, (_, i) => addDays(w, i));
     const from = berlinToUtc(w, '00:00'), to = berlinToUtc(addDays(w, 8), '06:00');
-    const [list, blackouts] = await Promise.all([listBookings({ from, to, status: all ? undefined : [...ACTIVE] }), getAllBlocks(undefined, from, to)]);
+    const [list, blackouts] = await Promise.all([listBookings({ from, to, status: all ? undefined : [...ACTIVE], roomId: room }), getAllBlocks(undefined, from, to, room)]);
     return (
       <>
         <PageHead title="Kalender"><Link className="btn" href="/admin/wochenplan">Wochenplan drucken</Link>
           <div className="segmented"><Link href={`?m=${w.slice(0, 7)}${all ? '&alle=1' : ''}`}>Monat</Link><Link href="#" aria-current="page">Woche</Link></div>
           <Link className="btn" href="/admin/sperrzeiten#neu"><Lock className="icon-sm" />Sperren</Link><Link className="btn btn-primary" href="/admin/neu"><Plus className="icon-sm" />Termin</Link>
         </PageHead>
+      {RoomChips}
         <section className="card">
           <div className="card-head">
             <div className="inline"><Link className="iconbtn" href={keep({ w: addDays(w, -7) })} aria-label="Vorherige Woche"><ChevronLeft className="icon" /></Link>
@@ -42,7 +53,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
             <div className="inline"><Link className="btn btn-sm" href={`/admin/sperrzeiten?von=${w < today ? today : w}&bis=${addDays(w, 6)}#neu`}><Lock className="icon-sm" />Woche sperren</Link><Link className="btn btn-sm" href={keep({ w: monday(today) })}>Heute</Link><Link className="small" href={`?ansicht=woche&w=${w}${all ? '' : '&alle=1'}`}>{all ? 'Nur aktive' : 'Auch stornierte'}</Link></div>
           </div>
           <WeekBoard days={days} today={today} canEdit={me.role !== 'viewer'} blocks={blackouts}
-            events={list.flatMap((b) => { const c = cat.get(b.categoryId); return c ? [{ id: b.id, title: b.title, name: b.name, start: b.start, end: b.end, status: b.status, color: c.color, before: c.bufferBefore, after: c.bufferAfter, silent: b.silent }] : []; })} />
+            events={list.flatMap((b) => { const c = cat.get(b.categoryId); return c ? [{ id: b.id, title: label(b), name: b.name, start: b.start, end: b.end, status: b.status, color: c.color, before: c.bufferBefore, after: c.bufferAfter, silent: b.silent }] : []; })} />
           <div className="card-foot legend" style={{ marginTop: 0 }}>{cats.map((c) => <span key={c.id}><i style={{ '--c': c.color } as React.CSSProperties} />{c.name}</span>)}<span>schraffiert: Auf- und Abbau</span><span>gestrichelt: angefragt</span>{me.role !== 'viewer' && <span>Termine lassen sich mit der Maus verschieben</span>}</div>
         </section>
       </>
@@ -56,13 +67,14 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
   const cells: string[] = [];
   for (let i = 0; i < 42; i++) { const k = addDays(first, i); if (i >= 35 && k.slice(0, 7) !== m.slice(0, 7)) break; cells.push(k); }
   const from = berlinToUtc(cells[0], '00:00'), to = berlinToUtc(addDays(cells[cells.length - 1], 1), '00:00');
-  const [list, blackouts] = await Promise.all([listBookings({ from, to, status: all ? undefined : [...ACTIVE] }), getAllBlocks(undefined, from, to)]);
+  const [list, blackouts] = await Promise.all([listBookings({ from, to, status: all ? undefined : [...ACTIVE], roomId: room }), getAllBlocks(undefined, from, to, room)]);
   return (
     <>
       <PageHead title="Kalender"><Link className="btn" href="/admin/wochenplan">Wochenplan drucken</Link>
         <div className="segmented"><Link href="#" aria-current="page">Monat</Link><Link href={`?ansicht=woche&w=${monday(m.slice(0, 7) === today.slice(0, 7) ? today : m)}${all ? '&alle=1' : ''}`}>Woche</Link></div>
         <Link className="btn" href="/admin/sperrzeiten#neu"><Lock className="icon-sm" />Sperren</Link><Link className="btn btn-primary" href="/admin/neu"><Plus className="icon-sm" />Termin</Link>
       </PageHead>
+      {RoomChips}
       <section className="card">
         <div className="card-head">
           <div className="inline"><Link className="iconbtn" href={keep({ m: shift(-1) })} aria-label="Vorheriger Monat"><ChevronLeft className="icon" /></Link>
@@ -90,7 +102,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
                   })}
                   {items.map((b) => (
                     <Link key={b.id} href={`/admin/buchung/${b.id}`} className={`ev ${b.status}`} title={`${b.title} · ${b.name}`} style={{ '--c': cat.get(b.categoryId)?.color } as React.CSSProperties}>
-                      <span className="num">{berlinHm(b.start)}</span> {b.title}
+                      <span className="num">{berlinHm(b.start)}</span> {label(b)}
                     </Link>
                   ))}
                 </div>
@@ -113,7 +125,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
                   {bo.map((x) => <Link key={x.id} href="/admin/sperrzeiten" className="ag-item sys"><Lock className="icon-sm" />gesperrt: {x.reason}</Link>)}
                   {items.map((b) => (
                     <Link key={b.id} href={`/admin/buchung/${b.id}`} className={`ag-item ${b.status}`} style={{ '--c': cat.get(b.categoryId)?.color } as React.CSSProperties}>
-                      <span className="num">{berlinHm(b.start)}–{berlinHm(b.end)}</span><b>{b.title}</b><span className="muted">{b.name}</span>
+                      <span className="num">{berlinHm(b.start)}–{berlinHm(b.end)}</span><b>{label(b)}</b><span className="muted">{b.name}</span>
                     </Link>
                   ))}
                   {k >= today && <Link className="ag-add" href={`/admin/neu?datum=${k}`} aria-label={`Termin am ${k} eintragen`}><Plus className="icon-sm" /></Link>}

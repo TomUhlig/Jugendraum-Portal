@@ -30,6 +30,7 @@ const de = {
   dow: ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'],
   oclock: 'Uhr',
   app: {
+    room: 'Raum', upTo: (n: number) => `bis ${n} Personen`,
     altTitle: 'Ausweichtermine', altHint: 'falls der Wunschtag nicht klappt, gleiche Uhrzeit', altAdd: 'Ausweichtag', altRemove: 'Entfernen', altTaken: 'belegt', altOk: 'frei', altUnknown: 'wird geprüft',
     draftShare: 'Entwurf teilen', draftCopied: 'Link kopiert', draftHint: 'zum Abstimmen, ohne deine Kontaktdaten', draftText: 'Kannst du mal draufschauen? Unsere Anfrage für den Jugendraum:',
     repeatLabel: 'Regelmäßig wiederholen', repeatHint: 'z. B. Training oder Sitzungen, bis zu 12 Termine', weekly: 'jede Woche', biweekly: 'alle 2 Wochen', dates: 'Termine',
@@ -150,6 +151,7 @@ const en: Dict = {
   dow: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
   oclock: '',
   app: {
+    room: 'Room', upTo: (n: number) => `up to ${n} people`,
     altTitle: 'Alternative dates', altHint: 'in case your preferred day does not work, same time', altAdd: 'Alternative day', altRemove: 'Remove', altTaken: 'taken', altOk: 'free', altUnknown: 'checked on sending',
     draftShare: 'Share draft', draftCopied: 'Link copied', draftHint: 'to agree on it, without your contact details', draftText: 'Can you take a look? Our request for the youth room:',
     repeatLabel: 'Repeat regularly', repeatHint: 'e.g. training or meetings, up to 12 dates', weekly: 'every week', biweekly: 'every 2 weeks', dates: 'dates',
@@ -268,6 +270,7 @@ const tr: Dict = {
   dow: ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pz'],
   oclock: '',
   app: {
+    room: 'Salon', upTo: (n: number) => `en fazla ${n} kişi`,
     altTitle: 'Alternatif tarihler', altHint: 'istediğin gün olmazsa, aynı saat', altAdd: 'Alternatif gün', altRemove: 'Kaldır', altTaken: 'dolu', altOk: 'boş', altUnknown: 'gönderirken kontrol edilecek',
     draftShare: 'Taslağı paylaş', draftCopied: 'Bağlantı kopyalandı', draftHint: 'birlikte karar vermek için, iletişim bilgilerin olmadan', draftText: 'Bakabilir misin? Gençlik salonu talebimiz:',
     repeatLabel: 'Düzenli tekrarla', repeatHint: 'ör. antrenman veya toplantılar, en fazla 12 tarih', weekly: 'her hafta', biweekly: '2 haftada bir', dates: 'tarih',

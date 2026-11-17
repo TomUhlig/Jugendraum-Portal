@@ -1,6 +1,6 @@
 import { esc } from '@/lib/util/html';
 import QRCode from 'qrcode';
-import { getAllBlocks, getCategories, getSettings, listBookings } from '@/lib/data';
+import { getAllBlocks, getCategories, getRooms, getSettings, listBookings } from '@/lib/data';
 import { appUrl } from '@/lib/url';
 import { addDays, berlinHm, berlinParts, berlinToUtc, berlinYmd } from '@/lib/time';
 
@@ -13,10 +13,12 @@ const WDS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
  * Tür-Display für ein Tablet am Raum (Vollbild, aktualisiert sich jede Minute, hält den Bildschirm wach).
  * Ohne Namen: angezeigt werden Mannschaft/Abteilung oder die Art des Termins.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const now = Date.now(), today = berlinYmd(now);
   const from = berlinToUtc(today, '00:00'), to = berlinToUtc(addDays(today, 7), '06:00');
-  const [list, cats, blocks, s] = await Promise.all([listBookings({ from: from - 12 * 3600e3, to, status: ['confirmed'] }), getCategories(), getAllBlocks(undefined, from, to), getSettings()]);
+  const rooms = await getRooms();
+  const room = rooms.find((r) => r.id === new URL(req.url).searchParams.get('raum')) ?? rooms[0];
+  const [list, cats, blocks, s] = await Promise.all([listBookings({ from: from - 12 * 3600e3, to, status: ['confirmed'], roomId: room.id }), getCategories(), getAllBlocks(undefined, from, to, room.id), getSettings()]);
   const cat = new Map(cats.map((c) => [c.id, c]));
   const label = (b: (typeof list)[number]) => (b.bookerType === 'member' && b.team ? b.team : cat.get(b.categoryId)?.name ?? 'Belegt');
   const current = list.find((b) => b.start <= now && b.end > now);
@@ -64,13 +66,13 @@ main{display:grid;grid-template-columns:1.25fr 1fr;gap:2.5vw;padding:0 3vw 3vh;m
 .week{overflow:hidden;min-height:0}
 @media (orientation:portrait){main{grid-template-columns:1fr;grid-template-rows:auto 1fr}.status{padding:3.5vh 6vw;gap:1.2vh}.status h1{font-size:5.6vh}.status p{font-size:2.4vh}.today li{font-size:2.2vh}.week li{font-size:1.8vh}.dd b{font-size:2vh}.qr svg{width:10vh;height:10vh}header #clock b{font-size:4.6vh}}
 </style></head><body>
-<header><img src="/logo.png" alt=""><div class="t">Jugendraum<small>SV Heepen</small></div><div id="clock"><b>${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}</b><span>${WD[p.weekday]}, ${p.day}.${p.month}.${p.year}</span></div></header>
+<header><img src="/logo.png" alt=""><div class="t">${esc(rooms.length > 1 ? room.name : 'Jugendraum')}<small>SV Heepen</small></div><div id="clock"><b>${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}</b><span>${WD[p.weekday]}, ${p.day}.${p.month}.${p.year}</span></div></header>
 <main>
   <section class="status ${state}"><span class="k">${state === 'free' ? '<span class="dot"></span>Verfügbar' : state === 'busy' ? 'Gerade im Raum' : 'Nicht verfügbar'}</span><h1>${head}</h1><p>${sub}</p></section>
   <div class="side">
     <section class="card today"><h2>Heute</h2>${todays.length ? `<ul>${todays.map((b) => `<li class="${b.start <= now && b.end > now ? 'now' : b.end <= now ? 'done' : ''}"><b>${berlinHm(b.start)}–${berlinHm(b.end)}</b>${esc(label(b))}</li>`).join('')}</ul>` : '<div class="empty">Heute keine Termine</div>'}</section>
     <section class="card week"><h2>Die nächsten Tage</h2><ul>${days.join('')}</ul></section>
-    <section class="card qr">${qr}<div><b>Raum anfragen</b><span>${esc(appUrl().replace(/^https?:\/\//, ''))} · bis ${s.capacity} Personen</span></div></section>
+    <section class="card qr">${qr}<div><b>Raum anfragen</b><span>${esc(appUrl().replace(/^https?:\/\//, ''))} · bis ${room.capacity ?? s.capacity} Personen</span></div></section>
   </div>
 </main>
 <script>

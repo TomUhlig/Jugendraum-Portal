@@ -40,9 +40,9 @@ export const DEFAULT_SETTINGS: Settings = {
 export type ActiveStatus = 'pending_email' | 'requested' | 'confirmed';
 export const ACTIVE_STATUSES: ActiveStatus[] = ['pending_email', 'requested', 'confirmed'];
 
-export type Slot = { id: string; categoryId: string; start: number; end: number; status: ActiveStatus };
+export type Slot = { id: string; categoryId: string; start: number; end: number; status: ActiveStatus; roomId?: string };
 /** Sperrzeit. scope 'party' sperrt nur Feiern, 'all' jede Anfrage. */
-export type Blackout = { id: string; start: number; end: number; reason: string; scope?: 'all' | 'party' };
+export type Blackout = { id: string; start: number; end: number; reason: string; scope?: 'all' | 'party'; /** leer = alle Räume */ roomId?: string | null };
 export type Draft = { categoryId: string; start: number; end: number; guests: number };
 export type Level = 'ok' | 'warn' | 'block';
 export type Message = { level: Exclude<Level, 'ok'>; code: string; text: string };
@@ -156,7 +156,7 @@ export function checkBooking(d: Draft, ctx: Context): CheckResult {
  */
 export type RecurringBlock = {
   id: string; weekdays: number[]; fromTime: string | null; toTime: string | null;
-  scope: 'all' | 'party'; reason: string; validFrom: string | null; validUntil: string | null;
+  scope: 'all' | 'party'; reason: string; validFrom: string | null; validUntil: string | null; roomId?: string | null;
 };
 export const WEEKDAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
@@ -173,7 +173,7 @@ export function expandRecurring(rules: RecurringBlock[], from: number, to: numbe
         start = berlinToUtc(d, r.fromTime);
         end = r.toTime > r.fromTime ? berlinToUtc(d, r.toTime) : berlinToUtc(addDays(d, 1), r.toTime);
       } else { start = berlinToUtc(d, '00:00'); end = berlinToUtc(addDays(d, 1), '00:00'); }
-      if (end > from && start < to) out.push({ id: `${r.id}:${d}`, start, end, reason: r.reason, scope: r.scope });
+      if (end > from && start < to) out.push({ id: `${r.id}:${d}`, start, end, reason: r.reason, scope: r.scope, roomId: r.roomId ?? null });
     }
   }
   return out;
