@@ -1,13 +1,14 @@
 'use server';
 import { cookies } from 'next/headers';
+import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
   Admin, MailTextKey, addBlackout, deletePhoto, movePhoto, updatePhoto, addMessage, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
-  saveHolidaySettings, refreshSchoolHolidays, addNote, setNoteDone, deleteNote, saveRoom, undo, undoInfo, PROFILE_TAGS, emailFromBookerKey, saveProfile, confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
+  rundmailRecipients, type RundmailFilter, erasePersonalData, saveHolidaySettings, refreshSchoolHolidays, addNote, setNoteDone, deleteNote, saveRoom, undo, undoInfo, PROFILE_TAGS, emailFromBookerKey, saveProfile, confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
 } from '@/lib/data';
-import { mailMode, mails, teamMails } from '@/lib/mail';
+import { mailMode, mails, sendRundmail, teamMails } from '@/lib/mail';
 import { isValidIban, normalizeIban } from '@/lib/payment';
 import { refund } from '@/lib/stripe';
 import { afterDecision, afterSeriesDecision, notifyWaitlist } from '@/lib/notify';
@@ -512,4 +513,38 @@ export async function holidaysAction(fd: FormData) {
   try { n = await refreshSchoolHolidays(true); } catch (e) { err = (e as Error).message; }
   revalidatePath('/', 'layout');
   go('/admin/einstellungen#feiertage', err ? 'fehler' : 'ok', err ? `Gespeichert, aber die Schulferien konnten nicht abgerufen werden: ${err}` : `Gespeichert. ${n} Ferienzeiträume abgerufen.`);
+}
+
+export async function boardLinkAction(fd: FormData) {
+  await requireAdmin('admin');
+  const off = fd.get('off') === '1';
+  const key = off ? '' : randomBytes(18).toString('base64url');
+  await db()`insert into settings (key, value) values ('boardLink', ${db().json({ key, createdAt: Date.now() })}) on conflict (key) do update set value = excluded.value`;
+  go('/admin/team#vorstand', 'ok', off ? 'Der Vorstands-Link ist abgeschaltet.' : 'Neuer Vorstands-Link erstellt. Der alte funktioniert nicht mehr.');
+}
+
+export async function eraseAction(fd: FormData) {
+  const admin = await requireAdmin('admin');
+  const key = str(fd, 'key', 400), email = emailFromBookerKey(key);
+  if (!email) go('/admin/bucher', 'fehler', 'Unbekannter Bucher.');
+  if (str(fd, 'confirm', 200).toLowerCase() !== email!.toLowerCase()) go(`/admin/bucher/${key}#datenschutz`, 'fehler', 'Zur Bestätigung bitte die E-Mail-Adresse genau eintippen.');
+  const r = await erasePersonalData(email!, admin.name);
+  if (!r.ok) go(`/admin/bucher/${key}#datenschutz`, 'fehler', r.text);
+  revalidatePath('/admin', 'layout');
+  go('/admin/bucher', 'ok', r.text);
+}
+
+export async function rundmailAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  const g = str(fd, 'gruppe', 10), von = str(fd, 'von', 10), bis = str(fd, 'bis', 10);
+  const back = `/admin/rundmail?${new URLSearchParams({ gruppe: g, von, bis, merkmal: str(fd, 'merkmal', 40), team: str(fd, 'team', 80), stumm: str(fd, 'stumm', 1) })}`;
+  const subject = str(fd, 'subject', 120), text = String(fd.get('text') ?? '').trim().slice(0, 4000);
+  if (!subject || text.length < 10 || fd.get('sure') !== 'on') go(back, 'fehler', 'Bitte Betreff, Text und die Bestätigung ausfüllen.');
+  const list = await rundmailRecipients({ group: (['period', 'recent', 'tag', 'team'].includes(g) ? g : 'period') as RundmailFilter['group'],
+    from: isDate(von) ? berlinToUtc(von, '00:00') : undefined, to: isDate(bis) ? berlinToUtc(addDays(bis, 1), '00:00') : undefined,
+    tag: str(fd, 'merkmal', 40) || undefined, team: str(fd, 'team', 80) || undefined, includeSilent: fd.get('stumm') === '1' });
+  let ok = 0;
+  for (const r of list) if (await sendRundmail(r, subject, text, admin.name).catch(() => false)) ok++;
+  await db()`insert into audit_log (actor, action, detail) values (${admin.name}, 'rundmail', ${db().json({ subject, count: list.length, sent: ok })})`;
+  go(back, ok === list.length ? 'ok' : 'fehler', `Rundmail an ${ok} von ${list.length} Empfängern verschickt.${ok < list.length ? ' Fehler siehe Protokoll → E-Mails.' : ''}`);
 }

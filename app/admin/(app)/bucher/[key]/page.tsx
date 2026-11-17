@@ -8,7 +8,7 @@ import { PROFILE_TAGS, emailFromBookerKey, getCategories, getProfile } from '@/l
 import { eur, initials } from '@/lib/labels';
 import { berlinHm, fmtDay } from '@/lib/time';
 import { telHref } from '@/lib/util/phone';
-import { profileAction } from '../../../actions';
+import { eraseAction, profileAction } from '../../../actions';
 
 export const metadata = { title: 'Bucher' };
 
@@ -64,6 +64,17 @@ export default async function BucherProfil({ params, searchParams }: { params: P
           {me.role !== 'viewer' && <div className="card-foot"><button className="btn btn-primary" type="submit">Speichern</button></div>}
         </form>
       </div>
+      <section className="card" id="datenschutz" style={{ marginTop: 16 }}>
+        <div className="card-head"><div><h2>Datenschutz</h2><p>Für Anfragen nach Art. 15 (Auskunft) und Art. 17 DSGVO (Löschung). Beides wird im Protokoll vermerkt.</p></div></div>
+        <div className="card-body grid-2b">
+          <div className="stack-sm"><b className="small">Auskunft</b><span className="muted small">Alle gespeicherten Daten als Datei (Buchungen, Nachrichten, Rückmeldungen, Zahlungen, Mails, Notizen). Diese Datei der Person schicken.</span>
+            <a className="btn" href={`/admin/bucher-auskunft/${key}`} style={{ justifySelf: 'start' }}>Datenauskunft herunterladen</a></div>
+          {me.role === 'admin' && <form action={eraseAction} className="stack-sm"><input type="hidden" name="key" value={key} />
+            <b className="small">Löschen</b><span className="muted small">Name, Kontakt, Notizen, Nachrichten und Unterschriften werden entfernt, Buchungen bleiben anonym für die Statistik. Geht nicht, solange noch Termine anstehen.</span>
+            <input name="confirm" placeholder={`Zur Bestätigung: ${email}`} aria-label="E-Mail-Adresse zur Bestätigung" autoComplete="off" />
+            <button className="btn btn-danger" type="submit" style={{ justifySelf: 'start' }}>Endgültig löschen</button></form>}
+        </div>
+      </section>
     </>
   );
 }

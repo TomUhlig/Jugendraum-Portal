@@ -7,7 +7,7 @@ import { initials } from '@/lib/labels';
 import { appUrl } from '@/lib/url';
 import { PushToggle } from '@/components/PushToggle';
 import { countSubscriptions, vapidKeys } from '@/lib/push';
-import { removeAdminAction, upsertAdminAction } from '../../actions';
+import { boardLinkAction, removeAdminAction, upsertAdminAction } from '../../actions';
 
 export const metadata = { title: 'Team' };
 
@@ -20,6 +20,8 @@ export default async function Team({ searchParams }: { searchParams: Promise<Rec
   const [admins, keys, devices] = await Promise.all([listAdmins(), vapidKeys(), countSubscriptions(me.id)]);
   const feed = `${appUrl()}/api/ical/${feedToken(me.id)}`;
   const isAdmin = me.role === 'admin';
+  const [bl] = await db()`select value from settings where key = 'boardLink'`;
+  const boardKey = (bl?.value as { key?: string } | undefined)?.key || '';
   const teams = (await db()`select team from bookings where team <> '' and status = 'confirmed' and starts_at > now() - interval '12 months' group by team order by count(*) desc limit 12`).map((r) => r.team as string);
   const gcal = (url: string) => `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(url.replace(/^https?:/, 'webcal:'))}`;
   return (
@@ -77,6 +79,17 @@ export default async function Team({ searchParams }: { searchParams: Promise<Rec
             return <li key={x.label} className="feed-row"><div><b>{x.label}</b> <span className="muted small">{x.hint}</span><CopyText text={url} /></div><a className="btn btn-sm" href={gcal(url)} target="_blank" rel="noreferrer">In Google Kalender</a></li>;
           })}
         </ul>
+      </section>
+
+      <section className="card" id="vorstand">
+        <div className="card-head"><div><h2>Lesezugriff für den Vorstand</h2><p>Ein geheimer Link ohne Anmeldung: Kennzahlen, die nächsten 30 Tage und offene Anfragen. Ohne Namen und Kontaktdaten der Buchenden.</p></div></div>
+        <div className="card-body stack-sm">
+          {boardKey ? <CopyText text={`${appUrl()}/vorstand/${boardKey}`} /> : <span className="muted small">Noch kein Link erstellt.</span>}
+        </div>
+        {isAdmin && <form action={boardLinkAction} className="card-foot inline">
+          <button className="btn btn-primary" type="submit">{boardKey ? 'Neuen Link erstellen' : 'Link erstellen'}</button>
+          {boardKey && <button className="btn btn-danger" type="submit" name="off" value="1">Abschalten</button>}
+        </form>}
       </section>
     </>
   );

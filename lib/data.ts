@@ -916,3 +916,69 @@ export async function getDayInfos(from: number, to: number): Promise<Record<stri
   const { berlinYmd: ymdOf } = await import('./time');
   return Object.fromEntries(dayInfos(ymdOf(from), ymdOf(to), h.region, h.school));
 }
+
+// ---------- Datenschutz: Auskunft und Löschung (Art. 15/17 DSGVO) ----------
+/** Alles, was zu einer E-Mail-Adresse gespeichert ist, als JSON-taugliches Objekt. */
+export async function personalDataExport(email: string) {
+  const q = db(), em = email.toLowerCase();
+  const bookings = await q`select number, title, note, starts_at, ends_at, status, guests, booker_type, team, name, email, phone, agreed_with, equipment, lang,
+      rent_eur, deposit_eur, rent_paid, deposit_paid, created_at, verified_at, decided_at, reject_reason, checklist, alternatives, id
+    from bookings where lower(email) = ${em} order by starts_at`;
+  const ids = bookings.map((b) => b.id as string);
+  const none = ['00000000-0000-0000-0000-000000000000'];
+  const [messages, feedback, waitlist, payments, mails, signatures, profile, inbound] = await Promise.all([
+    q`select b.number, m.author_type, m.author_name, m.body, m.created_at from messages m join bookings b on b.id = m.booking_id where m.booking_id in ${q(ids.length ? ids : none)} order by m.created_at`,
+    q`select b.number, f.rating, f.comment, f.damage, f.created_at from feedback f join bookings b on b.id = f.booking_id where f.booking_id in ${q(ids.length ? ids : none)}`,
+    q`select starts_at, ends_at, name, email, notified_at, created_at from waitlist where lower(email) = ${em}`,
+    q`select b.number, p.provider, p.amount_eur, p.status, p.paid_at, p.refunded_eur from payments p join bookings b on b.id = p.booking_id where p.booking_id in ${q(ids.length ? ids : none)}`,
+    q`select kind, subject, created_at, ok from mail_log where lower(recipient) = ${em} order by created_at`,
+    q`select b.number, s.kind, s.signer, s.checklist, s.staff, s.created_at from signatures s join bookings b on b.id = s.booking_id where s.booking_id in ${q(ids.length ? ids : none)}`,
+    q`select note, tags, updated_at from booker_profiles where email = ${em}`,
+    q`select sender, accepted, created_at from inbound_mail where lower(sender) = ${em}`,
+  ]);
+  return {
+    erstellt: new Date().toISOString(), email: em,
+    hinweis: 'Auskunft nach Art. 15 DSGVO: alle beim Jugendraum-Portal gespeicherten Daten zu dieser E-Mail-Adresse. Unterschriften liegen als Bild vor und werden auf Wunsch gesondert übermittelt.',
+    buchungen: bookings.map(({ id, ...b }) => { void id; return b; }), nachrichten: messages, rueckmeldungen: feedback, warteliste: waitlist, zahlungen: payments,
+    mails: mails, unterschriften: signatures, teamNotizen: profile, eingegangeneMails: inbound,
+  };
+}
+/** Löscht bzw. anonymisiert alle Daten einer Person. Anstehende aktive Buchungen verhindern die Löschung. */
+export async function erasePersonalData(email: string, actor: string): Promise<{ ok: boolean; text: string }> {
+  const q = db(), em = email.toLowerCase();
+  const [future] = await q`select count(*)::int as n from bookings where lower(email) = ${em} and status in ('pending_email', 'requested', 'confirmed') and ends_at > now()`;
+  if (future.n > 0) return { ok: false, text: `Es gibt noch ${future.n} anstehende Buchung(en). Bitte zuerst stornieren oder abwarten.` };
+  const n = await q.begin(async (t) => {
+    const rows = await t`select id from bookings where lower(email) = ${em}`;
+    const ids = rows.map((r) => r.id as string);
+    if (ids.length) {
+      await t`delete from messages where booking_id in ${t(ids)}`;
+      await t`update feedback set comment = '' where booking_id in ${t(ids)}`;
+      await t`delete from signatures where booking_id in ${t(ids)}`;
+      await t`update bookings set name = 'gelöscht', email = 'geloescht@invalid', phone = '', note = '', team = '', internal_note = '', damage_note = '', alternatives = '[]' where id in ${t(ids)}`;
+    }
+    await t`delete from waitlist where lower(email) = ${em}`;
+    await t`delete from booker_profiles where email = ${em}`;
+    await t`update mail_log set recipient = 'geloescht@invalid' where lower(recipient) = ${em}`;
+    await t`update inbound_mail set sender = 'geloescht@invalid' where lower(sender) = ${em}`;
+    await t`insert into audit_log (actor, action, detail) values (${actor}, 'data-erased', ${t.json({ bookings: ids.length })})`;
+    return ids.length;
+  });
+  return { ok: true, text: `Daten gelöscht: ${n} Buchung(en) anonymisiert, Nachrichten, Unterschriften, Warteliste und Notizen entfernt.` };
+}
+
+// ---------- Rundmail ----------
+export type RundmailFilter = { group: 'period' | 'recent' | 'tag' | 'team'; from?: number; to?: number; tag?: string; team?: string; includeSilent?: boolean };
+/** Empfänger einer Rundmail (je E-Mail-Adresse einmal, mit zuletzt genutztem Namen und Sprache). */
+export async function rundmailRecipients(f: RundmailFilter): Promise<{ email: string; name: string; lang: Lang }[]> {
+  const q = db();
+  const rows = await q`
+    select distinct on (lower(email)) lower(email) as email, name, lang from bookings
+    where email not like '%@invalid' and status in ('requested', 'confirmed') ${f.includeSilent ? q`` : q`and not silent`}
+    ${f.group === 'period' && f.from && f.to ? q`and starts_at < ${new Date(f.to)} and ends_at > ${new Date(f.from)}` : q``}
+    ${f.group === 'recent' ? q`and starts_at > now() - interval '12 months'` : q``}
+    ${f.group === 'team' && f.team ? q`and lower(team) = ${f.team.toLowerCase()}` : q``}
+    ${f.group === 'tag' && f.tag ? q`and lower(email) in (select email from booker_profiles where ${f.tag} = any(tags))` : q``}
+    order by lower(email), created_at desc limit 300`;
+  return rows.map((r) => ({ email: r.email as string, name: r.name as string, lang: isLang(r.lang) ? r.lang : 'de' }));
+}

@@ -348,3 +348,10 @@ export const teamMails = {
       ...build({ preheader: `${items.length} Termine, ${open} offene Anfragen.`, heading: 'Die Woche im Jugendraum', blocks: [rows, ...(open ? [P(`<b>${open} Anfrage(n)</b> warten auf eine Entscheidung.`)] : [])], cta: { href: `${appUrl()}/admin`, label: 'Zur Verwaltung' } }) });
   },
 };
+
+/** Rundmail an Bucher: eine Mail pro Person (keine sichtbaren Mitempfänger). */
+export async function sendRundmail(to: { email: string; name: string; lang: Lang }, subject: string, text: string, from: string): Promise<boolean> {
+  const hi = MAIL_TEXT[to.lang].hello(firstName(to.name));
+  return sendMail({ kind: 'rundmail', to: to.email, subject,
+    ...build({ lang: to.lang, preheader: text.slice(0, 90), heading: subject, blocks: [P(hi), paragraphs(text), SMALL(`${esc(from)} · Orga-Team Jugendraum`)], cta: { href: appUrl(), label: 'Zum Jugendraum' } }) });
+}
