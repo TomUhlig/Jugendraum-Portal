@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
   Admin, MailTextKey, addBlackout, deletePhoto, movePhoto, updatePhoto, addMessage, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
-  addNote, setNoteDone, deleteNote, saveRoom, undo, undoInfo, PROFILE_TAGS, emailFromBookerKey, saveProfile, confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
+  saveHolidaySettings, refreshSchoolHolidays, addNote, setNoteDone, deleteNote, saveRoom, undo, undoInfo, PROFILE_TAGS, emailFromBookerKey, saveProfile, confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
 } from '@/lib/data';
 import { mailMode, mails, teamMails } from '@/lib/mail';
 import { isValidIban, normalizeIban } from '@/lib/payment';
@@ -502,4 +502,14 @@ export async function deleteNoteAction(fd: FormData) {
   await deleteNote(str(fd, 'id', 40));
   revalidatePath('/admin', 'layout');
   go('/admin/raumbuch', 'ok', 'Gelöscht.');
+}
+
+export async function holidaysAction(fd: FormData) {
+  await requireAdmin('admin');
+  const region = /^DE-[A-Z]{2}$/.test(String(fd.get('region'))) ? String(fd.get('region')) : 'DE-NW';
+  await saveHolidaySettings({ region, blockPublic: fd.get('blockPublic') === 'on' });
+  let n = 0, err = '';
+  try { n = await refreshSchoolHolidays(true); } catch (e) { err = (e as Error).message; }
+  revalidatePath('/', 'layout');
+  go('/admin/einstellungen#feiertage', err ? 'fehler' : 'ok', err ? `Gespeichert, aber die Schulferien konnten nicht abgerufen werden: ${err}` : `Gespeichert. ${n} Ferienzeiträume abgerufen.`);
 }

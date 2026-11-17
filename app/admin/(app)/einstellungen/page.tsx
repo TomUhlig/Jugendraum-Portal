@@ -4,23 +4,26 @@ import { db } from '@/lib/db';
 import { CopyText } from '@/components/CopyText';
 import { Flash, PageHead } from '@/components/Flash';
 import { requireAdmin } from '@/lib/auth';
-import { getCategories, getExtras, getRooms, getSettings, operatorComplete } from '@/lib/data';
+import { getCategories, getExtras, getHolidaySettings, getRooms, getSettings, operatorComplete } from '@/lib/data';
 import { DEFAULT_TEXTS, TEXT_LABELS, mailFrom, mailMode } from '@/lib/mail';
 import { formatIban } from '@/lib/payment';
 import { stripeEnabled } from '@/lib/stripe';
 import { appUrl } from '@/lib/url';
 import type { MailTextKey } from '@/lib/data';
 import { calendarId, googleConfigured, googleSettings, serviceEmail } from '@/lib/gcal';
-import { roomsAction, templatesAction, inboxAction, googleResyncAction, googleSettingsAction, googleTestAction, offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
+import { holidaysAction, roomsAction, templatesAction, inboxAction, googleResyncAction, googleSettingsAction, googleTestAction, offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
 
 export const metadata = { title: 'Einstellungen' };
 
+const STATES: Record<string, string> = { 'DE-NW': 'Nordrhein-Westfalen', 'DE-NI': 'Niedersachsen', 'DE-HE': 'Hessen', 'DE-RP': 'Rheinland-Pfalz', 'DE-BW': 'Baden-Württemberg', 'DE-BY': 'Bayern',
+  'DE-SL': 'Saarland', 'DE-HB': 'Bremen', 'DE-HH': 'Hamburg', 'DE-SH': 'Schleswig-Holstein', 'DE-MV': 'Mecklenburg-Vorpommern', 'DE-BB': 'Brandenburg', 'DE-BE': 'Berlin',
+  'DE-SN': 'Sachsen', 'DE-ST': 'Sachsen-Anhalt', 'DE-TH': 'Thüringen' };
 const de = (n: number) => n.toString().replace('.', ',');
 
 export default async function Einstellungen({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin();
   const sp = await searchParams;
-  const [cats, s, x, gs, allRooms] = await Promise.all([getCategories(), getSettings(), getExtras(), googleSettings(), getRooms(undefined, true)]);
+  const [cats, s, x, gs, allRooms, hol] = await Promise.all([getCategories(), getSettings(), getExtras(), googleSettings(), getRooms(undefined, true), getHolidaySettings()]);
   const gOn = googleConfigured();
   const imap = imapConfig();
   const [inboxRow] = await db()`select value from settings where key = 'inbox'`;
@@ -84,6 +87,8 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
         <div className="card-head"><div><h2>Auf der Vereinsseite einbinden</h2><p>Zeigt die Belegung der nächsten zwei Wochen ohne Namen, mit Link zur Anfrage. Diesen Code in die Vereinsseite einfügen (z. B. als „HTML-Block“).</p></div></div>
         <div className="card-body stack-sm">
           <CopyText text={`<iframe src="${appUrl()}/einbetten?tage=14" title="Belegung Jugendraum" style="width:100%;max-width:720px;height:560px;border:0" loading="lazy"></iframe>`} />
+          <p className="small"><b>Belegungsampel</b> (klein, z. B. für die Startseite des Vereins): <img src="/ampel.svg" alt="Belegungsampel" height={28} style={{ verticalAlign: 'middle' }} /></p>
+          <CopyText text={`<a href="${appUrl()}/"><img src="${appUrl()}/ampel.svg" alt="Belegung Jugendraum" height="36"></a>`} />
           <p className="small"><b>Tür-Display:</b> Ein altes Tablet am Raum zeigt <a href="/anzeige" target="_blank" rel="noreferrer">{appUrl().replace(/^https?:\/\//, '')}/anzeige</a> im Vollbild: ob der Raum gerade frei ist, die heutigen Termine und einen QR-Code zum Anfragen. Ohne Namen, aktualisiert sich selbst und hält den Bildschirm an.</p>
           <p className="muted small">Varianten: <code>?tage=7</code> bis <code>?tage=28</code>, <code>&amp;theme=dark</code> für dunkle Seiten, <code>&amp;lang=en</code>. <a href="/einbetten" target="_blank" rel="noreferrer">Vorschau öffnen</a></p>
         </div>
@@ -108,6 +113,17 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
           <span className="muted small">Hinweis: Das ist keine Rechtsberatung. Lass die Angaben im Zweifel vom Vorstand prüfen.</span>
         </fieldset>
         {!ro && <div className="card-foot"><button className="btn btn-primary" type="submit">Speichern</button></div>}
+      </form>
+
+      <form action={holidaysAction} className="card" id="feiertage">
+        <div className="card-head"><div><h2>Feiertage und Schulferien</h2><p>Erscheinen in allen Kalendern. Feiertage werden berechnet, Schulferien kommen von openholidaysapi.org und werden wöchentlich aktualisiert.</p></div></div>
+        <div className="card-body stack-sm">
+          <div className="row" style={{ gridTemplateColumns: 'minmax(0, 260px)' }}><div className="field"><label htmlFor="h-region">Bundesland</label>
+            <select id="h-region" name="region" defaultValue={hol.region} disabled={ro}>{Object.entries(STATES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div></div>
+          <label className="choice"><input type="checkbox" name="blockPublic" defaultChecked={hol.blockPublic} disabled={ro} /><span><b>An gesetzlichen Feiertagen keine Anfragen</b><br /><span className="muted small">Heiligabend und Silvester bleiben buchbar. Einzelne Feiertage kannst du sonst über Sperrzeiten regeln.</span></span></label>
+          <p className="muted small">{hol.school.length ? `${hol.school.length} Ferienzeiträume gespeichert${hol.fetchedAt ? `, zuletzt abgerufen ${new Date(hol.fetchedAt).toLocaleDateString('de-DE')}` : ''}. Nächste: ${hol.school.filter((p) => p.to >= new Date().toISOString().slice(0, 10)).slice(0, 2).map((p) => `${p.name} (${p.from.split('-').reverse().join('.')}–${p.to.split('-').reverse().join('.')})`).join(', ')}` : 'Noch keine Schulferien abgerufen.'}</p>
+        </div>
+        <div className="card-foot inline"><button className="btn btn-primary" type="submit" disabled={ro}>Speichern und Ferien abrufen</button></div>
       </form>
 
       <form action={roomsAction} className="card" id="raeume">

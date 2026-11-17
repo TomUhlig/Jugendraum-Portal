@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { Booking, getBooking, getCategories, listBookings, notifyRecipients, toBooking } from '@/lib/data';
+import { refreshSchoolHolidays, Booking, getBooking, getCategories, listBookings, notifyRecipients, toBooking } from '@/lib/data';
 import { syncToGoogle } from '@/lib/gcal';
 import { pollInbox } from '@/lib/inbox';
 import { pushTeam } from '@/lib/push';
@@ -78,7 +78,10 @@ export async function GET(req: Request) {
     report.morningPush = todayList.length;
   }
 
-  // 8. Antworten per Mail abholen
+  // 8. Schulferien wöchentlich aktualisieren
+  report.schoolHolidays = await refreshSchoolHolidays().catch(() => -1);
+
+  // 9. Antworten per Mail abholen
   const inbox = await pollInbox();
   report.inbox = inbox.added;
 

@@ -11,6 +11,7 @@ import { LOCALE, catLabel, t, type Lang } from '@/lib/i18n';
 type Fees = { rent: number; deposit: number };
 export type Occupancy = {
   rooms?: { id: string; name: string; capacity: number }[]; roomId?: string;
+  days?: Record<string, { name: string; kind: 'holiday' | 'school'; info?: boolean }[]>;
   categories: Category[]; settings: Settings; slots: Slot[]; blackouts: Blackout[];
   equipment: string[]; feesExternal: Fees; feesMemberParty: Fees;
 };
@@ -367,10 +368,12 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
                     // ganztägig gesperrt (für alle, oder für Feiern, wenn eine Feier gewählt ist)
                     const blocked = data.blackouts.some((b) => b.start <= ds && b.end >= de && (b.scope !== 'party' || cat?.isParty));
                     const wd = weekdayOf(k), fri = wd === 5 ? k : wd === 6 ? addDays(k, -1) : wd === 0 ? addDays(k, -2) : null;
-                    const cls = ['dcell', k.slice(0, 7) !== month.slice(0, 7) && 'out', k === todayKey && 'today', k === f.date && 'sel', blocked && 'blocked'].filter(Boolean).join(' ');
+                    const info = data.days?.[k] ?? [];
+                    const hol = info.find((x) => x.kind === 'holiday'), school = info.find((x) => x.kind === 'school');
+                    const cls = ['dcell', k.slice(0, 7) !== month.slice(0, 7) && 'out', k === todayKey && 'today', k === f.date && 'sel', blocked && 'blocked', hol && 'hol', school && 'school'].filter(Boolean).join(' ');
                     return (
                       <button type="button" key={k} className={cls} disabled={k < todayKey || blocked} onClick={() => { setF((s) => ({ ...s, date: k })); if (monthStart(k) !== month) setMonth(monthStart(k)); }}
-                        aria-label={`${dayLabel(k)}: ${blocked ? T.blocked : list.length ? T.bookingsN(list.length) : T.free}`} aria-pressed={k === f.date}>
+                        aria-label={`${dayLabel(k)}${hol ? ` (${hol.name})` : ''}: ${blocked ? T.blocked : list.length ? T.bookingsN(list.length) : T.free}`} aria-pressed={k === f.date} title={info.map((x) => x.name).join(' · ') || undefined}>
                         {fri && partyWeekends.has(fri) && <span className="pw-flag" title={T.partyFlag} />}
                         <span className="d">{+k.slice(8)}</span>
                         <span className="dots">{list.slice(0, 3).map((s) => <i key={s.id} className={s.status !== 'confirmed' ? 'open' : ''} style={{ '--c': cats.get(s.categoryId)?.color } as React.CSSProperties} />)}</span>
@@ -390,6 +393,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
                 {!f.date ? <p className="muted small" style={{ paddingTop: 6 }}>{T.pickDay}</p> : (
                   <>
                     <h3>{dayLabel(f.date)}</h3>
+                    {(data.days?.[f.date] ?? []).length > 0 && <p className="day-info">{(data.days?.[f.date] ?? []).map((x) => <span key={x.name} className={`badge no-dot ${x.kind === 'holiday' ? 'b-info' : ''}`}>{x.name}</span>)}</p>}
                     {dayBlocks(f.date).map((b) => (
                       <div key={b.id} className="alert alert-bad" style={{ padding: '8px 10px' }}><div className="small"><strong>{b.scope === 'party' ? T.noParties : T.closed}</strong> {blackoutWhen(b, lang)}: {b.reason}</div></div>
                     ))}

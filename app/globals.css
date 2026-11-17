@@ -990,3 +990,12 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .rb-thanks p { max-width: 50ch; color: var(--ink-2) }
 @media (min-width: 640px) { .rb-stats { grid-template-columns: repeat(3, 1fr) } .rb-facts { grid-template-columns: repeat(2, 1fr) } }
 .rb-body h2 { margin-bottom: 14px }
+/* ---------- Feiertage / Ferien ---------- */
+.dcell.hol .d { color: var(--bad); font-weight: 800 }
+.dcell.school { background-image: linear-gradient(to top, color-mix(in srgb, var(--gelb) 40%, transparent) 0 3px, transparent 3px) }
+.day-info { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 }
+.mday .hol-label { font-size: .68rem; font-weight: 600; color: var(--bad); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.mday .school-label { font-size: .68rem; color: var(--warn); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.mday.school-day { background-image: linear-gradient(to bottom, color-mix(in srgb, var(--gelb) 22%, transparent) 0 3px, transparent 3px) }
+.wgrid .wh .hol-name { font-size: .62rem; color: var(--bad); font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.wgrid .wh .school-name { font-size: .62rem; color: var(--warn); font-weight: 600 }

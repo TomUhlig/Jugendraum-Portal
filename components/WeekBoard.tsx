@@ -17,7 +17,7 @@ const laneStyle = (l?: { lane: number; lanes: number }): React.CSSProperties => 
 const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
 /** Wochenraster mit Drag & Drop: Termine in 15-Minuten-Schritten auf andere Tage oder Uhrzeiten ziehen. */
-export function WeekBoard({ days, today, events, blocks, canEdit }: { days: string[]; today: string; events: WeekEvent[]; blocks: WeekBlock[]; canEdit: boolean }) {
+export function WeekBoard({ days, today, events, blocks, canEdit, infos = {} }: { days: string[]; today: string; events: WeekEvent[]; blocks: WeekBlock[]; canEdit: boolean; infos?: Record<string, { name: string; kind: 'holiday' | 'school' }[]> }) {
   const router = useRouter();
   const gridRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ id: string; x0: number; y0: number; dx: number; dy: number } | null>(null);
@@ -88,7 +88,7 @@ export function WeekBoard({ days, today, events, blocks, canEdit }: { days: stri
       <div className="table-wrap">
         <div className="wgrid" ref={gridRef}>
           <div />
-          {days.map((d) => { const wd = new Date(d + 'T12:00:00Z').getUTCDay(); return <div key={d} className={`wh${d === today ? ' today' : ''}${wd === 0 || wd === 6 ? ' we' : ''}${d < today ? ' past' : ''}`}><small>{WD[wd]}</small><b>{+d.slice(8)}</b></div>; })}
+          {days.map((d) => { const wd = new Date(d + 'T12:00:00Z').getUTCDay(); return <div key={d} className={`wh${d === today ? ' today' : ''}${wd === 0 || wd === 6 ? ' we' : ''}${d < today ? ' past' : ''}`}><small>{WD[wd]}</small><b>{+d.slice(8)}</b>{(infos[d] ?? []).slice(0, 1).map((x) => <span key={x.name} className={x.kind === 'holiday' ? 'hol-name' : 'school-name'} title={x.name}>{x.name}</span>)}</div>; })}
           <div className="hours" style={{ height: HEIGHT }}>{Array.from({ length: SPAN }, (_, i) => <span key={i} style={{ top: `${(i / SPAN) * 100}%` }}>{i ? String((H0 + i) % 24).padStart(2, '0') + ':00' : ''}</span>)}</div>
           {days.map((d) => (
             <div key={d} className={`wcol${canEdit && d >= today ? ' addable' : ''}${[0, 6].includes(new Date(d + 'T12:00:00Z').getUTCDay()) ? ' we' : ''}${d < today ? ' past' : ''}`} style={{ height: HEIGHT }}

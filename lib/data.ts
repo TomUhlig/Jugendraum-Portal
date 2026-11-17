@@ -7,6 +7,7 @@ import {
   ACTIVE_STATUSES, Blackout, Category, CheckResult, DEFAULT_SETTINGS, Message, RecurringBlock, Settings, Slot, checkBooking, expandRecurring, partyWeekendOf,
 } from './rules';
 import { DAY } from './time';
+import { dayInfos, fetchSchoolHolidays, publicHolidays, type DayInfo, type SchoolPeriod } from './holidays';
 import { rememberRooms } from './room-cache';
 import { DEFAULT_TEMPLATES, type ReplyTemplate } from './templates';
 import { isLang, type Lang } from './i18n';
@@ -120,8 +121,14 @@ export async function deleteRecurring(actor: string, id: string) {
 }
 /** Alle Sperren im Zeitraum: einzelne Sperrzeiten plus aufgelöste regelmäßige Sperren. Mit roomId nur die für diesen Raum geltenden. */
 export async function getAllBlocks(q: Q = db(), from: number, to: number, roomId?: string): Promise<Blackout[]> {
-  const [single, rec, google] = await Promise.all([getBlackouts(q, from, to), getRecurring(q), googleBusy(from, to)]);
-  const all = [...single, ...expandRecurring(rec, from, to), ...google];
+  const [single, rec, google, hol] = await Promise.all([getBlackouts(q, from, to), getRecurring(q), googleBusy(from, to), getHolidaySettings(q)]);
+  const holidays: Blackout[] = [];
+  if (hol.blockPublic) {
+    const { berlinYmd: ymdOf, berlinToUtc: b2u, addDays: add } = await import('./time');
+    for (let y = +ymdOf(from).slice(0, 4); y <= +ymdOf(to).slice(0, 4); y++)
+      for (const d of publicHolidays(y, hol.region)) if (!d.info) { const s = b2u(d.date, '00:00'), e = b2u(add(d.date, 1), '00:00'); if (e > from && s < to) holidays.push({ id: `h:${d.date}`, start: s, end: e, reason: `Feiertag: ${d.name}`, scope: 'all', roomId: null }); }
+  }
+  const all = [...single, ...expandRecurring(rec, from, to), ...google, ...holidays];
   return (roomId ? all.filter((b) => !b.roomId || b.roomId === roomId) : all).sort((a, b) => a.start - b.start);
 }
 
@@ -151,8 +158,9 @@ export async function getPublicOccupancy(from: number, to: number, roomId = DEFA
   const [categories, settings, slots, blackouts, extras, rooms] = await Promise.all([
     getCategories(q), getSettings(q), getSlots(q, from - 7 * DAY, to + 7 * DAY, roomId), getAllBlocks(q, from, to, roomId), getExtras(q), getRooms(q),
   ]);
+  const days = await getDayInfos(from, to).catch(() => ({}));
   return {
-    categories, settings: withRoom(settings, rooms, roomId), blackouts, slots: slots.map((s) => ({ ...s, id: s.id.slice(0, 8) })), rooms, roomId,
+    categories, settings: withRoom(settings, rooms, roomId), blackouts, slots: slots.map((s) => ({ ...s, id: s.id.slice(0, 8) })), rooms, roomId, days,
     equipment: extras.equipment, feesExternal: extras.feesExternal, feesMemberParty: extras.feesMemberParty,
   };
 }
@@ -883,3 +891,28 @@ export async function setNoteDone(id: string, actor: string, done: boolean) {
 }
 export async function deleteNote(id: string) { await db()`delete from room_notes where id = ${id}`; }
 export async function openNotesCount(): Promise<number> { const [r] = await db()`select count(*)::int as n from room_notes where done_at is null`; return r?.n ?? 0; }
+
+// ---------- Feiertage und Ferien ----------
+export type HolidaySettings = { region: string; blockPublic: boolean; school: SchoolPeriod[]; fetchedAt: number | null };
+export async function getHolidaySettings(q: Q = db()): Promise<HolidaySettings> {
+  try { const [r] = await q`select value from settings where key = 'holidays'`; return { region: 'DE-NW', blockPublic: false, school: [], fetchedAt: null, ...(r?.value ?? {}) }; }
+  catch { return { region: 'DE-NW', blockPublic: false, school: [], fetchedAt: null }; }
+}
+export async function saveHolidaySettings(h: Partial<HolidaySettings>) {
+  const cur = await getHolidaySettings();
+  await db()`insert into settings (key, value) values ('holidays', ${db().json({ ...cur, ...h } as never)}) on conflict (key) do update set value = excluded.value`;
+}
+/** Schulferien neu abrufen (wöchentlich im täglichen Lauf oder per Knopf). */
+export async function refreshSchoolHolidays(force = false): Promise<number> {
+  const h = await getHolidaySettings();
+  if (!force && h.fetchedAt && Date.now() - h.fetchedAt < 7 * DAY) return h.school.length;
+  const school = await fetchSchoolHolidays(h.region, new Date().getFullYear() - 1, 3);
+  await saveHolidaySettings({ school, fetchedAt: Date.now() });
+  return school.length;
+}
+/** Feiertage und Ferien als Kalenderhinweise (YYYY-MM-DD → Liste). */
+export async function getDayInfos(from: number, to: number): Promise<Record<string, DayInfo[]>> {
+  const h = await getHolidaySettings();
+  const { berlinYmd: ymdOf } = await import('./time');
+  return Object.fromEntries(dayInfos(ymdOf(from), ymdOf(to), h.region, h.school));
+}
