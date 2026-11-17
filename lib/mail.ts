@@ -151,6 +151,12 @@ const SERIES_TX = {
   en: { title: (n: number) => `All ${n} dates of the series`, skipped: 'These dates were already taken and were not requested:' },
   tr: { title: (n: number) => `Serinin ${n} tarihinin tümü`, skipped: 'Bu tarihler zaten doluydu ve talep edilmedi:' },
 };
+const ALT_TX: Record<Lang, string> = { de: 'Ausweichtermine, falls der Wunschtermin nicht klappt', en: 'Alternative dates if the preferred one does not work', tr: 'İstenen tarih olmazsa alternatif tarihler' };
+/** Ausweichtermine einer Anfrage als kurzer Block. */
+function altBlock(b: Booking): Block[] {
+  if (!b.alternatives?.length || b.status === 'confirmed') return [];
+  return [SMALL(`<b>${ALT_TX[b.lang]}:</b> ${b.alternatives.map((a) => `${fmtDay(a.start, b.lang)}, ${berlinHm(a.start)}–${berlinHm(a.end)}`).join(' · ')}`)];
+}
 /** Terminliste einer Serie als Mail-Block. */
 function seriesBlock(dates: { start: number; end: number }[], lang: Lang, skipped: number[] = []): Block[] {
   if (dates.length < 2 && !skipped.length) return [];
@@ -213,12 +219,12 @@ export const mails = {
   verify: (b: Booking, c: Category | undefined, verifyToken: string, series?: { dates: { start: number; end: number }[]; skipped: number[] }) => {
     const M = MAIL_TEXT[b.lang], V = M.verify;
     return sendMail({ kind: 'verify', to: bookerTo(b), bookingId: b.id, number: b.number, subject: V.subject(b.number),
-      ...build({ lang: b.lang, preheader: V.pre, heading: V.heading, blocks: [P(hello(b)), P(V.text), details(b, c, [], b.lang), ...(series ? seriesBlock(series.dates, b.lang, series.skipped) : [])], cta: { href: `${appUrl()}/bestaetigen/${verifyToken}`, label: V.cta }, after: [SMALL(V.small)], progress: 1 }) });
+      ...build({ lang: b.lang, preheader: V.pre, heading: V.heading, blocks: [P(hello(b)), P(V.text), details(b, c, [], b.lang), ...altBlock(b), ...(series ? seriesBlock(series.dates, b.lang, series.skipped) : [])], cta: { href: `${appUrl()}/bestaetigen/${verifyToken}`, label: V.cta }, after: [SMALL(V.small)], progress: 1 }) });
   },
   received: async (b: Booking, c?: Category, series: Booking[] = []) => {
     const M = MAIL_TEXT[b.lang];
     return sendMail({ kind: 'received', to: bookerTo(b), bookingId: b.id, number: b.number, subject: M.received.subject(b.title, fmtDay(b.start, b.lang)),
-      ...build({ lang: b.lang, preheader: M.received.pre, heading: M.received.heading, blocks: [P(hello(b)), paragraphs(await text('received', b.lang)), details(b, c, [], b.lang), ...seriesBlock(series, b.lang)], cta: { href: manageLink(b), label: M.viewRequest }, progress: 2 }) });
+      ...build({ lang: b.lang, preheader: M.received.pre, heading: M.received.heading, blocks: [P(hello(b)), paragraphs(await text('received', b.lang)), details(b, c, [], b.lang), ...altBlock(b), ...seriesBlock(series, b.lang)], cta: { href: manageLink(b), label: M.viewRequest }, progress: 2 }) });
   },
   confirmed: async (b: Booking, c?: Category, series: Booking[] = []) => {
     const M = MAIL_TEXT[b.lang];
@@ -311,7 +317,8 @@ const adminLink = (b: Booking) => `${appUrl()}/admin/buchung/${b.id}`;
 const who = (b: Booking) => `${esc(b.name)} (${b.bookerType === 'member' ? 'Mitglied' + (b.team ? ', ' + esc(b.team) : '') : 'nicht im Verein'}) · ${esc(b.email)} · ${esc(b.phone)}`;
 export const teamMails = {
   newRequest: (to: string[], b: Booking, c?: Category, conflicts?: string, series: Booking[] = []) => {
-    const blocks = [P(who(b)), ...(series.length > 1 ? [P(`<b>Serienanfrage:</b> ${series.length} Termine`)] : []), details(b, c, [['Abgesprochen mit', esc(b.agreedWith)]]), ...(b.note ? [P(`„${esc(b.note)}“`)] : []),
+    const blocks = [P(who(b)), ...(series.length > 1 ? [P(`<b>Serienanfrage:</b> ${series.length} Termine`)] : []),
+      ...(b.alternatives.length ? [P(`<b>Ausweichtermine:</b> ${b.alternatives.map((a) => `${fmtDay(a.start)}, ${berlinHm(a.start)}–${berlinHm(a.end)} Uhr`).join(' · ')}`)] : []), details(b, c, [['Abgesprochen mit', esc(b.agreedWith)]]), ...(b.note ? [P(`„${esc(b.note)}“`)] : []),
       ...(conflicts ? [P(`<span style="color:#B42F36"><b>Achtung:</b> ${esc(conflicts)}</span>`)] : [])];
     // Jede Person bekommt eine eigene Mail mit persönlichem Entscheidungslink (ohne Anmeldung nutzbar)
     return Promise.all(to.map((r) => sendMail({ kind: 'team-new', to: r, bookingId: b.id, number: b.number, replyTo: b.email, subject: `Neue Anfrage: ${b.title}, ${fmtDay(b.start)}`,

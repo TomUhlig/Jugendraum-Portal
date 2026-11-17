@@ -308,6 +308,9 @@ create table if not exists signatures (
   primary key (booking_id, kind)
 );
 
+-- ---------- Version 14: Ausweichtermine ----------
+alter table bookings add column if not exists alternatives jsonb not null default '[]';
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then

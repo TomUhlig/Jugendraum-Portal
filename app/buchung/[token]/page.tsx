@@ -121,6 +121,10 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           )}
         </section>
 
+        {['pending_email', 'requested'].includes(b.status) && b.alternatives.length > 0 && (
+          <section className="card card-body stack-sm"><b>{t(lang).app.altTitle}</b>
+            <ul className="list" style={{ margin: 0 }}>{b.alternatives.map((a) => <li key={a.start} className="num">{fmtDay(a.start, lang)}, {berlinHm(a.start)}–{berlinHm(a.end)}</li>)}</ul></section>
+        )}
         {b.status === 'confirmed' && future && (
           <section className="card card-body invite-teaser">
             <div><b>{B.guestTitle}</b><p className="muted small">{B.guestText}</p></div>

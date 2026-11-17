@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, BellRing, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, Ellipsis, GraduationCap, Megaphone, PartyPopper, Share2, Shirt, Users, XCircle,
+  AlertTriangle, ArrowLeft, ArrowRight, BellRing, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, Ellipsis, GraduationCap, Megaphone, PartyPopper, Plus, Share2, Shirt, Users, X, XCircle,
 } from 'lucide-react';
 import { Turnstile } from './Turnstile';
 import { Blackout, Category, CheckResult, Settings, Slot, blackoutWhen, checkBooking, partyWeekendOf } from '@/lib/rules';
@@ -114,6 +114,16 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   useEffect(() => { setWait({ open: false, state: 'idle', msg: '' }); }, [f.date, f.start, f.end, catId]);
   const [repeat, setRepeat] = useState<{ on: boolean; freq: 'weekly' | 'biweekly'; count: number }>({ on: false, freq: 'weekly', count: 6 });
   const seriesOn = repeat.on && !!cat && !cat.isParty;
+  // Ausweichtermine: andere Tage zur gleichen Uhrzeit (höchstens zwei)
+  const [alts, setAlts] = useState<string[]>([]);
+  const altChecks = useMemo(() => alts.map((d) => {
+    if (!d || !draft || !catId) return { date: d, state: 'unknown' as const };
+    const len = draft.end - draft.start, st = berlinToUtc(d, f.start);
+    const from = berlinToUtc(addDays(month, -7), '00:00'), to = berlinToUtc(addDays(shiftMonth(month, 1), 7), '00:00');
+    if (st < from || st > to) return { date: d, state: 'unknown' as const };
+    const r = checkBooking({ start: st, end: st + len, guests: draft.guests, categoryId: catId }, { ...data, now, lang });
+    return { date: d, state: r.level === 'block' ? 'taken' as const : 'ok' as const };
+  }), [alts, draft, catId, f.start, month, data, now, lang]);
   const seriesPreview = useMemo(() => {
     if (!seriesOn || !draft || !catId) return [];
     const step = repeat.freq === 'weekly' ? 7 : 14, len = draft.end - draft.start;
@@ -162,6 +172,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
           equipment, bookerType, team: bookerType === 'member' ? f.team.trim() : '', name: f.name.trim(), email: f.email.trim(),
           phone: f.phone.trim(), agreedWith: who, agreed: agree, rulesAccepted: rules, lang, website: f.website, elapsed: Date.now() - loadedAt, turnstile: captcha,
           ...(seriesOn ? { repeat: { freq: repeat.freq, count: repeat.count } } : {}),
+          ...(!seriesOn && alts.filter(Boolean).length ? { alternatives: alts.filter((d) => d && d !== f.date).map((d) => ({ date: d, start: f.start, end: f.end })) } : {}),
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -227,6 +238,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
             <div className="item"><dt>{T.time}</dt><dd className={f.date ? 'num' : 'tbd'}>{f.date && draft ? `${f.start}–${f.end}${uhr}${berlinYmd(draft.end) !== f.date ? ' ' + T.nextDay : ''}` : T.open}</dd></div>
             {cat && draft && <div className="item"><dt>{T.reserved}</dt><dd className="num" style={{ fontWeight: 400 }}>{berlinHm(draft.start - cat.bufferBefore * MIN)}–{berlinHm(draft.end + cat.bufferAfter * MIN)}{uhr}<br /><span className="muted small">{T.inclSetup}</span></dd></div>}
             <div className="item"><dt>{T.people}</dt><dd className="num">{f.guests || '–'}</dd></div>
+            {!seriesOn && alts.some(Boolean) && <div className="item"><dt>{T.altTitle}</dt><dd style={{ fontWeight: 400 }}>{alts.filter(Boolean).map((d) => dayLabel(d)).join(', ')}</dd></div>}
             {equipment.length > 0 && <div className="item"><dt>{T.equipment}</dt><dd style={{ fontWeight: 400 }}>{equipment.join(', ')}</dd></div>}
             {(fees.rent > 0 || fees.deposit > 0) && <div className="item"><dt>{T.costs}</dt><dd style={{ fontWeight: 400 }}>{fees.rent > 0 && <>{T.rent} {eur(fees.rent)}<br /></>}{fees.deposit > 0 && <>{T.deposit} {eur(fees.deposit)} <span className="muted small">{T.depositBack}</span></>}</dd></div>}
           </dl>
@@ -416,6 +428,20 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
                     setF((v) => ({ ...v, date: d, start: berlinHm(s.start), end: berlinHm(s.end) })); if (monthStart(d) !== month) setMonth(monthStart(d));
                   }}>{result.suggestion.label}</button></div>}
                 </div>
+              </div>
+            )}
+            {f.date && cat && !seriesOn && (
+              <div className={`alt-box${alts.length ? ' on' : ''}`}>
+                <div className="between"><span><b>{T.altTitle}</b> <span className="muted small">{T.altHint}</span></span>
+                  {alts.length < 2 && <button type="button" className="btn btn-sm" onClick={() => setAlts((a) => [...a, ''])}><Plus className="icon-sm" />{T.altAdd}</button>}</div>
+                {alts.map((d, i) => (
+                  <div key={i} className="alt-row">
+                    <input type="date" aria-label={`${T.altTitle} ${i + 1}`} value={d} min={todayKey} onChange={(e) => setAlts((a) => a.map((x, j) => (j === i ? e.target.value : x)))} />
+                    <span className="num small">{f.start}–{f.end}</span>
+                    {d && <span className={`badge ${altChecks[i]?.state === 'taken' ? 'b-bad' : altChecks[i]?.state === 'ok' ? 'b-ok' : 'b-expired'}`}>{altChecks[i]?.state === 'taken' ? T.altTaken : altChecks[i]?.state === 'ok' ? T.altOk : T.altUnknown}</span>}
+                    <button type="button" className="iconbtn" aria-label={T.altRemove} onClick={() => setAlts((a) => a.filter((_, j) => j !== i))}><X className="icon-sm" /></button>
+                  </div>
+                ))}
               </div>
             )}
             {f.date && cat && !cat.isParty && result?.level !== 'block' && (

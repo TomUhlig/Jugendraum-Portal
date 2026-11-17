@@ -5,14 +5,14 @@ import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
   Admin, MailTextKey, addBlackout, deletePhoto, movePhoto, updatePhoto, addMessage, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
-  decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
+  confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
 } from '@/lib/data';
 import { mailMode, mails, teamMails } from '@/lib/mail';
 import { isValidIban, normalizeIban } from '@/lib/payment';
 import { refund } from '@/lib/stripe';
 import { afterDecision, afterSeriesDecision, notifyWaitlist } from '@/lib/notify';
 import { Freq, describeSeries, seriesDates } from '@/lib/series';
-import { addDays, berlinToUtc } from '@/lib/time';
+import { addDays, berlinToUtc, fmtDay as fmtDayShort } from '@/lib/time';
 import { pollInbox } from '@/lib/inbox';
 import type { ReplyTemplate } from '@/lib/templates';
 import { clearGoogleCache, syncToGoogle, testConnection } from '@/lib/gcal';
@@ -428,4 +428,13 @@ export async function templatesAction(fd: FormData) {
   }
   await saveSettings(admin.name, { templates: list }, []);
   go('/admin/einstellungen#bausteine', 'ok', `${list.length} Textbausteine gespeichert.`);
+}
+
+export async function confirmAltAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  const id = str(fd, 'id', 40), start = Number(fd.get('start')), end = Number(fd.get('end'));
+  const b = await confirmOnAlternative(id, admin.name, start, end);
+  if (!b) go(`/admin/buchung/${id}`, 'fehler', 'Der Ausweichtermin ist inzwischen nicht mehr frei oder die Anfrage wurde schon bearbeitet.');
+  await afterDecision(b!);
+  go(`/admin/buchung/${id}`, 'ok', `Bestätigt auf ${fmtDayShort(b!.start)}.${b!.silent ? '' : ` ${b!.name} bekommt die Bestätigung mit dem neuen Termin.`}`);
 }

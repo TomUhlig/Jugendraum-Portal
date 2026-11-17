@@ -29,6 +29,7 @@ const schema = z.object({
   elapsed: z.coerce.number().optional(),
   turnstile: z.string().max(4000).optional(),
   lang: z.enum(['de', 'en', 'tr']).default('de'),
+  alternatives: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), start: z.string().regex(/^\d{2}:\d{2}$/), end: z.string().regex(/^\d{2}:\d{2}$/) })).max(2).default([]),
   repeat: z.object({ freq: z.enum(['weekly', 'biweekly']), count: z.coerce.number().int().min(2).max(12) }).optional(), // Honeypot: Menschen lassen das Feld leer
 }).refine((v) => v.bookerType === 'external' || v.team.length > 0, { path: ['team'], message: 'Mannschaft/Abteilung fehlt' });
 
@@ -56,13 +57,17 @@ export async function POST(req: Request) {
     const len = end - start;
     const slots = days.map((d) => { const s = berlinToUtc(d, v.start); return { start: s, end: s + len }; });
     const rule = describeSeries(v.date, v.repeat.freq, days[0], days[days.length - 1], days.length);
-    const res = await createSeriesRequest({ ...v, start, end }, slots, rule);
+    const res = await createSeriesRequest({ ...v, start, end, alternatives: [] }, slots, rule);
     if (!res.ok) return NextResponse.json({ error: L.notFree, check: res.check }, { status: 409 });
     await mails.verify(res.booking, cat, res.verifyToken, { dates: res.dates, skipped: res.skipped });
     return NextResponse.json({ number: res.booking.number, count: res.dates.length, skipped: res.skipped }, { status: 201 });
   }
 
-  const res = await createBooking({ ...v, start, end });
+  const toSlot = (a: { date: string; start: string; end: string }) => {
+    const s = berlinToUtc(a.date, a.start); let e = berlinToUtc(a.date, a.end); if (e <= s) e = berlinToUtc(addDays(a.date, 1), a.end); return { start: s, end: e };
+  };
+  const alternatives = v.alternatives.map(toSlot).filter((a) => a.start !== start);
+  const res = await createBooking({ ...v, start, end, alternatives });
   if (!res.ok) return NextResponse.json({ error: L.notFree, check: res.check }, { status: 409 });
   await mails.verify(res.booking, cat, res.verifyToken);
   return NextResponse.json({ number: res.booking.number }, { status: 201 });

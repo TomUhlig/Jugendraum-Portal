@@ -4,7 +4,7 @@ import { Check, X } from 'lucide-react';
 import { BookingFacts } from '@/components/BookingFacts';
 import { StatusBadge } from '@/components/StatusBadge';
 import { parseDecisionToken } from '@/lib/auth';
-import { checkExisting, decide, decideSeries, getBooking, getCategories, getExtras, listSeries } from '@/lib/data';
+import { checkOptions, confirmOnAlternative, checkExisting, decide, decideSeries, getBooking, getCategories, getExtras, listSeries } from '@/lib/data';
 import { TemplatePicker } from '@/components/TemplatePicker';
 import { fillTemplate } from '@/lib/templates';
 import { berlinHm, fmtDay } from '@/lib/time';
@@ -23,6 +23,12 @@ async function decideFromMail(fd: FormData) {
   if (!ctx) redirect(`/entscheiden/${token}`);
   if (action === 'reject' && reason.length < 3) redirect(`/entscheiden/${token}?fehler=grund`);
   const one = await getBooking(ctx!.bookingId);
+  const altStart = Number(fd.get('altStart')), altEnd = Number(fd.get('altEnd'));
+  if (action === 'confirm' && altStart && altEnd) {
+    const b = await confirmOnAlternative(ctx!.bookingId, ctx!.admin.name, altStart, altEnd);
+    if (b) await afterDecision(b);
+    redirect(`/entscheiden/${token}?erledigt=${b ? 'confirm' : 'schon'}`);
+  }
   if (whole && one?.seriesId) {
     const list = await decideSeries(one.seriesId, action, ctx!.admin.name, action === 'reject' ? reason : undefined);
     await afterSeriesDecision(list);
@@ -53,6 +59,7 @@ export default async function Entscheiden({ params, searchParams }: { params: Pr
   const open = b.status === 'requested';
   const series = b.seriesId ? (await listSeries(b.seriesId)).filter((x) => x.status === 'requested') : [];
   const whole = series.length > 1 ? '1' : '';
+  const options = open && b.alternatives.length ? await checkOptions(b) : [];
   const check = open ? await checkExisting(b) : null;
   const done = sp.erledigt;
   return (
@@ -76,10 +83,19 @@ export default async function Entscheiden({ params, searchParams }: { params: Pr
           </div>
           {open && (
             <div className="card-foot decide-foot">
+              {options.length > 1 ? (
+                <ul className="opt-list" style={{ width: '100%' }}>{options.map((o) => (
+                  <li key={o.start}><span><b className="num">{fmtDay(o.start)}, {berlinHm(o.start)}–{berlinHm(o.end)}</b> <span className="muted small">{o.main ? 'Wunschtermin' : 'Ausweichtermin'}</span><br />
+                    <span className={`badge b-${o.check.level === 'ok' ? 'ok' : o.check.level === 'warn' ? 'warn' : 'bad'}`} style={{ whiteSpace: 'normal' }}>{o.check.level === 'ok' ? 'frei' : o.check.messages[0]?.text}</span></span>
+                    <form action={decideFromMail}><input type="hidden" name="token" value={token} /><input type="hidden" name="action" value="confirm" />
+                      {!o.main && <><input type="hidden" name="altStart" value={o.start} /><input type="hidden" name="altEnd" value={o.end} /></>}
+                      <button className="btn btn-ok" type="submit" disabled={o.check.level === 'block'}><Check className="icon-sm" />Bestätigen</button></form>
+                  </li>))}</ul>
+              ) : (
               <form action={decideFromMail}>
                 <input type="hidden" name="token" value={token} /><input type="hidden" name="action" value="confirm" /><input type="hidden" name="whole" value={whole} />
                 <button className="btn btn-ok btn-lg" type="submit"><Check className="icon-sm" />{whole ? `Alle ${series.length} bestätigen` : 'Bestätigen'}</button>
-              </form>
+              </form>)}
               <details className="reject-box">
                 <summary className="btn btn-danger"><X className="icon-sm" />Ablehnen …</summary>
                 <form action={decideFromMail} className="stack-sm" style={{ marginTop: 12 }}>

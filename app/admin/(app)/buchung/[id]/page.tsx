@@ -8,11 +8,11 @@ import { Flash } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { getSignatures, checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
+import { checkOptions, getSignatures, checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
 import { MessageThread } from '@/components/MessageThread';
 import { eur } from '@/lib/labels';
 import { berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong } from '@/lib/time';
-import { decideSeriesAction, cancelSeriesAction, changeAction, decideAction, handoverAction, messageAction, moneyAction, noteAction, refundAction, silentAction } from '../../../actions';
+import { confirmAltAction, decideSeriesAction, cancelSeriesAction, changeAction, decideAction, handoverAction, messageAction, moneyAction, noteAction, refundAction, silentAction } from '../../../actions';
 
 export const metadata = { title: 'Buchung' };
 
@@ -56,6 +56,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
   const dayDiff = Math.round((berlinToUtc(berlinYmd(b.start), '00:00') - berlinToUtc(berlinYmd(Date.now()), '00:00')) / 864e5);
   const rel = Date.now() >= b.start && Date.now() < b.end ? { text: 'läuft gerade', cls: 'now' } : b.end <= Date.now() ? { text: dayDiff === 0 ? 'heute vorbei' : `vor ${-dayDiff} ${dayDiff === -1 ? 'Tag' : 'Tagen'}`, cls: 'past' }
     : { text: dayDiff === 0 ? `heute, ${berlinHm(b.start)} Uhr` : dayDiff === 1 ? 'morgen' : `in ${dayDiff} Tagen`, cls: dayDiff <= 2 ? 'soon' : '' };
+  const options = b.status === 'requested' && b.alternatives.length ? await checkOptions(b) : [];
   const tpl = (use: 'reject' | 'message') => extras.templates.filter((t) => t.use === use || t.use === 'both')
     .map((t) => ({ title: t.title, text: fillTemplate(t.text, { name: b.name, title: b.title, date: fmtDay(b.start), time: `${berlinHm(b.start)}–${berlinHm(b.end)} Uhr`, agreedWith: b.agreedWith }) }));
   const hidden = (action: string) => <><input type="hidden" name="id" value={b.id} /><input type="hidden" name="action" value={action} /><input type="hidden" name="back" value={`/admin/buchung/${b.id}`} /></>;
@@ -137,7 +138,16 @@ export default async function Detail({ params, searchParams }: { params: Promise
               <div className="card-head"><h2>Entscheidung</h2></div>
               <div className="card-body stack">
                 {b.status === 'pending_email' && <p className="muted small">Die E-Mail-Adresse ist noch nicht bestätigt. Ohne Bestätigung verfällt die Anfrage 24 Stunden nach Eingang.</p>}
-                {b.status === 'requested' && <form action={decideAction}>{hidden('confirm')}<button className="btn btn-ok" type="submit">Bestätigen und Mail senden</button></form>}
+                {b.status === 'requested' && options.length < 2 && <form action={decideAction}>{hidden('confirm')}<button className="btn btn-ok" type="submit">Bestätigen und Mail senden</button></form>}
+                {b.status === 'requested' && options.length > 1 && (
+                  <div className="stack-sm"><span className="small"><b>Wunschtermin oder Ausweichtermin bestätigen</b></span>
+                    <ul className="opt-list">{options.map((o) => (
+                      <li key={o.start}><span><b className="num">{fmtDay(o.start)}, {berlinHm(o.start)}–{berlinHm(o.end)}</b> <span className="muted small">{o.main ? 'Wunschtermin' : 'Ausweichtermin'}</span><br />
+                        <span className={`badge b-${o.check.level === 'ok' ? 'ok' : o.check.level === 'warn' ? 'warn' : 'bad'}`} style={{ whiteSpace: 'normal' }}>{o.check.level === 'ok' ? 'frei' : o.check.messages[0]?.text}</span></span>
+                        {o.main ? <form action={decideAction}>{hidden('confirm')}<button className="btn btn-sm btn-ok" type="submit" disabled={o.check.level === 'block'}>Bestätigen</button></form>
+                          : <form action={confirmAltAction}><input type="hidden" name="id" value={b.id} /><input type="hidden" name="start" value={o.start} /><input type="hidden" name="end" value={o.end} /><button className="btn btn-sm btn-ok" type="submit" disabled={o.check.level === 'block'}>Diesen bestätigen</button></form>}
+                      </li>))}</ul></div>
+                )}
                 <form action={decideAction} className="stack-sm">
                   {hidden(b.status === 'confirmed' ? 'cancel' : 'reject')}
                   <div className="field"><label htmlFor="reason">{b.status === 'confirmed' ? 'Stornieren' : 'Ablehnen'}: Begründung für {b.name}</label>

@@ -17,7 +17,7 @@ export type Booking = {
   start: number; end: number; guests: number; bookerType: 'member' | 'external'; team: string;
   name: string; email: string; phone: string; agreedWith: string; manageToken: string; equipment: string[];
   rejectReason: string | null; internalNote: string; decidedBy: string | null; createdAt: number;
-  seriesId: string | null; createdBy: string | null; silent: boolean; lang: Lang;
+  seriesId: string | null; createdBy: string | null; silent: boolean; lang: Lang; alternatives: { start: number; end: number }[];
   rent: number; deposit: number; rentPaid: boolean; depositPaid: boolean; depositReturned: boolean; depositWithheld: number;
   keyHandedOut: boolean; handoverAt: number | null; handoverBy: string | null; meterStart: number | null;
   returnAt: number | null; returnBy: string | null; meterEnd: number | null; conditionOk: boolean | null; damageNote: string;
@@ -34,7 +34,7 @@ export const toBooking = (r: Row): Booking => ({
   name: r.name as string, email: r.email as string, phone: r.phone as string, agreedWith: r.agreed_with as string,
   manageToken: r.manage_token as string, equipment: (r.equipment as string[]) ?? [], rejectReason: (r.reject_reason as string) ?? null,
   internalNote: r.internal_note as string, decidedBy: (r.decided_by as string) ?? null, createdAt: +(r.created_at as Date),
-  seriesId: (r.series_id as string) ?? null, createdBy: (r.created_by as string) ?? null, silent: !!r.silent, lang: isLang(r.lang) ? r.lang : 'de',
+  seriesId: (r.series_id as string) ?? null, createdBy: (r.created_by as string) ?? null, silent: !!r.silent, lang: isLang(r.lang) ? r.lang : 'de', alternatives: Array.isArray(r.alternatives) ? (r.alternatives as { start: number; end: number }[]) : [],
   rent: num(r.rent_eur), deposit: num(r.deposit_eur), rentPaid: !!r.rent_paid, depositPaid: !!r.deposit_paid, depositReturned: !!r.deposit_returned, depositWithheld: num(r.deposit_withheld_eur),
   keyHandedOut: !!r.key_handed_out, handoverAt: ts(r.handover_at), handoverBy: (r.handover_by as string) ?? null, meterStart: numOrNull(r.meter_start),
   returnAt: ts(r.return_at), returnBy: (r.return_by as string) ?? null, meterEnd: numOrNull(r.meter_end),
@@ -139,6 +139,7 @@ export async function getPublicOccupancy(from: number, to: number) {
 export type NewBooking = {
   categoryId: string; title: string; note: string; start: number; end: number; guests: number; equipment: string[];
   bookerType: 'member' | 'external'; team: string; name: string; email: string; phone: string; agreedWith: string; lang?: Lang;
+  alternatives?: { start: number; end: number }[];
 };
 export type CreateResult = { ok: true; booking: Booking; verifyToken: string } | { ok: false; check: CheckResult };
 
@@ -164,6 +165,8 @@ export async function createBooking(b: NewBooking): Promise<CreateResult> {
       guests: b.guests, booker_type: b.bookerType, team: b.team, name: b.name, email: b.email.toLowerCase(), phone: b.phone,
       agreed_with: b.agreedWith, party_weekend: partyWeekendOf(b.start, cat, ctx.settings), manage_token: token(), verify_token: verifyToken,
       equipment, rent_eur: fees.rent, deposit_eur: fees.deposit, lang: b.lang ?? 'de',
+      // Ausweichtermine nur speichern, wenn sie (jetzt) frei sind; sie blockieren den Kalender nicht
+      alternatives: q.json((b.alternatives ?? []).filter((a) => checkBooking({ ...b, ...a }, { ...ctx, now: Date.now(), lang: b.lang }).level !== 'block').slice(0, 2)),
     })} returning *`;
     await audit(q, b.email, row.id, 'created');
     return { ok: true as const, booking: toBooking(row), verifyToken };
@@ -728,4 +731,20 @@ export async function saveHandoverStep(id: string, actor: string, kind: 'out' | 
     else await q`update bookings set return_at = now(), return_by = ${actor}, meter_end = ${d.meter}, condition_ok = ${d.conditionOk ?? null}, damage_note = ${d.damageNote ?? ''} where id = ${id}`;
     await audit(q, actor, id, kind === 'out' ? 'handover-signed' : 'return-signed', { signer: d.signer, meter: d.meter, checklist: d.checklist });
   });
+}
+
+// ---------- Ausweichtermine ----------
+/** Prüft Haupt- und Ausweichtermine einer Anfrage gegen den aktuellen Kalender (für die Entscheidung). */
+export async function checkOptions(b: Booking): Promise<{ start: number; end: number; main: boolean; check: CheckResult }[]> {
+  const opts = [{ start: b.start, end: b.end, main: true }, ...b.alternatives.map((a) => ({ ...a, main: false }))];
+  return Promise.all(opts.map(async (o) => ({ ...o, check: await checkExisting({ ...b, start: o.start, end: o.end }) })));
+}
+/** Bestätigt eine Anfrage auf einem Ausweichtermin: Termin verschieben, Ausweichtermine leeren, dann bestätigen. */
+export async function confirmOnAlternative(id: string, actor: string, start: number, end: number): Promise<Booking | null> {
+  const b = await getBooking(id);
+  if (!b || b.status !== 'requested' || !b.alternatives.some((a) => a.start === start && a.end === end)) return null;
+  const res = await changeBooking(id, actor, { categoryId: b.categoryId, title: b.title, guests: b.guests, equipment: b.equipment, start, end }, false);
+  if (!res.ok) return null;
+  await db()`update bookings set alternatives = '[]' where id = ${id}`;
+  return decide(id, 'confirm', actor);
 }
