@@ -748,3 +748,44 @@ export async function confirmOnAlternative(id: string, actor: string, start: num
   await db()`update bookings set alternatives = '[]' where id = ${id}`;
   return decide(id, 'confirm', actor);
 }
+
+// ---------- Bucher-Profile ----------
+export const PROFILE_TAGS = ['Stammbucher', 'zuverlässig', 'Kaution einbehalten', 'Rücksprache nötig'] as const;
+export type BookerSummary = { email: string; name: string; team: string; phone: string; total: number; confirmed: number; cancelled: number; last: number | null; next: number | null; tags: string[]; external: boolean };
+const keyOf = (email: string) => Buffer.from(email.toLowerCase()).toString('base64url');
+export const bookerKey = keyOf;
+export const emailFromBookerKey = (k: string) => { try { const e = Buffer.from(k, 'base64url').toString('utf8'); return /^[^@\s]+@[^@\s]+$/.test(e) ? e : null; } catch { return null; } };
+
+export async function listBookers(search = ''): Promise<BookerSummary[]> {
+  const like = search ? `%${search.replace(/[%_]/g, '')}%` : null;
+  const rows = await db()`
+    with b as (select *, lower(email) as em from bookings where email <> 'geloescht@invalid' and not (email like '%@invalid'))
+    select em as email,
+      (array_agg(name order by created_at desc))[1] as name, (array_agg(team order by created_at desc))[1] as team, (array_agg(phone order by created_at desc))[1] as phone,
+      bool_or(booker_type = 'external') as external,
+      count(*)::int as total, count(*) filter (where status = 'confirmed')::int as confirmed, count(*) filter (where status in ('cancelled', 'rejected'))::int as cancelled,
+      max(starts_at) filter (where starts_at < now() and status = 'confirmed') as last, min(starts_at) filter (where starts_at >= now() and status in ('confirmed', 'requested')) as next,
+      coalesce((select tags from booker_profiles p where p.email = em), '{}') as tags
+    from b where status <> 'pending_email' and status <> 'expired'
+    ${like ? db()`and (name ilike ${like} or team ilike ${like} or email ilike ${like})` : db()``}
+    group by em order by count(*) desc, max(starts_at) desc limit 300`;
+  return rows.map((r) => ({ email: r.email, name: r.name, team: r.team ?? '', phone: r.phone ?? '', total: r.total, confirmed: r.confirmed, cancelled: r.cancelled,
+    last: r.last ? +r.last : null, next: r.next ? +r.next : null, tags: r.tags ?? [], external: !!r.external }));
+}
+export async function getProfile(email: string) {
+  const em = email.toLowerCase();
+  const [p] = await db()`select * from booker_profiles where email = ${em}`;
+  const list = await listByEmail(em);
+  const [fb] = await db()`select count(*)::int as n, avg(rating)::float as avg, bool_or(damage) as damage from feedback f join bookings b on b.id = f.booking_id where lower(b.email) = ${em}`;
+  return { note: (p?.note as string) ?? '', tags: (p?.tags as string[]) ?? [], updatedBy: (p?.updated_by as string) ?? '', updatedAt: p ? +p.updated_at : null, bookings: list,
+    feedback: { n: fb?.n ?? 0, avg: fb?.avg ?? null, damage: !!fb?.damage } };
+}
+export async function saveProfile(email: string, actor: string, note: string, tags: string[]) {
+  const em = email.toLowerCase();
+  await db()`insert into booker_profiles (email, note, tags, updated_by) values (${em}, ${note}, ${tags}, ${actor})
+    on conflict (email) do update set note = excluded.note, tags = excluded.tags, updated_by = excluded.updated_by, updated_at = now()`;
+}
+export async function profileTags(email: string): Promise<string[]> {
+  const [p] = await db()`select tags from booker_profiles where email = ${email.toLowerCase()}`;
+  return (p?.tags as string[]) ?? [];
+}

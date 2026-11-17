@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { QuickSearch } from './QuickSearch';
-import { BarChart3, FileSpreadsheet, CalendarDays, CalendarOff, ClipboardList, History, Hourglass, Image as ImageIcon, LayoutDashboard, MessageSquareText, PlusCircle, Search, Settings, Users } from 'lucide-react';
+import { Contact, BarChart3, FileSpreadsheet, CalendarDays, CalendarOff, ClipboardList, History, Hourglass, Image as ImageIcon, LayoutDashboard, MessageSquareText, PlusCircle, Search, Settings, Users } from 'lucide-react';
 
 const GROUPS = [
   { name: 'Betrieb', items: [
@@ -12,6 +12,7 @@ const GROUPS = [
     { href: '/admin/buchungen', label: 'Buchungen', icon: ClipboardList },
     { href: '/admin/neu', label: 'Termin eintragen', icon: PlusCircle },
     { href: '/admin/warteliste', label: 'Warteliste', icon: Hourglass },
+    { href: '/admin/bucher', label: 'Bucher', icon: Contact },
   ] },
   { name: 'Auswertung', items: [
     { href: '/admin/statistik', label: 'Statistik', icon: BarChart3 },

@@ -8,7 +8,7 @@ import { Flash } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { checkOptions, getSignatures, checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
+import { bookerKey, profileTags, checkOptions, getSignatures, checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
 import { MessageThread } from '@/components/MessageThread';
 import { eur } from '@/lib/labels';
 import { berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong } from '@/lib/time';
@@ -56,6 +56,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
   const dayDiff = Math.round((berlinToUtc(berlinYmd(b.start), '00:00') - berlinToUtc(berlinYmd(Date.now()), '00:00')) / 864e5);
   const rel = Date.now() >= b.start && Date.now() < b.end ? { text: 'läuft gerade', cls: 'now' } : b.end <= Date.now() ? { text: dayDiff === 0 ? 'heute vorbei' : `vor ${-dayDiff} ${dayDiff === -1 ? 'Tag' : 'Tagen'}`, cls: 'past' }
     : { text: dayDiff === 0 ? `heute, ${berlinHm(b.start)} Uhr` : dayDiff === 1 ? 'morgen' : `in ${dayDiff} Tagen`, cls: dayDiff <= 2 ? 'soon' : '' };
+  const tags = await profileTags(b.email);
   const options = b.status === 'requested' && b.alternatives.length ? await checkOptions(b) : [];
   const tpl = (use: 'reject' | 'message') => extras.templates.filter((t) => t.use === use || t.use === 'both')
     .map((t) => ({ title: t.title, text: fillTemplate(t.text, { name: b.name, title: b.title, date: fmtDay(b.start), time: `${berlinHm(b.start)}–${berlinHm(b.end)} Uhr`, agreedWith: b.agreedWith }) }));
@@ -228,6 +229,8 @@ export default async function Detail({ params, searchParams }: { params: Promise
             <div className="card-head"><h2>Kontakt</h2><span className="badge b-info no-dot">{b.bookerType === 'member' ? 'Mitglied' : 'nicht im Verein'}</span></div>
             <div className="card-body stack-sm">
               <b>{b.name}</b>{b.team && <span className="muted">{b.team}</span>}
+              {tags.length > 0 && <span className="bk-tags">{tags.map((t) => <span key={t} className={`badge no-dot tag-${t.replace(/\W+/g, '')}`}>{t}</span>)}</span>}
+              {!b.email.endsWith('@invalid') && <Link href={`/admin/bucher/${bookerKey(b.email)}`} className="small">Profil und alle Buchungen →</Link>}
               <a href={`mailto:${b.email}`} className="inline"><Mail className="icon-sm" />{b.email}</a>
               {b.phone && <a href={telHref(b.phone)} className="inline"><Phone className="icon-sm" />{b.phone}</a>}
               {!b.email.endsWith('@invalid') && <div className="contact-actions">

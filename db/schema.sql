@@ -311,6 +311,15 @@ create table if not exists signatures (
 -- ---------- Version 14: Ausweichtermine ----------
 alter table bookings add column if not exists alternatives jsonb not null default '[]';
 
+-- ---------- Version 15: Bucher-Profile ----------
+create table if not exists booker_profiles (
+  email text primary key,
+  note text not null default '',
+  tags text[] not null default '{}',
+  updated_by text not null default '',
+  updated_at timestamptz not null default now()
+);
+
 -- Supabase: Zugriff nur über den Server (Service-Verbindung). Öffentliche Rollen sehen nichts.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -332,5 +341,6 @@ do $$ begin
     execute 'alter table push_subscriptions enable row level security';
     execute 'alter table inbound_mail enable row level security';
     execute 'alter table signatures enable row level security';
+    execute 'alter table booker_profiles enable row level security';
   end if;
 end $$;

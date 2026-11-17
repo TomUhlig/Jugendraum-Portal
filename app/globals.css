@@ -910,3 +910,22 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .alt-row input[type=date] { width: auto; min-height: 38px }
 .opt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px }
 .opt-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; flex-wrap: wrap }
+/* ---------- Bucher ---------- */
+.booker-row { display: grid; grid-template-columns: 40px 1fr auto auto; gap: 14px; align-items: center; color: inherit; text-decoration: none; padding-block: 4px }
+.booker-row:hover b { color: var(--brand-ink) }
+.bk-main { display: grid; gap: 2px; min-width: 0 }
+.bk-main > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.bk-tags { display: flex; gap: 4px; flex-wrap: wrap; white-space: normal !important }
+.bk-stats { display: grid; justify-items: end; line-height: 1.2 }
+.bk-stats b { font-size: 1.2rem; font-family: var(--f-display) }
+.bk-dates { min-width: 130px; text-align: right }
+.avatar.lg { width: 52px; height: 52px; font-size: 1.1rem }
+.tag-zuverlässig, .tag-zuverlssig { --b-bg: var(--ok-bg); --b-fg: var(--ok) }
+.tag-Stammbucher { --b-bg: var(--brand-tint); --b-fg: var(--brand-ink) }
+.tag-Kautioneinbehalten, .tag-Rücksprachenötig, .tag-Rcksprachentig { --b-bg: var(--warn-bg); --b-fg: var(--warn) }
+.chip-check { display: inline-flex; cursor: pointer }
+.chip-check input { position: absolute; opacity: 0; pointer-events: none }
+.chip-check span { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-strong); font-size: .85rem; font-weight: 600; color: var(--ink-2) }
+.chip-check input:checked + span { background: var(--brand); border-color: var(--brand); color: #fff }
+.chip-check input:focus-visible + span { outline: 2px solid var(--brand-ink); outline-offset: 2px }
+@media (max-width: 700px) { .booker-row { grid-template-columns: 40px 1fr auto } .bk-dates { display: none } }

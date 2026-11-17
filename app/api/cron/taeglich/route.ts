@@ -63,6 +63,9 @@ export async function GET(req: Request) {
   const anon = await q`update bookings set name = 'gelöscht', email = 'geloescht@invalid', phone = '', note = '', team = '', internal_note = ''
     where ends_at < now() - interval '12 months' and email <> 'geloescht@invalid' returning *`;
   report.anonymized = anon.length;
+  // Profile ohne verbleibende Buchungen ebenfalls löschen
+  const gone = await q`delete from booker_profiles p where not exists (select 1 from bookings b where lower(b.email) = p.email) returning email`;
+  report.profilesRemoved = gone.length;
   // auch im Google-Kalender die Namen entfernen
   for (const r of anon.filter((x) => x.google_event_id).slice(0, 50)) await syncToGoogle(toBooking(r));
 

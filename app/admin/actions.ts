@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
   Admin, MailTextKey, addBlackout, deletePhoto, movePhoto, updatePhoto, addMessage, getPayment, recordRefund, addRecurring, deleteRecurring, removeWaitById, adminCreate, cancelSeries, changeBooking, decide, deleteBlackout, getBooking, getCategories, getExtras,
-  confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
+  PROFILE_TAGS, emailFromBookerKey, saveProfile, confirmOnAlternative, decideSeries, removeAdmin, saveSettings, setSilent, updateHandover, updateInternal, updateMoney, upsertAdmin, listBookings,
 } from '@/lib/data';
 import { mailMode, mails, teamMails } from '@/lib/mail';
 import { isValidIban, normalizeIban } from '@/lib/payment';
@@ -437,4 +437,14 @@ export async function confirmAltAction(fd: FormData) {
   if (!b) go(`/admin/buchung/${id}`, 'fehler', 'Der Ausweichtermin ist inzwischen nicht mehr frei oder die Anfrage wurde schon bearbeitet.');
   await afterDecision(b!);
   go(`/admin/buchung/${id}`, 'ok', `Bestätigt auf ${fmtDayShort(b!.start)}.${b!.silent ? '' : ` ${b!.name} bekommt die Bestätigung mit dem neuen Termin.`}`);
+}
+
+export async function profileAction(fd: FormData) {
+  const admin = await requireAdmin('manager');
+  const key = str(fd, 'key', 400);
+  const email = emailFromBookerKey(key);
+  if (!email) go('/admin/bucher', 'fehler', 'Unbekannter Bucher.');
+  const tags = fd.getAll('tags').map(String).filter((t) => (PROFILE_TAGS as readonly string[]).includes(t));
+  await saveProfile(email!, admin.name, String(fd.get('note') ?? '').trim().slice(0, 2000), tags);
+  go(`/admin/bucher/${key}`, 'ok', 'Profil gespeichert.');
 }
