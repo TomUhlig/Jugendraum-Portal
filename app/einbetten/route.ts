@@ -2,7 +2,7 @@ import { esc } from '@/lib/util/html';
 import { getPublicOccupancy, getRooms } from '@/lib/data';
 import { appUrl } from '@/lib/url';
 import { addDays, berlinParts, berlinToUtc, berlinYmd } from '@/lib/time';
-import { isLang, t, type Lang } from '@/lib/i18n';
+import { LOCALE, isLang, t, type Lang } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +19,7 @@ export async function GET(req: Request) {
   const dark = u.searchParams.get('theme') === 'dark';
   const l = u.searchParams.get('lang');
   const lang: Lang = isLang(l) ? l : 'de';
-  const T = TX[lang], D = t(lang);
+  const T = TX[lang as keyof typeof TX] ?? TX.en, D = t(lang);
   const today = berlinYmd(Date.now());
   const from = berlinToUtc(today, '00:00'), to = berlinToUtc(addDays(today, days), '00:00');
   const rooms = await getRooms();
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   const occ = await getPublicOccupancy(from, to, room.id);
   const base = appUrl();
   const W0 = 8, W1 = 24; // sichtbarer Bereich 8–24 Uhr
-  const LOC = { de: 'de-DE', en: 'en-GB', tr: 'tr-TR' }[lang];
+  const LOC = LOCALE[lang];
   const wd = new Intl.DateTimeFormat(LOC, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Berlin' });
   const rows: string[] = [];
   for (let i = 0; i < days; i++) {

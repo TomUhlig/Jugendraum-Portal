@@ -46,8 +46,9 @@ function wrap(text: string, font: PDFFont, size: number, width: number): string[
 
 /** A4-PDF mit Hausordnung, Schlüsselregeln und den Eckdaten der Buchung (Anhang der Bestätigungsmail). */
 export async function hausordnungPdf(b: Booking, cat: Category | undefined, capacity: number, op: Operator): Promise<{ filename: string; content: string }> {
-  const lang: Lang = b.lang ?? 'de';
-  const T = TX[lang];
+  // Arabisch hat in der eingebetteten Schrift keine Zeichen und keine Rechts-nach-links-Satzung: dann Englisch
+  const lang: Lang = b.lang === 'ar' ? 'en' : (b.lang ?? 'de');
+  const T = TX[lang as keyof typeof TX] ?? TX.en;
   const a = await assets();
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);

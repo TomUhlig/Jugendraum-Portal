@@ -94,15 +94,16 @@ const eurL = (n: number, lang: Lang) => n.toLocaleString(LOCALE[lang], { style: 
 type Mailout = { preheader: string; heading: string; blocks: Block[]; cta?: { href: string; label: string }; lang?: Lang; after?: Block[]; progress?: 1 | 2 | 3 | 4 };
 function layout(o: Mailout) {
   const M = MAIL_TEXT[o.lang ?? 'de'];
-  return `<!doctype html><html lang="${o.lang ?? 'de'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${esc(o.heading)}</title></head>
-<body style="margin:0;padding:0;background:#F4F5F8;font-family:'Source Sans 3','Segoe UI',Helvetica,Arial,sans-serif">
+  const rtl = o.lang === 'ar';
+  return `<!doctype html><html lang="${o.lang ?? 'de'}" dir="${rtl ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${esc(o.heading)}</title></head>
+<body dir="${rtl ? 'rtl' : 'ltr'}" style="margin:0;padding:0;background:#F4F5F8;font-family:'Source Sans 3','Segoe UI',Tahoma,Helvetica,Arial,sans-serif;text-align:${rtl ? 'right' : 'left'}">
 <span style="display:none;max-height:0;overflow:hidden">${esc(o.preheader)}</span>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F5F8;padding:28px 12px"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#FFFFFF;border:1px solid #E1E4EC;border-top:4px solid #FFD800;border-radius:8px">
 <tr><td style="padding:20px 28px;border-bottom:1px solid #E1E4EC">
   <table role="presentation" cellpadding="0" cellspacing="0"><tr>
   <td><img src="${appUrl()}/logo.png" width="36" height="36" alt="SV Heepen" style="display:block"></td>
-  <td style="padding-left:12px;font-size:16px;line-height:1.2;color:#2E367A;font-weight:700">${M.room}<br><span style="font-size:12px;color:#646A85;font-weight:400">SV Heepen</span></td>
+  <td style="padding-${rtl ? 'right' : 'left'}:12px;font-size:16px;line-height:1.2;color:#2E367A;font-weight:700">${M.room}<br><span style="font-size:12px;color:#646A85;font-weight:400">SV Heepen</span></td>
   </tr></table></td></tr>
 <tr><td style="padding:28px 28px 8px">
 ${o.progress ? progressBar(o.progress, o.lang ?? 'de') : ''}<h1 style="margin:0 0 16px;font-size:21px;line-height:1.3;color:#161A33;font-weight:700">${esc(o.heading)}</h1>
@@ -117,6 +118,8 @@ const PROGRESS: Record<Lang, string[]> = {
   de: ['Angefragt', 'E-Mail bestätigt', 'Bestätigt', 'Termin'],
   en: ['Requested', 'Email confirmed', 'Confirmed', 'Your date'],
   tr: ['Talep', 'E-posta onaylandı', 'Onaylandı', 'Tarih'],
+  uk: ['Запит', 'Пошту підтверджено', 'Підтверджено', 'Дата'],
+  ar: ['الطلب', 'تأكيد البريد', 'مؤكد', 'الموعد'],
 };
 /** Kleine Schrittanzeige oben in Bucher-Mails: wo steht meine Anfrage? */
 function progressBar(step: number, lang: Lang): string {
@@ -137,8 +140,8 @@ function build(o: Mailout) {
 }
 
 
-const GCAL_TX: Record<Lang, string> = { de: 'In Google Kalender eintragen', en: 'Add to Google Calendar', tr: 'Google Takvim’e ekle' };
-const ATTACH_TX: Record<Lang, string> = { de: 'Kalenderdatei und Hausordnung (PDF) im Anhang', en: 'Calendar file and house rules (PDF) attached', tr: 'Takvim dosyası ve ev kuralları (PDF) ekte' };
+const GCAL_TX: Record<Lang, string> = { de: 'In Google Kalender eintragen', en: 'Add to Google Calendar', tr: 'Google Takvim’e ekle', uk: 'Додати в Google Календар', ar: 'إضافة إلى تقويم Google' };
+const ATTACH_TX: Record<Lang, string> = { de: 'Kalenderdatei und Hausordnung (PDF) im Anhang', en: 'Calendar file and house rules (PDF) attached', tr: 'Takvim dosyası ve ev kuralları (PDF) ekte', uk: 'Файл календаря та правила (PDF) у вкладенні', ar: 'ملف التقويم وقواعد الاستخدام (PDF) مرفقان' };
 const PROTO_TX = {
   de: { out: { subject: (t: string) => `Schlüssel übergeben: ${t}`, heading: 'Schlüssel übergeben', text: 'danke, der Schlüssel ist übergeben. Das unterschriebene Protokoll findest du im Anhang. Viel Spaß im Jugendraum!' },
         in: { subject: (t: string) => `Rückgabe bestätigt: ${t}`, heading: 'Rückgabe bestätigt', text: 'danke für die Rückgabe. Das unterschriebene Protokoll mit Zählerstand und Zustand findest du im Anhang.' } },
@@ -146,13 +149,19 @@ const PROTO_TX = {
         in: { subject: (t: string) => `Return confirmed: ${t}`, heading: 'Return confirmed', text: 'thank you for returning the room. The signed record with meter reading and condition is attached.' } },
   tr: { out: { subject: (t: string) => `Anahtar teslim edildi: ${t}`, heading: 'Anahtar teslim edildi', text: 'teşekkürler, anahtar teslim edildi. İmzalı tutanak ektedir. Gençlik salonunda iyi eğlenceler!' },
         in: { subject: (t: string) => `İade onaylandı: ${t}`, heading: 'İade onaylandı', text: 'iade için teşekkürler. Sayaç ve durum bilgisini içeren imzalı tutanak ektedir.' } },
+  uk: { out: { subject: (t: string) => `Ключ передано: ${t}`, heading: 'Ключ передано', text: 'дякуємо, ключ передано. Підписаний протокол у вкладенні. Гарно провести час!' },
+        in: { subject: (t: string) => `Повернення підтверджено: ${t}`, heading: 'Повернення підтверджено', text: 'дякуємо за повернення. Підписаний протокол із показниками лічильника та станом приміщення у вкладенні.' } },
+  ar: { out: { subject: (t: string) => `تم تسليم المفتاح: ${t}`, heading: 'تم تسليم المفتاح', text: 'شكرًا، تم تسليم المفتاح. المحضر الموقع مرفق. نتمنى لكم وقتًا ممتعًا!' },
+        in: { subject: (t: string) => `تم تأكيد الإرجاع: ${t}`, heading: 'تم تأكيد الإرجاع', text: 'شكرًا على الإرجاع. المحضر الموقع مع قراءة العداد وحالة القاعة مرفق.' } },
 };
 const SERIES_TX = {
   de: { title: (n: number) => `Alle ${n} Termine der Serie`, skipped: 'Diese Termine waren schon belegt und wurden nicht angefragt:' },
   en: { title: (n: number) => `All ${n} dates of the series`, skipped: 'These dates were already taken and were not requested:' },
   tr: { title: (n: number) => `Serinin ${n} tarihinin tümü`, skipped: 'Bu tarihler zaten doluydu ve talep edilmedi:' },
+  uk: { title: (n: number) => `Усі ${n} дат серії`, skipped: 'Ці дати вже були зайняті й не запитувалися:' },
+  ar: { title: (n: number) => `كل مواعيد السلسلة (${n})`, skipped: 'هذه المواعيد كانت محجوزة ولم تُطلب:' },
 };
-const ALT_TX: Record<Lang, string> = { de: 'Ausweichtermine, falls der Wunschtermin nicht klappt', en: 'Alternative dates if the preferred one does not work', tr: 'İstenen tarih olmazsa alternatif tarihler' };
+const ALT_TX: Record<Lang, string> = { de: 'Ausweichtermine, falls der Wunschtermin nicht klappt', en: 'Alternative dates if the preferred one does not work', tr: 'İstenen tarih olmazsa alternatif tarihler', uk: 'Запасні дати, якщо бажана не підійде', ar: 'مواعيد بديلة إن لم يناسب الموعد المفضل' };
 /** Ausweichtermine einer Anfrage als kurzer Block. */
 function altBlock(b: Booking): Block[] {
   if (!b.alternatives?.length || b.status === 'confirmed') return [];
@@ -168,12 +177,12 @@ function seriesBlock(dates: { start: number; end: number }[], lang: Lang, skippe
   return out;
 }
 
-const ROOM_TX: Record<Lang, string> = { de: 'Raum', en: 'Room', tr: 'Salon' };
+const ROOM_TX: Record<Lang, string> = { de: 'Raum', en: 'Room', tr: 'Salon', uk: 'Приміщення', ar: 'القاعة' };
 function details(b: Booking, c?: Category, extra: [string, string][] = [], lang: Lang = 'de'): Block {
   const L = MAIL_TEXT[lang].labels;
   const eur = (n: number) => eurL(n, lang);
   const rows: [string, string][] = [
-    [L.booking, b.number], ...(roomLabel(b.roomId) ? [[ROOM_TX[lang], esc(roomLabel(b.roomId)!)] as [string, string]] : []), [L.occasion, esc(b.title)], [L.date, `${fmtLong(b.start, lang)}<br>${berlinHm(b.start)}–${berlinHm(b.end)}${L.uhr}${berlinYmd(b.end) !== berlinYmd(b.start) ? ` (${L.until} ${fmtDay(b.end, lang)})` : ''}`],
+    [L.booking, b.number], ...(roomLabel(b.roomId) ? [[ROOM_TX[lang], esc(roomLabel(b.roomId)!)] as [string, string]] : []), [L.occasion, esc(b.title)], [L.date, `${fmtLong(b.start, lang)}<br><span dir="ltr">${berlinHm(b.start)}–${berlinHm(b.end)}</span>${L.uhr}${berlinYmd(b.end) !== berlinYmd(b.start) ? ` (${L.until} ${fmtDay(b.end, lang)})` : ''}`],
     ...(c ? [[L.kind, esc(catLabel(lang, c).name)] as [string, string]] : []), [L.people, String(b.guests)],
     ...(b.equipment.length ? [[L.equipment, esc(b.equipment.join(', '))] as [string, string]] : []),
     ...(b.rent > 0 ? [[L.rent, eur(b.rent)] as [string, string]] : []), ...(b.deposit > 0 ? [[L.deposit, eur(b.deposit)] as [string, string]] : []),

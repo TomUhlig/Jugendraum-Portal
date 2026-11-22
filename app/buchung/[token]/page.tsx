@@ -143,7 +143,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
         )}
         {series.length > 1 && (
           <section className="card">
-            <div className="card-head"><h2>{({ de: 'Alle Termine dieser Serie', en: 'All dates in this series', tr: 'Bu serinin tüm tarihleri' } as const)[lang]}</h2><span className="muted small">{series.length}</span></div>
+            <div className="card-head"><h2>{({ de: 'Alle Termine dieser Serie', en: 'All dates in this series', tr: 'Bu serinin tüm tarihleri', uk: 'Усі дати цієї серії', ar: 'كل مواعيد هذه السلسلة' } as const)[lang]}</h2><span className="muted small">{series.length}</span></div>
             <ul className="list">{series.map((x) => (
               <li key={x.id} className="between" style={{ paddingBlock: 8 }}>
                 <a href={`/buchung/${x.manageToken}`} className="num" style={{ fontWeight: x.id === b.id ? 700 : 400 }}>{fmtDay(x.start, lang)}, {berlinHm(x.start)}–{berlinHm(x.end)}</a>

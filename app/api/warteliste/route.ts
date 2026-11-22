@@ -14,7 +14,7 @@ const schema = z.object({
   website: z.string().max(0).optional(),
   elapsed: z.coerce.number().optional(),
   turnstile: z.string().max(4000).optional(),
-  lang: z.enum(['de', 'en', 'tr']).default('de'),
+  lang: z.enum(['de', 'en', 'tr', 'uk', 'ar']).default('de'),
 });
 
 /** Auf die Warteliste für einen belegten Termin setzen. */

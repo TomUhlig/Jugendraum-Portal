@@ -4,7 +4,7 @@ import Link from 'next/link';
 import BookingApp from '@/components/BookingApp';
 import { turnstileEnabled, turnstileSiteKey } from '@/lib/antispam';
 import { getLang } from '@/lib/lang';
-import { t } from '@/lib/i18n';
+import { LOCALE, t } from '@/lib/i18n';
 import { getExtras, getPublicOccupancy, getRooms, listPhotos, nextFreeEvenings } from '@/lib/data';
 import { Gallery } from '@/components/Gallery';
 import { addDays, berlinParts, berlinToUtc, berlinYmd, fmtLong, hmRange } from '@/lib/time';
@@ -48,7 +48,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     nextFreeEvenings(5, '18:00', '22:00', roomParam).catch(() => []),
   ]);
   const hero = photos[0];
-  const LOC = { de: 'de-DE', en: 'en-GB', tr: 'tr-TR' }[lang];
+  const LOC = LOCALE[lang];
   const wd = new Intl.DateTimeFormat(LOC, { weekday: 'short', timeZone: 'Europe/Berlin' });
   const mo = new Intl.DateTimeFormat(LOC, { month: 'short', timeZone: 'Europe/Berlin' });
   return (

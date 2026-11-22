@@ -1,18 +1,19 @@
 import type { Metadata, Viewport } from 'next';
 import { FormBusy } from '@/components/FormBusy';
 import { AppShell } from '@/components/AppShell';
-import { Archivo, Source_Sans_3 } from 'next/font/google';
+import { Archivo, Noto_Sans_Arabic, Source_Sans_3 } from 'next/font/google';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { Theme, ThemeSwitch } from '@/components/ThemeSwitch';
 import { LangSwitch } from '@/components/LangSwitch';
 import { getLang } from '@/lib/lang';
-import { t } from '@/lib/i18n';
+import { dirOf, t } from '@/lib/i18n';
 import { NavLink } from '@/components/NavLinks';
 import './globals.css';
 
-const archivo = Archivo({ subsets: ['latin'], variable: '--font-archivo', display: 'swap' });
-const source = Source_Sans_3({ subsets: ['latin'], variable: '--font-source', display: 'swap' });
+const archivo = Archivo({ subsets: ['latin', 'latin-ext'], variable: '--font-archivo', display: 'swap' });
+const source = Source_Sans_3({ subsets: ['latin', 'latin-ext', 'cyrillic'], variable: '--font-source', display: 'swap' });
+const arabic = Noto_Sans_Arabic({ subsets: ['arabic'], variable: '--font-arabic', display: 'swap', preload: false, weight: ['400', '600', '700'] });
 
 export const metadata: Metadata = {
   title: { default: 'Jugendraum anfragen · SV Heepen', template: '%s · Jugendraum SV Heepen' },
@@ -33,7 +34,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const lang = await getLang();
   const n = t(lang).nav;
   return (
-    <html lang={lang} className={`${archivo.variable} ${source.variable}`} data-theme={theme === 'system' ? undefined : theme}>
+    <html lang={lang} dir={dirOf(lang)} className={`${archivo.variable} ${source.variable} ${arabic.variable}`} data-theme={theme === 'system' ? undefined : theme}>
       <body>
         <a href="#inhalt" className="hp">{n.skip}</a>
         <header className="site-header">

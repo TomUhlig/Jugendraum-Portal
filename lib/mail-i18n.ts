@@ -39,7 +39,8 @@ const de = {
   mine: { subject: 'Deine Buchungen im Jugendraum', pre: 'Link zu deiner Übersicht, 7 Tage gültig.', heading: 'Deine Buchungen',
     text: 'Hier ist der Link zu all deinen Buchungen im Jugendraum. Dort kannst du sie ansehen, in den Kalender übernehmen oder absagen.', small: 'Der Link ist 7 Tage gültig. Du hast ihn nicht angefordert? Dann ignoriere diese Mail.', cta: 'Meine Buchungen ansehen' },
 };
-type MailDict = typeof de;
+export type MailDict = typeof de;
+import { arMail, ukMail } from './mail-i18n-extra';
 
 const en: MailDict = {
   footer: 'Youth room of SV Heepen · This message was sent automatically. If you have questions, simply reply to this email or contact Michael Grieswelle or Sigrid Brodig.',
@@ -119,4 +120,4 @@ const tr: MailDict = {
     text: 'Gençlik salonundaki tüm rezervasyonlarınızın bağlantısı aşağıda. Orada görüntüleyebilir, takviminize ekleyebilir veya iptal edebilirsiniz.', small: 'Bağlantı 7 gün geçerlidir. Siz istemediyseniz bu e-postayı dikkate almayın.', cta: 'Rezervasyonlarımı gör' },
 };
 
-export const MAIL_TEXT: Record<Lang, MailDict> = { de, en, tr };
+export const MAIL_TEXT: Record<Lang, MailDict> = { de, en, tr, uk: ukMail, ar: arMail };

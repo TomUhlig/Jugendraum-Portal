@@ -1,11 +1,13 @@
 // Mehrsprachigkeit für alles, was Buchende sehen (Verwaltung bleibt deutsch).
 // Türkische Texte vor Veröffentlichung bitte von einer Muttersprachlerin/einem Muttersprachler gegenlesen lassen.
 
-export type Lang = 'de' | 'en' | 'tr';
-export const LANGS: Lang[] = ['de', 'en', 'tr'];
-export const LANG_LABEL: Record<Lang, string> = { de: 'Deutsch', en: 'English', tr: 'Türkçe' };
-export const LOCALE: Record<Lang, string> = { de: 'de-DE', en: 'en-GB', tr: 'tr-TR' };
-export const isLang = (v: unknown): v is Lang => v === 'de' || v === 'en' || v === 'tr';
+export type Lang = 'de' | 'en' | 'tr' | 'uk' | 'ar';
+export const LANGS: Lang[] = ['de', 'en', 'tr', 'uk', 'ar'];
+export const LANG_LABEL: Record<Lang, string> = { de: 'Deutsch', en: 'English', tr: 'Türkçe', uk: 'Українська', ar: 'العربية' };
+export const LOCALE: Record<Lang, string> = { de: 'de-DE', en: 'en-GB', tr: 'tr-TR', uk: 'uk-UA', ar: 'ar' };
+export const isLang = (v: unknown): v is Lang => typeof v === 'string' && (LANGS as string[]).includes(v);
+/** Schreibrichtung: Arabisch von rechts nach links. */
+export const dirOf = (l: Lang) => (l === 'ar' ? 'rtl' : 'ltr');
 
 /** Sprache aus Cookie oder Accept-Language (Standard Deutsch). */
 export function pickLang(cookie: string | undefined, acceptLanguage: string | null): Lang {
@@ -134,6 +136,8 @@ const de = {
 };
 
 type Dict = typeof de;
+import { uk } from './i18n-uk';
+import { ar } from './i18n-ar';
 
 const en: Dict = {
   nav: { request: 'Book', room: 'Room & rules', admin: 'Admin', mine: 'My bookings', houseRules: 'House rules', imprint: 'Legal notice', privacy: 'Privacy', club: 'SV Heepen website', footer: 'Youth room of SV Heepen', language: 'Language', skip: 'Skip to content' },
@@ -373,7 +377,7 @@ const tr: Dict = {
     nfTitle: 'Bu kapı kapalı', nfText: 'Bu sayfa yok (artık). Bağlantı yanlış kopyalanmış ya da rezervasyon silinmiş olabilir.', home: 'Ana sayfaya git', maintTitle: 'Kısa bir bakım', maintText: 'Site şu anda bakımda ve birazdan geri dönecek. Acil sorular için Michael Grieswelle veya Sigrid Brodig ile iletişime geçin.' },
 };
 
-export const DICT: Record<Lang, Dict> = { de, en, tr };
+export const DICT: Record<Lang, Dict> = { de, en, tr, uk, ar };
 export const t = (lang: Lang | undefined) => DICT[lang ?? 'de'] ?? de;
 export type { Dict };
 

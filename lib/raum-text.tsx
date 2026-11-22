@@ -4,7 +4,7 @@ type V = { capacity: number; fromH: number; untilH: string; latest: string; lead
 
 /** Texte der Seite „Raum & Regeln“ in drei Sprachen. */
 export function raumText(lang: Lang, v: V) {
-  if (lang === 'en') return {
+  if (lang === 'en' || lang === 'uk' || lang === 'ar') return {
     title: 'Room & rules', kicker: 'Youth room of SV Heepen', intro: 'To keep the youth room usable for everyone, a few rules apply. By making a request, you accept them.',
     toc: ['The room', 'How booking works', 'Parties', 'Preparation times', 'Costs', 'Key, handover, return', 'House rules', 'Cancellations and changes', 'Privacy'],
     capacity: `up to ${v.capacity} people`, capacitySub: 'maximum permitted', party: '1 party per weekend', partySub: `Fri ${v.fromH}:00 to Mon ${v.untilH}:00`,

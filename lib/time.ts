@@ -67,8 +67,8 @@ export function weekendKey(ts: number, fromHour = 12, untilHour = 6): string | n
   return back === null ? null : addDays(ymd(p), -back);
 }
 
-type Lng = 'de' | 'en' | 'tr';
-const LOC: Record<Lng, string> = { de: 'de-DE', en: 'en-GB', tr: 'tr-TR' };
+type Lng = 'de' | 'en' | 'tr' | 'uk' | 'ar';
+const LOC: Record<Lng, string> = { de: 'de-DE', en: 'en-GB', tr: 'tr-TR', uk: 'uk-UA', ar: 'ar' };
 const fmtCache = new Map<string, Intl.DateTimeFormat>();
 function fmt(lang: Lng, kind: 'day' | 'long' | 'short'): Intl.DateTimeFormat {
   const k = lang + kind;

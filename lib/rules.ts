@@ -180,11 +180,13 @@ export function expandRecurring(rules: RecurringBlock[], from: number, to: numbe
 }
 
 /** Kurzbeschreibung einer regelmäßigen Sperre, z. B. „Mo, Di · 00:00–17:00 Uhr“. */
-const WD: Record<Lang, string[]> = { de: ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'], en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], tr: ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'] };
+const WD: Record<Lang, string[]> = { de: ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'], en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], tr: ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'], uk: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'], ar: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'] };
 const RW: Record<Lang, { daily: string; workdays: string; weekend: string; allDay: string; uhr: string }> = {
   de: { daily: 'täglich', workdays: 'Mo–Fr', weekend: 'Sa und So', allDay: 'ganztägig', uhr: ' Uhr' },
   en: { daily: 'daily', workdays: 'Mon–Fri', weekend: 'Sat and Sun', allDay: 'all day', uhr: '' },
   tr: { daily: 'her gün', workdays: 'Pt–Cu', weekend: 'Ct ve Pz', allDay: 'tüm gün', uhr: '' },
+  uk: { daily: 'щодня', workdays: 'Пн–Пт', weekend: 'Сб і Нд', allDay: 'увесь день', uhr: '' },
+  ar: { daily: 'يوميًا', workdays: 'الاثنين–الجمعة', weekend: 'السبت والأحد', allDay: 'طوال اليوم', uhr: '' },
 };
 export function describeRecurring(r: RecurringBlock, lang: Lang = 'de'): string {
   const order = [1, 2, 3, 4, 5, 6, 0], w = RW[lang];

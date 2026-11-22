@@ -148,7 +148,7 @@ textarea { min-height: 96px; resize: vertical }
 .field-error { color: var(--bad); font-size: .82rem; font-weight: 600 }
 .span-2 { grid-column: span 2 }
 @media (max-width: 520px) { .span-2 { grid-column: auto } }
-.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden }
+.hp { position: absolute; inset-inline-start: 0; top: 0; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap }
 .choice { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); cursor: pointer }
 .choice:hover { border-color: var(--muted) }
 .choice input { width: 18px; height: 18px; margin: 3px 0 0; accent-color: var(--brand); flex: none }
@@ -1009,3 +1009,22 @@ tfoot th { background: var(--surface-2); color: var(--ink); font-size: .9rem }
 .spontan-slots button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff }
 .spontan-done { text-align: center; justify-items: center }
 .spontan-done > .icon { width: 40px; height: 40px; color: var(--ok) }
+/* ---------- Sprachwahl als Menü ---------- */
+.lang-switch { position: relative; display: inline-block; padding: 0; border: 0; background: none; margin-left: 6px }
+.lang-switch > summary { list-style: none; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--ink-2); cursor: pointer; font-weight: 700; font-size: .75rem; letter-spacing: .04em }
+.lang-switch > summary::-webkit-details-marker { display: none }
+.lang-switch[open] > summary { border-color: var(--brand-ink); color: var(--brand-ink) }
+.lang-switch ul { position: absolute; inset-inline-end: 0; top: calc(100% + 6px); z-index: 30; list-style: none; margin: 0; padding: 4px; min-width: 170px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 30px -12px rgba(10,14,40,.35) }
+.lang-switch ul button { all: unset; box-sizing: border-box; width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: .9rem; color: var(--ink) }
+.lang-switch ul button:hover, .lang-switch ul button:focus-visible { background: var(--brand-tint) }
+.lang-switch ul button[aria-checked="true"] { font-weight: 700; color: var(--brand-ink) }
+/* ---------- Arabisch: Schrift und Richtung ---------- */
+:root[lang="ar"] { --f-body: var(--font-arabic), var(--font-source), "Segoe UI", Tahoma, sans-serif; --f-display: var(--font-arabic), var(--font-archivo), Tahoma, sans-serif }
+:root[lang="ar"] body { font-family: var(--f-body); line-height: 1.7 }
+[dir="rtl"] .hero-eyebrow::before, [dir="rtl"] .icon-flip { transform: scaleX(-1) }
+[dir="rtl"] .btn-gelb .icon, [dir="rtl"] .free-list .icon, [dir="rtl"] .hero-cta .icon { transform: scaleX(-1) }
+[dir="rtl"] .num, [dir="rtl"] input[type=email], [dir="rtl"] input[type=tel] { direction: ltr; unicode-bidi: isolate }
+.site-header .lang-switch ul button { height: auto; min-width: 0; font-size: .9rem }
+a.hp:focus { clip-path: none; width: auto; height: auto; z-index: 100; padding: 10px 14px; background: var(--brand); color: #fff; border-radius: 0 0 8px 0 }
+/* Zeitleisten bleiben links→rechts (Uhrzeiten), auch bei Arabisch */
+[dir="rtl"] .track, [dir="rtl"] .ticks, [dir="rtl"] .bar, [dir="rtl"] .cl-bar, [dir="rtl"] .rb-months { direction: ltr }

@@ -20,6 +20,14 @@ export const CHECKLIST_TEXT: Record<Lang, { title: string; hint: string; before:
     items: { key: 'Anahtar teslimi irtibat kişisiyle konuşuldu', guests: 'Misafir sayısı belli (izin verilen en fazla)', neighbours: 'Komşular bilgilendirildi',
     food: 'Yiyecek ve içecek ayarlandı', trash: 'Çöp torbası ve temizlik malzemesi planlandı', deposit: 'Ücret ve depozito ödendi', cleanteam: 'Sonrası için temizlik ekibi belirlendi',
     clean: 'Salon süpürüldü, mutfak temiz, çöpler götürüldü', lock: 'Pencereler kapalı, ışıklar kapalı, kalorifer kısık, kilitlendi', return: 'Anahtar iade edildi' } },
+  uk: { title: 'Контрольний список', hint: 'Для ваших позначок. Команда бачить, що вже зроблено.', before: 'До', after: 'Після', done: (a, b) => `Виконано ${a} з ${b}`,
+    items: { key: 'Передачу ключа узгоджено з контактною особою', guests: 'Кількість гостей визначено (у межах дозволеної)', neighbours: 'Сусідів попереджено',
+    food: 'Їжу та напої організовано', trash: 'Мішки для сміття та засоби для прибирання заплановано', deposit: 'Плату та заставу сплачено', cleanteam: 'Команду для прибирання визначено',
+    clean: 'Приміщення підметено, кухня чиста, сміття винесено', lock: 'Вікна зачинено, світло вимкнено, опалення зменшено, замкнено', return: 'Ключ повернуто' } },
+  ar: { title: 'قائمة المهام', hint: 'لتضع علامة عليها. يرى فريق التنظيم ما تم إنجازه.', before: 'قبل', after: 'بعد', done: (a, b) => `تم ${a} من ${b}`,
+    items: { key: 'تم الاتفاق على تسليم المفتاح مع الشخص المسؤول', guests: 'عدد الضيوف محدد (ضمن الحد المسموح)', neighbours: 'تم إبلاغ الجيران',
+    food: 'تم تنظيم الطعام والمشروبات', trash: 'أكياس القمامة ومواد التنظيف جاهزة', deposit: 'تم دفع الرسوم والتأمين', cleanteam: 'تم تحديد فريق التنظيف',
+    clean: 'القاعة مكنوسة والمطبخ نظيف والقمامة أُخذت', lock: 'النوافذ مغلقة والأنوار مطفأة والتدفئة منخفضة والباب مقفل', return: 'تم إرجاع المفتاح' } },
 };
 /** Punkte, die für diese Buchung gelten (Feier-Punkte nur bei Feiern, Kautions-Punkt nur bei Kosten). */
 export const itemsFor = (isParty: boolean, hasFees: boolean) => CHECKLIST.filter((i) => (!i.party || isParty) && (i.id !== 'deposit' || hasFees));

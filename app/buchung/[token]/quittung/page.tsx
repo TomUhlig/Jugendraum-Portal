@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { getBookingByToken, getCategories, getExtras, listPayments } from '@/lib/data';
 import { getLang } from '@/lib/lang';
+import { LOCALE } from '@/lib/i18n';
 import { berlinHm, fmtDay, fmtLong } from '@/lib/time';
 import { PrintLink } from '@/components/PrintLink';
 
@@ -20,11 +21,11 @@ export default async function Quittung({ params }: { params: Promise<{ token: st
   const b = await getBookingByToken(token);
   if (!b) notFound();
   const lang = b.lang ?? (await getLang());
-  const T = TX[lang];
+  const T = TX[lang as keyof typeof TX] ?? TX.en;
   const [cats, x, pays] = await Promise.all([getCategories(), getExtras(), listPayments(b.id)]);
   const cat = cats.find((c) => c.id === b.categoryId);
   const op = x.operator;
-  const money = (n: number) => n.toLocaleString(lang === 'en' ? 'en-GB' : lang === 'tr' ? 'tr-TR' : 'de-DE', { style: 'currency', currency: 'EUR' });
+  const money = (n: number) => n.toLocaleString(LOCALE[lang], { style: 'currency', currency: 'EUR' });
   const paid = pays.filter((p) => p.status === 'paid' || p.status === 'refunded');
   const viaFor = (part: 'rent' | 'deposit') => {
     const p = paid.find((q) => q.parts.includes(part));

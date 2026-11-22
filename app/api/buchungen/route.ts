@@ -28,7 +28,7 @@ const schema = z.object({
   website: z.string().max(0).optional(),
   elapsed: z.coerce.number().optional(),
   turnstile: z.string().max(4000).optional(),
-  lang: z.enum(['de', 'en', 'tr']).default('de'),
+  lang: z.enum(['de', 'en', 'tr', 'uk', 'ar']).default('de'),
   roomId: z.string().max(40).optional(),
   alternatives: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), start: z.string().regex(/^\d{2}:\d{2}$/), end: z.string().regex(/^\d{2}:\d{2}$/) })).max(2).default([]),
   repeat: z.object({ freq: z.enum(['weekly', 'biweekly']), count: z.coerce.number().int().min(2).max(12) }).optional(), // Honeypot: Menschen lassen das Feld leer
