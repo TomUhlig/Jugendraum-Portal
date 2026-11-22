@@ -95,6 +95,8 @@ Unter **Einstellungen**:
 
 Außerdem:
 - Unter **Team** deinen Namen ändern und Michael Grieswelle, Sigrid Brodig und weitere Personen anlegen.
+- Unter **Einstellungen → Ansprechpartner** pflegen, mit wem Buchende vorher sprechen (Name, Aufgabe, Foto, Telefon). Die Namen erscheinen im Pflicht-Haken, auf „Raum & Regeln“ und im Fußtext der Mails.
+- Unter **Einstellungen → Regeln** festlegen, welche Arten mehrtägig gebucht werden dürfen (z. B. Turnier oder Freizeit, Standard: bis 3 Tage).
 - Unter **Sperrzeiten** feste Ruhetage oder Ferien eintragen.
 - Unter **Team** deinen persönlichen **Kalender-Abo-Link** ins Handy übernehmen.
 

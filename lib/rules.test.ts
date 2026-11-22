@@ -141,3 +141,26 @@ describe('Hinweise in anderen Sprachen', () => {
     expect(r.suggestion?.label).toBe('20:00 saatine kaydır');
   });
 });
+
+describe('Mehrtägig', () => {
+  const codes = (r: ReturnType<typeof checkBooking>) => r.messages.filter((m) => m.level === 'block').map((m) => m.code);
+  it('erlaubt Fr–So für Vereinsveranstaltungen', () => {
+    const r = checkBooking({ categoryId: 'event', start: t('2026-11-20', '17:00'), end: t('2026-11-22', '14:00'), guests: 20 }, ctx([]));
+    expect(codes(r)).not.toContain('duration');
+  });
+  it('sperrt mehr als die erlaubten Tage', () => {
+    const r = checkBooking({ categoryId: 'event', start: t('2026-11-20', '17:00'), end: t('2026-11-23', '14:00'), guests: 20 }, ctx([]));
+    expect(codes(r)).toContain('duration');
+  });
+  it('nie für Feiern oder nicht freigegebene Arten', () => {
+    expect(codes(checkBooking({ categoryId: 'party', start: t('2026-11-20', '17:00'), end: t('2026-11-22', '14:00'), guests: 20 }, ctx([])))).toContain('duration');
+    expect(codes(checkBooking({ categoryId: 'meet', start: t('2026-11-20', '17:00'), end: t('2026-11-22', '14:00'), guests: 5 }, ctx([])))).toContain('duration');
+  });
+  it('zu lang an einem Tag bleibt zu lang', () => {
+    expect(codes(checkBooking({ categoryId: 'event', start: t('2026-11-20', '07:00'), end: t('2026-11-20', '23:00'), guests: 5 }, ctx([])))).toContain('duration');
+  });
+  it('erkennt Überschneidung mit Termin am zweiten Tag', () => {
+    const r = checkBooking({ categoryId: 'event', start: t('2026-11-20', '17:00'), end: t('2026-11-22', '14:00'), guests: 20 }, ctx([slot('a', 'meet', '2026-11-21', '10:00', '2026-11-21', '12:00')]));
+    expect(codes(r)).toContain('overlap');
+  });
+});

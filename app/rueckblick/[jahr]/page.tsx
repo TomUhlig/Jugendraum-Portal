@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { CalendarCheck, Clock, PartyPopper, Shirt, Star, Users } from 'lucide-react';
-import { bookingsForYear, getCategories, getYearReport } from '@/lib/data';
+import { bookingsForYear, getCategories, getContacts, getYearReport } from '@/lib/data';
 import { berlinParts, fmtLong } from '@/lib/time';
 import { appUrl } from '@/lib/url';
 import { ShareButton } from '@/components/ShareButton';
@@ -81,7 +81,7 @@ export default async function Rueckblick({ params }: { params: Promise<{ jahr: s
         )}
 
         <section className="rb-thanks">
-          <p>Danke an Michael Grieswelle, Sigrid Brodig und alle, die Schlüssel übergeben, aufräumen und mitanpacken.</p>
+          <p>Danke an {(await getContacts()).map((c) => c.name).join(', ')} und alle, die Schlüssel übergeben, aufräumen und mitanpacken.</p>
           <ShareButton url={url} title={`Der Jugendraum ${year}`} label="Rückblick teilen" className="btn btn-gelb" />
         </section>
       </div>

@@ -2,6 +2,7 @@
 import { cookies } from 'next/headers';
 import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
+import { normalizeContacts } from '@/lib/contacts';
 import { redirect } from 'next/navigation';
 import { requireAdmin, sessionCookie } from '@/lib/auth';
 import {
@@ -32,8 +33,9 @@ const money = (fd: FormData, k: string) => Math.max(0, Math.round((Number(String
 const numOrNull = (fd: FormData, k: string) => { const v = String(fd.get(k) ?? '').replace(',', '.').trim(); return v === '' || isNaN(+v) ? null : +v; };
 const isDate = (s: string) => /^\d{4}-\d\d-\d\d$/.test(s);
 const isTime = (s: string) => /^\d\d:\d\d$/.test(s);
-function range(date: string, start: string, end: string) {
+function range(date: string, start: string, end: string, endDate?: string) {
   const s = berlinToUtc(date, start);
+  if (endDate && isDate(endDate) && endDate > date) return { start: s, end: berlinToUtc(endDate, end) };
   const e = end > start ? berlinToUtc(date, end) : berlinToUtc(addDays(date, 1), end);
   return { start: s, end: e };
 }
@@ -91,7 +93,7 @@ export async function createAction(fd: FormData) {
     equipment: fd.getAll('equipment').map(String), bookerType: fd.get('bookerType') === 'external' ? 'external' : 'member',
     team: str(fd, 'team', 80), name: str(fd, 'name', 80) || admin.name, email: contactEmail || admin.email, phone: str(fd, 'phone', 40),
     agreedWith: str(fd, 'agreedWith', 40) || admin.name, override: fd.get('override') === 'on', seriesRule: rule, silent, roomId: str(fd, 'roomId', 40) || undefined,
-    slots: dates.map((d) => range(d, start, end)),
+    slots: repeat === 'none' ? [range(date, start, end, str(fd, 'endDate', 10))] : dates.map((d) => range(d, start, end)),
   });
   if (mailMode === 'confirm' && !silent && res.created[0]) {
     const cat = (await getCategories()).find((c) => c.id === categoryId);
@@ -112,7 +114,7 @@ export async function changeAction(fd: FormData) {
   const id = str(fd, 'id', 40);
   const date = str(fd, 'date', 10), start = str(fd, 'start', 5), end = str(fd, 'end', 5);
   if (!isDate(date) || !isTime(start) || !isTime(end)) go(`/admin/buchung/${id}?bearbeiten=1`, 'fehler', 'Bitte Datum und Uhrzeit prüfen.');
-  const r = range(date, start, end);
+  const r = range(date, start, end, str(fd, 'endDate', 10));
   const res = await changeBooking(id, admin.name, {
     categoryId: str(fd, 'categoryId', 20), title: str(fd, 'title', 80), guests: Math.max(1, Number(fd.get('guests')) || 1),
     equipment: fd.getAll('equipment').map(String), ...r, roomId: str(fd, 'roomId', 40) || undefined,
@@ -236,6 +238,7 @@ export async function settingsAction(fd: FormData) {
   await saveSettings(admin.name, {
     partyBlocksWholeWeekend: fd.get('partyBlocksWholeWeekend') === 'on', partyMinLeadDays: n('partyMinLeadDays', 0, 120), minLeadHours: n('minLeadHours', 0, 336),
     horizonDays: n('horizonDays', 14, 730), capacity: n('capacity', 1, 500), partyLatestEnd: isTime(latest) ? latest : '01:00',
+    multiDayMax: n('multiDayMax', 0, 14), multiDayCats: cats.filter((c) => fd.get(`multi_${c.id}`) === 'on').map((c) => c.id),
   }, cats);
   revalidatePath('/', 'layout');
   go('/admin/einstellungen', 'ok', 'Regeln gespeichert.');
@@ -480,6 +483,21 @@ export async function roomsAction(fd: FormData) {
   }
   revalidatePath('/', 'layout');
   go('/admin/einstellungen#raeume', 'ok', `${saved} ${saved === 1 ? 'Raum' : 'Räume'} gespeichert.`);
+}
+
+// ---------- Ansprechpartner ----------
+export async function contactsAction(fd: FormData) {
+  const admin = await requireAdmin('admin');
+  const n = Math.min(9, Number(fd.get('count')) || 0);
+  const list = Array.from({ length: n }, (_, i) => ({
+    name: str(fd, `c_name_${i}`, 80), role: str(fd, `c_role_${i}`, 80), phone: str(fd, `c_phone_${i}`, 40), email: str(fd, `c_email_${i}`, 120),
+    photo: String(fd.get(`c_photo_${i}`) ?? ''), showPhone: fd.get(`c_show_${i}`) === 'on',
+  }));
+  const contacts = normalizeContacts(list);
+  if (!list.some((c) => c.name.length >= 2)) go('/admin/einstellungen#ansprechpartner', 'fehler', 'Mindestens eine Person muss eingetragen bleiben.');
+  await saveSettings(admin.name, { contacts }, []);
+  revalidatePath('/', 'layout');
+  go('/admin/einstellungen#ansprechpartner', 'ok', `${contacts.length} ${contacts.length === 1 ? 'Ansprechpartner' : 'Ansprechpartner'} gespeichert.`);
 }
 
 // ---------- Raumbuch ----------

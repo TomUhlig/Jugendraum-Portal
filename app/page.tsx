@@ -64,33 +64,39 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
               <Link className="btn btn-glass" href="/raum">{I.more}</Link>
               {lang === 'de' && <Link className="btn btn-glass" href="/jetzt">Heute frei?</Link>}
             </div>
-            <ul className="facts">
-              <li><Users className="icon" />{I.capacity(initial.settings.capacity)}</li>
-              <li><PartyPopper className="icon" />{I.oneParty}</li>
-              <li><CalendarClock className="icon" />{I.lead(initial.settings.partyMinLeadDays)}</li>
-            </ul>
           </div>
-          <aside className="hero-card" aria-labelledby="free-h">
-            <h2 id="free-h">{I.nextFree}{allRooms.length > 1 && <span className="muted small"> · {allRooms.find((r) => r.id === roomParam)?.name}</span>}</h2>
-            <p>{free.length ? I.nextFreeHint : I.noneFree}</p>
-            {free.length > 0 && (
-              <ul className="free-list">
+          <aside className="board" aria-labelledby="free-h">
+            <div className="board-head">
+              <h2 id="free-h">{I.nextFree}{allRooms.length > 1 && <span> · {allRooms.find((r) => r.id === roomParam)?.name}</span>}</h2>
+              <span className="board-live">{I.boardLive}</span>
+            </div>
+            {free.length > 0 ? (
+              <ol className="board-rows">
                 {free.map((f) => (
                   <li key={f.date}>
                     <a href={`/?${allRooms.length > 1 ? `raum=${roomParam}&` : ''}datum=${f.date}&von=18:00&bis=22:00#anfrage`}>
-                      <span className="fd"><small>{wd.format(f.start).replace('.', '')}</small><b>{berlinParts(f.start).day}</b><small>{mo.format(f.start).replace('.', '')}</small></span>
-                      <span className="ft">{hmRange(f.start, f.end, lang)}</span>
-                      <ArrowRight className="icon" aria-hidden />
+                      <span className="b-wd">{wd.format(f.start).replace('.', '')}</span>
+                      <span className="b-day">{String(berlinParts(f.start).day).padStart(2, '0')}</span>
+                      <span className="b-mo">{mo.format(f.start).replace('.', '')}</span>
+                      <span className="b-time">{hmRange(f.start, f.end, lang)}</span>
+                      <ArrowRight className="icon b-go" aria-hidden />
                     </a>
                   </li>
                 ))}
-              </ul>
-            )}
-            <div className="hero-card-foot">
+              </ol>
+            ) : <p className="board-empty">{I.noneFree}</p>}
+            <div className="board-foot">
               <a href="#anfrage">{I.otherDay}</a>
               {free.length > 0 && <a className="wa" target="_blank" rel="noopener" href={`https://wa.me/?text=${encodeURIComponent(`${I.nextFree} – Jugendraum SV Heepen:\n${free.map((f) => `• ${wd.format(f.start).replace('.', '')} ${berlinParts(f.start).day}. ${mo.format(f.start).replace('.', '')}, ${hmRange(f.start, f.end, lang)}: ${appUrl()}/?${allRooms.length > 1 ? `raum=${roomParam}&` : ''}datum=${f.date}&von=18:00&bis=22:00`).join('\n')}`)}`}><Share2 className="icon-sm" aria-hidden />{I.share}</a>}
             </div>
           </aside>
+        </div>
+        <div className="wrap">
+          <ul className="stats">
+            <li><Users className="icon" aria-hidden /><b>{initial.settings.capacity}</b><span>{I.statPeople}</span></li>
+            <li><PartyPopper className="icon" aria-hidden /><b>1</b><span>{I.statParty}</span></li>
+            <li><CalendarClock className="icon" aria-hidden /><b>{initial.settings.partyMinLeadDays}</b><span>{I.statLead}</span></li>
+          </ul>
         </div>
       </section>
       {photos.length > 0 && <section className="wrap photos-band" aria-label="Fotos"><Gallery photos={photos} variant="strip" /></section>}

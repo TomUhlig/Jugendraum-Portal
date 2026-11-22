@@ -1,6 +1,7 @@
 import { SpontanForm } from '@/components/SpontanForm';
 import { turnstileEnabled, turnstileSiteKey } from '@/lib/antispam';
 import { getPublicOccupancy, getRooms } from '@/lib/data';
+import { whoText } from '@/lib/contacts';
 import { addDays, berlinToUtc, berlinYmd } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
@@ -17,8 +18,8 @@ export default async function Jetzt({ searchParams }: { searchParams: Promise<Re
     <main className="wrap narrow" style={{ paddingBlock: 28 }}>
       <div className="stack">
         <div><span className="eyebrow">Für Mitglieder · {rooms.length > 1 ? room.name : 'Jugendraum'}</span><h1 style={{ fontSize: '1.9rem' }}>Heute frei?</h1>
-          <p className="muted">Kurzfristig ein Treffen im Raum? Zeit antippen, kurz bestätigen, fertig. Die Absprache mit Michael Grieswelle oder Sigrid Brodig gilt auch hier.</p></div>
-        <SpontanForm data={{ categories: data.categories, settings: data.settings, slots: data.slots, blackouts: data.blackouts, roomId: room.id }} turnstileKey={turnstileEnabled() ? turnstileSiteKey() : ''} />
+          <p className="muted">Kurzfristig ein Treffen im Raum? Zeit antippen, kurz bestätigen, fertig. Die Absprache mit {whoText(data.contacts.map((c) => c.name))} gilt auch hier.</p></div>
+        <SpontanForm data={{ categories: data.categories, settings: data.settings, slots: data.slots, blackouts: data.blackouts, roomId: room.id, people: data.contacts.map((c) => c.name) }} turnstileKey={turnstileEnabled() ? turnstileSiteKey() : ''} />
       </div>
     </main>
   );

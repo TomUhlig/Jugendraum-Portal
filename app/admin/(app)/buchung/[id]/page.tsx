@@ -1,8 +1,10 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, FileDown, Hourglass, Mail, MailX, MessageCircle, PenLine, Pencil, Phone, Printer, Repeat, Undo2 } from 'lucide-react';
+import { calendarDays } from '@/lib/rules';
 import Link from 'next/link';
 import { TemplatePicker } from '@/components/TemplatePicker';
 import { RoomSelect } from '@/components/RoomSelect';
 import { fillTemplate } from '@/lib/templates';
+import { whoText } from '@/lib/contacts';
 import { CHECKLIST_TEXT, itemsFor } from '@/lib/checklist';
 import { telHref, waNumber } from '@/lib/util/phone';
 import { notFound } from 'next/navigation';
@@ -10,7 +12,7 @@ import { Flash } from '@/components/Flash';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { getRooms, undoInfo, bookerKey, profileTags, checkOptions, getSignatures, checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
+import { getContacts, getRooms, undoInfo, bookerKey, profileTags, checkOptions, getSignatures, checkExisting, getAudit, getBooking, getCategories, getExtras, getFeedback, listMessages, listPayments, listSeries, listWaitlist, markMessagesRead } from '@/lib/data';
 import { MessageThread } from '@/components/MessageThread';
 import { eur } from '@/lib/labels';
 import { berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong } from '@/lib/time';
@@ -60,10 +62,11 @@ export default async function Detail({ params, searchParams }: { params: Promise
     : { text: dayDiff === 0 ? `heute, ${berlinHm(b.start)} Uhr` : dayDiff === 1 ? 'morgen' : `in ${dayDiff} Tagen`, cls: dayDiff <= 2 ? 'soon' : '' };
   const tags = await profileTags(b.email);
   const rooms = await getRooms();
+  const who = whoText((await getContacts()).map((c) => c.name));
   const lastUndo = await undoInfo(b.id);
   const options = b.status === 'requested' && b.alternatives.length ? await checkOptions(b) : [];
   const tpl = (use: 'reject' | 'message') => extras.templates.filter((t) => t.use === use || t.use === 'both')
-    .map((t) => ({ title: t.title, text: fillTemplate(t.text, { name: b.name, title: b.title, date: fmtDay(b.start), time: `${berlinHm(b.start)}–${berlinHm(b.end)} Uhr`, agreedWith: b.agreedWith }) }));
+    .map((t) => ({ title: t.title, text: fillTemplate(t.text, { name: b.name, title: b.title, date: fmtDay(b.start), time: `${berlinHm(b.start)}–${berlinHm(b.end)} Uhr`, agreedWith: b.agreedWith, who }) }));
   const hidden = (action: string) => <><input type="hidden" name="id" value={b.id} /><input type="hidden" name="action" value={action} /><input type="hidden" name="back" value={`/admin/buchung/${b.id}`} /></>;
   const skipped: [number, string][] = sp.uebersprungen ? (() => { try { return JSON.parse(sp.uebersprungen); } catch { return []; } })() : [];
   const history = [
@@ -129,6 +132,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
                   <div className="field"><label htmlFor="e-date">Datum</label><input id="e-date" name="date" type="date" defaultValue={berlinYmd(b.start)} required /></div>
                   <div className="field"><label htmlFor="e-start">Von</label><input id="e-start" name="start" type="time" step={900} defaultValue={berlinHm(b.start)} required /></div>
                   <div className="field"><label htmlFor="e-end">Bis</label><input id="e-end" name="end" type="time" step={900} defaultValue={berlinHm(b.end)} required /><span className="hint">früher als Beginn = Folgetag</span></div>
+                  <div className="field"><label htmlFor="e-enddate">Letzter Tag</label><input id="e-enddate" name="endDate" type="date" defaultValue={calendarDays(b.start, b.end) >= 3 ? berlinYmd(b.end) : undefined} /><span className="hint">nur bei mehrtägigen Terminen</span></div>
                   <div className="field"><label htmlFor="e-guests">Personen</label><input id="e-guests" name="guests" type="number" min={1} defaultValue={b.guests} /></div>
                 </div>
                 {extras.equipment.length > 0 && <div className="field"><span className="label">Ausstattung</span><div className="chips">{extras.equipment.map((e) => <label key={e} className="chip"><input type="checkbox" name="equipment" value={e} defaultChecked={b.equipment.includes(e)} />{e}</label>)}</div></div>}

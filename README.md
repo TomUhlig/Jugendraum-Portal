@@ -11,7 +11,8 @@ Online-Buchung für den Jugendraum des SV Heepen: Mitglieder und Externe fragen 
 **Für Bucher** (Anfrage in vier Schritten: Anlass, Termin, Kontakt, Prüfen)
 - Belegungskalender (anonym) mit Tagesansicht inkl. Pufferzeiten
 - Formular in 4 Schritten mit Live-Prüfung: frei / Hinweis / belegt, inkl. Vorschlag für die nächste freie Zeit bzw. das nächste freie Party-Wochenende
-- Pflicht-Haken „mit Michael Grieswelle oder Sigrid Brodig abgesprochen“ plus Auswahl der Person
+- Pflicht-Haken „vorher mit den Ansprechpartnern abgesprochen“ plus Auswahl der Person (Ansprechpartner mit Foto und Telefon in den Einstellungen pflegbar)
+- Mehrtägige Veranstaltungen (Turnier, Lehrgang, Freizeit) als eine Buchung, Länge und erlaubte Arten einstellbar
 - E-Mail-Bestätigung (Double-Opt-in). Unbestätigte Anfragen verfallen nach 24 h
 - Ausstattung auswählen (Beamer, Musikanlage, …), Kosten und Kaution werden vorab angezeigt
 - Persönliche Buchungsseite mit Statusverlauf, Kalenderdatei und Absage

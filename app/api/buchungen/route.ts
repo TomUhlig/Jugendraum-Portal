@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createBooking, createSeriesRequest, getCategories, getRooms } from '@/lib/data';
+import { createBooking, createSeriesRequest, getCategories, getContacts, getRooms } from '@/lib/data';
 import { describeSeries, seriesDates } from '@/lib/series';
 import { mails } from '@/lib/mail';
 import { clientIp, rateLimited } from '@/lib/ratelimit';
@@ -15,6 +15,8 @@ const schema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   start: z.string().regex(/^\d{2}:\d{2}$/),
   end: z.string().regex(/^\d{2}:\d{2}$/),
+  /** Mehrtägig: letzter Tag (sonst endet der Termin am selben oder am Folgetag) */
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   guests: z.coerce.number().int().min(1).max(500),
   equipment: z.array(z.string().max(60)).max(20).default([]),
   bookerType: z.enum(['member', 'external']),
@@ -22,7 +24,7 @@ const schema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.string().trim().email().max(120),
   phone: z.string().trim().min(4).max(40),
-  agreedWith: z.enum(['Michael Grieswelle', 'Sigrid Brodig']),
+  agreedWith: z.string().trim().min(2).max(80),
   agreed: z.literal(true),
   rulesAccepted: z.literal(true),
   website: z.string().max(0).optional(),
@@ -45,16 +47,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: L.check, fields: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
   const v = parsed.data;
+  if (!(await getContacts()).some((c) => c.name === v.agreedWith)) return NextResponse.json({ error: L.check, fields: { agreedWith: ['unknown'] } }, { status: 400 });
   const human = await checkHuman({ elapsed: v.elapsed, turnstile: v.turnstile, ip: clientIp(req), lang: v.lang });
   if (human) return NextResponse.json({ error: human }, { status: 400 });
   const start = berlinToUtc(v.date, v.start);
   let end = berlinToUtc(v.date, v.end);
   if (end <= start) end = berlinToUtc(addDays(v.date, 1), v.end);
+  const multi = !!v.endDate && v.endDate > v.date;
+  if (multi) end = berlinToUtc(v.endDate!, v.end);
 
   const cat = (await getCategories()).find((c) => c.id === v.categoryId);
   const rooms = await getRooms();
   const roomId = rooms.find((r) => r.id === v.roomId)?.id ?? rooms[0].id;
-  if (v.repeat && cat && !cat.isParty) {
+  if (v.repeat && cat && !cat.isParty && !multi) {
     // Serie: gleiche Uhrzeit an jedem Termin
     const days = seriesDates(v.date, v.repeat.freq, { count: v.repeat.count });
     const len = end - start;
@@ -69,7 +74,7 @@ export async function POST(req: Request) {
   const toSlot = (a: { date: string; start: string; end: string }) => {
     const s = berlinToUtc(a.date, a.start); let e = berlinToUtc(a.date, a.end); if (e <= s) e = berlinToUtc(addDays(a.date, 1), a.end); return { start: s, end: e };
   };
-  const alternatives = v.alternatives.map(toSlot).filter((a) => a.start !== start);
+  const alternatives = multi ? [] : v.alternatives.map(toSlot).filter((a) => a.start !== start);
   const res = await createBooking({ ...v, start, end, alternatives, roomId });
   if (!res.ok) return NextResponse.json({ error: L.notFree, check: res.check }, { status: 409 });
   await mails.verify(res.booking, cat, res.verifyToken);

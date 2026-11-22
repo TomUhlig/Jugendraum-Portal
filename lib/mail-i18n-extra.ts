@@ -1,7 +1,7 @@
 import type { MailDict } from './mail-i18n';
 // Ukrainisch und Arabisch für die Mails an Buchende. Bitte vor Veröffentlichung gegenlesen lassen.
 export const ukMail: MailDict = {
-  footer: 'Молодіжна кімната SV Heepen · Цей лист надіслано автоматично. З питаннями просто відповідайте на цей лист або звертайтеся до Michael Grieswelle чи Sigrid Brodig.',
+  footer: 'Молодіжна кімната SV Heepen · Цей лист надіслано автоматично. З питаннями просто відповідайте на цей лист або звертайтеся до {wer}.',
   footerText: 'Молодіжна кімната SV Heepen', room: 'Молодіжна кімната',
   hello: (n) => `Вітаємо, ${n}!`,
   labels: { booking: 'Бронювання', occasion: 'Подія', date: 'Дата', kind: 'Тип', people: 'Осіб', equipment: 'Обладнання', rent: 'Плата', deposit: 'Застава', contact: 'Контактна особа', until: 'до', uhr: '' },
@@ -40,7 +40,7 @@ export const ukMail: MailDict = {
 };
 
 export const arMail: MailDict = {
-  footer: 'قاعة الشباب في نادي SV Heepen · أُرسلت هذه الرسالة تلقائيًا. للأسئلة يمكنك الرد على هذه الرسالة أو التواصل مع Michael Grieswelle أو Sigrid Brodig.',
+  footer: 'قاعة الشباب في نادي SV Heepen · أُرسلت هذه الرسالة تلقائيًا. للأسئلة يمكنك الرد على هذه الرسالة أو التواصل مع {wer}.',
   footerText: 'قاعة الشباب في نادي SV Heepen', room: 'قاعة الشباب',
   hello: (n) => `مرحبًا ${n}،`,
   labels: { booking: 'الحجز', occasion: 'المناسبة', date: 'الموعد', kind: 'النوع', people: 'الأشخاص', equipment: 'المعدات', rent: 'الرسوم', deposit: 'التأمين', contact: 'الشخص المسؤول', until: 'حتى', uhr: '' },

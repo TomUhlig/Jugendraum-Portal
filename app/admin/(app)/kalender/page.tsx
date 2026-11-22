@@ -1,3 +1,4 @@
+import { calendarDays } from '@/lib/rules';
 import { ChevronLeft, ChevronRight, Lock, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { PageHead } from '@/components/Flash';
@@ -12,6 +13,9 @@ export const metadata = { title: 'Kalender' };
 const ACTIVE = ['pending_email', 'requested', 'confirmed'] as const;
 const monday = (d: string) => addDays(d, -((weekdayOf(d) + 6) % 7));
 const dLabel = (d: string, o: Intl.DateTimeFormatOptions) => new Date(d + 'T12:00:00Z').toLocaleDateString('de-DE', { ...o, timeZone: 'UTC' });
+
+/** Mehrtägige Termine erscheinen an jedem Tag, den sie berühren. */
+const isMulti = (b: { start: number; end: number }) => b.end - b.start > 86_400_000 || calendarDays(b.start, b.end) > 2;
 
 export default async function Kalender({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin();
@@ -87,7 +91,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
             {['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'].map((d) => <div className="dow" key={d}>{d}</div>)}
             {cells.map((k) => {
               const ds = berlinToUtc(k, '00:00'), de = berlinToUtc(addDays(k, 1), '00:00');
-              const items = list.filter((b) => b.start >= ds && b.start < de);
+              const items = list.filter((b) => (b.start >= ds && b.start < de) || (isMulti(b) && b.start < ds && b.end > ds));
               const bo = blackouts.filter((b) => b.start < de && b.end > ds);
               const fullBlock = k >= today && bo.some((b) => b.scope !== 'party' && b.start <= ds && b.end >= de);
               return (
@@ -103,7 +107,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
                   })}
                   {items.map((b) => (
                     <Link key={b.id} href={`/admin/buchung/${b.id}`} className={`ev ${b.status}`} title={`${b.title} · ${b.name}`} style={{ '--c': cat.get(b.categoryId)?.color } as React.CSSProperties}>
-                      <span className="num">{berlinHm(b.start)}</span> {label(b)}
+                      <span className="num">{b.start < ds ? (b.end < de ? `bis ${berlinHm(b.end)}` : 'ganztags') : berlinHm(b.start)}</span> {label(b)}
                     </Link>
                   ))}
                 </div>
@@ -115,7 +119,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
         <ol className="agenda">
           {cells.filter((k) => k.slice(0, 7) === m.slice(0, 7)).map((k) => {
             const ds = berlinToUtc(k, '00:00'), de = berlinToUtc(addDays(k, 1), '00:00');
-            const items = list.filter((b) => b.start >= ds && b.start < de);
+            const items = list.filter((b) => (b.start >= ds && b.start < de) || (isMulti(b) && b.start < ds && b.end > ds));
             const bo = blackouts.filter((b) => b.start < de && b.end > ds && b.scope !== 'party');
             if (!items.length && !bo.length && k !== today) return null;
             return (
@@ -126,7 +130,7 @@ export default async function Kalender({ searchParams }: { searchParams: Promise
                   {bo.map((x) => <Link key={x.id} href="/admin/sperrzeiten" className="ag-item sys"><Lock className="icon-sm" />gesperrt: {x.reason}</Link>)}
                   {items.map((b) => (
                     <Link key={b.id} href={`/admin/buchung/${b.id}`} className={`ag-item ${b.status}`} style={{ '--c': cat.get(b.categoryId)?.color } as React.CSSProperties}>
-                      <span className="num">{berlinHm(b.start)}–{berlinHm(b.end)}</span><b>{label(b)}</b><span className="muted">{b.name}</span>
+                      <span className="num">{b.start < ds ? (b.end < de ? `bis ${berlinHm(b.end)}` : 'ganztags') : isMulti(b) ? `ab ${berlinHm(b.start)}` : `${berlinHm(b.start)}–${berlinHm(b.end)}`}</span><b>{label(b)}</b><span className="muted">{b.name}</span>
                     </Link>
                   ))}
                   {k >= today && <Link className="ag-add" href={`/admin/neu?datum=${k}`} aria-label={`Termin am ${k} eintragen`}><Plus className="icon-sm" /></Link>}

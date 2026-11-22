@@ -4,7 +4,8 @@ import { TocSpy } from '@/components/TocSpy';
 import { nextFreeEvenings } from '@/lib/data';
 import { t } from '@/lib/i18n';
 import { fmtDay, hmRange } from '@/lib/time';
-import { getCategories, getExtras, getRecurring, getSettings, listPhotos } from '@/lib/data';
+import { getCategories, getContacts, getExtras, getRecurring, getSettings, listPhotos } from '@/lib/data';
+import { initials } from '@/lib/contacts';
 import { Gallery } from '@/components/Gallery';
 import { describeRecurring } from '@/lib/rules';
 import { KEY_RULES, hausordnung } from '@/lib/hausordnung';
@@ -17,9 +18,9 @@ export const metadata = { title: 'Raum & Regeln' };
 const IDS = ['raum', 'ablauf', 'feiern', 'puffer', 'kosten', 'uebergabe', 'hausordnung', 'storno', 'datenschutz'];
 
 export default async function Raum() {
-  const [cats, s, x, rec, photos, lang, free] = await Promise.all([getCategories(), getSettings(), getExtras(), getRecurring(), listPhotos(), getLang(), nextFreeEvenings(3).catch(() => [])]);
+  const [cats, s, x, rec, photos, lang, free, contacts] = await Promise.all([getCategories(), getSettings(), getExtras(), getRecurring(), listPhotos(), getLang(), nextFreeEvenings(3).catch(() => []), getContacts()]);
   const D = t(lang);
-  const T = raumText(lang, { capacity: s.capacity, fromH: s.weekendFromHour, untilH: String(s.weekendUntilHour).padStart(2, '0'), latest: s.partyLatestEnd, lead: s.partyMinLeadDays, whole: s.partyBlocksWholeWeekend });
+  const T = raumText(lang, { people: contacts.map((c) => c.name), capacity: s.capacity, fromH: s.weekendFromHour, untilH: String(s.weekendUntilHour).padStart(2, '0'), latest: s.partyLatestEnd, lead: s.partyMinLeadDays, whole: s.partyBlocksWholeWeekend });
   const eur = (n: number) => n.toLocaleString(LOCALE[lang], { style: 'currency', currency: 'EUR', maximumFractionDigits: n % 1 ? 2 : 0 });
   const today = new Date().toISOString().slice(0, 10);
   const fixed = rec.filter((r) => !r.validUntil || r.validUntil >= today);
@@ -96,7 +97,7 @@ export default async function Raum() {
           </div>
           <div className="card card-body stack-sm">
             <b className="small">{D.app.contacts}</b>
-            {['Michael Grieswelle', 'Sigrid Brodig'].map((n) => <div key={n} className="contact"><span className="avatar">{n.split(' ').map((w) => w[0]).join('')}</span><div><b className="small">{n}</b><br /><span className="muted small">{D.app.contactRole}</span></div></div>)}
+            {contacts.map((c) => <div key={c.name} className="contact">{c.photo ? <img className="avatar" src={c.photo} alt="" /> : <span className="avatar">{initials(c.name)}</span>}<div><b className="small">{c.name}</b><br /><span className="muted small">{(lang === 'de' && c.role) || D.app.contactRole}</span>{c.showPhone && c.phone && <><br /><a className="small num" href={`tel:${c.phone.replace(/[^\d+]/g, '')}`}>{c.phone}</a></>}</div></div>)}
           </div>
         </aside>
       </div>

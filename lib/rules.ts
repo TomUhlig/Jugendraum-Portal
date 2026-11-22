@@ -24,6 +24,10 @@ export type Settings = {
   partyLatestEnd: string; // "01:00"
   weekendFromHour: number; // Freitag ab
   weekendUntilHour: number; // Montag bis
+  /** Mehrtägige Veranstaltungen: höchstens so viele Kalendertage (0 = aus). */
+  multiDayMax: number;
+  /** Arten, die mehrtägig gebucht werden dürfen (Feiern nie). */
+  multiDayCats: string[];
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -35,7 +39,19 @@ export const DEFAULT_SETTINGS: Settings = {
   partyLatestEnd: '01:00',
   weekendFromHour: 12,
   weekendUntilHour: 6,
+  multiDayMax: 3,
+  multiDayCats: ['event', 'work', 'team', 'misc'],
 };
+
+/** Darf diese Art über mehrere Tage gehen? */
+export function allowsMultiDay(c: Category | undefined, s: Settings): boolean {
+  return !!c && !c.isParty && (s.multiDayMax ?? 0) > 1 && (s.multiDayCats ?? []).includes(c.id);
+}
+/** Anzahl Kalendertage, die ein Termin berührt (Ende um 0:00 zählt nicht mit). */
+export function calendarDays(start: number, end: number): number {
+  const a = Date.parse(berlinYmd(start) + 'T00:00:00Z'), b = Date.parse(berlinYmd(end - 1) + 'T00:00:00Z');
+  return Math.round((b - a) / DAY) + 1;
+}
 
 export type ActiveStatus = 'pending_email' | 'requested' | 'confirmed';
 export const ACTIVE_STATUSES: ActiveStatus[] = ['pending_email', 'requested', 'confirmed'];
@@ -86,7 +102,12 @@ export function checkBooking(d: Draft, ctx: Context): CheckResult {
 
   const duration = d.end - d.start;
   if (d.start < now) add('block', 'past', T.past);
-  if (duration > c.maxDurationMin * MIN) add('block', 'duration', T.duration(cname(c), c.maxDurationMin / 60));
+  // Mehrtägig: endet frühestens am übernächsten Tag oder dauert länger als die Art an einem Stück erlaubt
+  const spanDays = calendarDays(d.start, d.end);
+  const multi = duration > c.maxDurationMin * MIN && spanDays >= 2 && allowsMultiDay(c, s);
+  if (multi) {
+    if (spanDays > s.multiDayMax) add('block', 'duration', T.multiDayMax(s.multiDayMax));
+  } else if (duration > c.maxDurationMin * MIN) add('block', 'duration', T.duration(cname(c), c.maxDurationMin / 60));
   if (!ctx.asAdmin && d.start > now + s.horizonDays * DAY) add('block', 'horizon', T.horizon(Math.round(s.horizonDays / 30)));
 
   // Sperrzeiten
@@ -107,7 +128,9 @@ export function checkBooking(d: Draft, ctx: Context): CheckResult {
     const gapBeforeB = requiredGap(c, bc);
     const free = d.start >= b.end + gapAfterB || d.end + gapBeforeB <= b.start;
     if (free) continue;
-    const when = `${fmtDay(b.start, L)} ${berlinHm(b.start)}–${berlinHm(b.end)}`;
+    const when = calendarDays(b.start, b.end) > 2 || b.end - b.start > DAY
+      ? `${fmtDay(b.start, L)} ${berlinHm(b.start)} – ${fmtDay(b.end, L)} ${berlinHm(b.end)}`
+      : `${fmtDay(b.start, L)} ${berlinHm(b.start)}–${berlinHm(b.end)}`;
     const core = d.start < b.end && b.start < d.end;
     if (core) add('block', 'overlap', T.overlap(when, b.status === 'confirmed'));
     else add('block', 'buffer', T.buffer(when, Math.max(gapAfterB, gapBeforeB) / MIN));

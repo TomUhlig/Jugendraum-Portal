@@ -1,6 +1,6 @@
 import { Flash, PageHead } from '@/components/Flash';
 import { requireAdmin } from '@/lib/auth';
-import { getCategories, getExtras, getRooms } from '@/lib/data';
+import { getCategories, getContacts, getExtras, getRooms } from '@/lib/data';
 import { RoomSelect } from '@/components/RoomSelect';
 import { addDays, berlinYmd } from '@/lib/time';
 import { createAction } from '../../actions';
@@ -10,7 +10,7 @@ export const metadata = { title: 'Termin eintragen' };
 export default async function Neu({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin('manager');
   const sp = await searchParams;
-  const [cats, extras, rooms] = await Promise.all([getCategories(), getExtras(), getRooms()]);
+  const [cats, extras, rooms, contacts] = await Promise.all([getCategories(), getExtras(), getRooms(), getContacts()]);
   const tomorrow = addDays(berlinYmd(Date.now()), 1);
   return (
     <>
@@ -30,6 +30,7 @@ export default async function Neu({ searchParams }: { searchParams: Promise<Reco
                 <div className="field"><label htmlFor="n-date" className="req">Datum</label><input id="n-date" name="date" type="date" required defaultValue={sp.datum ?? tomorrow} /></div>
                 <div className="field"><label htmlFor="n-start" className="req">Von</label><input id="n-start" name="start" type="time" step={900} required defaultValue={/^\d\d:\d\d$/.test(sp.von ?? '') ? sp.von : '19:00'} /></div>
                 <div className="field"><label htmlFor="n-end" className="req">Bis</label><input id="n-end" name="end" type="time" step={900} required defaultValue={/^\d\d:\d\d$/.test(sp.bis ?? '') ? sp.bis : '21:00'} /><span className="hint">früher als Beginn = Folgetag</span></div>
+                <div className="field"><label htmlFor="n-enddate">Letzter Tag</label><input id="n-enddate" name="endDate" type="date" /><span className="hint">nur bei mehrtägigen Terminen</span></div>
                 <div className="field"><label htmlFor="n-guests">Personen</label><input id="n-guests" name="guests" type="number" min={1} defaultValue={10} /></div>
               </div>
               {extras.equipment.length > 0 && <div className="field"><span className="label">Ausstattung</span><div className="chips">{extras.equipment.map((e) => <label key={e} className="chip"><input type="checkbox" name="equipment" value={e} />{e}</label>)}</div></div>}
@@ -59,7 +60,7 @@ export default async function Neu({ searchParams }: { searchParams: Promise<Reco
               <div className="field"><label htmlFor="n-team">Mannschaft / Abteilung</label><input id="n-team" name="team" type="text" /></div>
               <div className="field"><label htmlFor="n-email">E-Mail</label><input id="n-email" name="email" type="email" placeholder={me.email} /></div>
               <div className="field"><label htmlFor="n-phone">Telefon</label><input id="n-phone" name="phone" type="tel" /></div>
-              <div className="field"><label htmlFor="n-ag">Abgesprochen mit</label><select id="n-ag" name="agreedWith" defaultValue=""><option value="">{me.name}</option><option>Michael Grieswelle</option><option>Sigrid Brodig</option></select></div>
+              <div className="field"><label htmlFor="n-ag">Abgesprochen mit</label><select id="n-ag" name="agreedWith" defaultValue=""><option value="">{me.name}</option>{contacts.filter((c) => c.name !== me.name).map((c) => <option key={c.name}>{c.name}</option>)}</select></div>
             </div>
           </section>
           <section className="card">

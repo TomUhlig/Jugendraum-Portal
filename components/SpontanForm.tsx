@@ -5,12 +5,12 @@ import { checkBooking, type Blackout, type Category, type Settings, type Slot } 
 import { addDays, berlinHm, berlinToUtc, berlinYmd } from '@/lib/time';
 import { Turnstile } from './Turnstile';
 
-type Data = { categories: Category[]; settings: Settings; slots: Slot[]; blackouts: Blackout[]; roomId?: string };
-const PEOPLE = ['Michael Grieswelle', 'Sigrid Brodig'];
+type Data = { categories: Category[]; settings: Settings; slots: Slot[]; blackouts: Blackout[]; roomId?: string; people: string[] };
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /** Kurzfristig buchen: freie Zeitfenster ab jetzt, Kontakt aus dem Gerät, ein Klick. Nur für Mitglieder. */
 export function SpontanForm({ data, turnstileKey }: { data: Data; turnstileKey: string }) {
+  const PEOPLE = data.people;
   const [loadedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);

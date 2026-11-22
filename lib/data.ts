@@ -1,4 +1,5 @@
 import 'server-only';
+import { normalizeContacts, type Contact } from './contacts';
 import { randomBytes } from 'node:crypto';
 import type postgres from 'postgres';
 import { googleBusy, queueGoogle } from './gcal';
@@ -69,6 +70,14 @@ export async function getSettings(q: Q = db()): Promise<Settings> {
   for (const k of Object.keys(s)) if (k in rows) s[k] = rows[k];
   return s as Settings;
 }
+
+export async function getContacts(q: Q = db()): Promise<Contact[]> {
+  const [r] = await q`select value from settings where key = 'contacts'`;
+  return normalizeContacts(r?.value);
+}
+/** Was öffentlich sichtbar ist: Telefonnummer nur mit Häkchen, E-Mail nie. */
+export type PublicContact = { name: string; role: string; phone: string; photo: string };
+export const publicContacts = (l: Contact[]): PublicContact[] => l.map((c) => ({ name: c.name, role: c.role, phone: c.showPhone ? c.phone : '', photo: c.photo }));
 
 export type Fees = { rent: number; deposit: number };
 export type MailTextKey = 'confirmed' | 'rejected' | 'reminder' | 'followup' | 'received';
@@ -155,13 +164,13 @@ export async function saveRoom(actor: string, r: { id?: string; name: string; ca
 /** Öffentliche, anonyme Belegung für den Kalender (ohne Namen, Notizen, Kontaktdaten). */
 export async function getPublicOccupancy(from: number, to: number, roomId = DEFAULT_ROOM) {
   const q = db();
-  const [categories, settings, slots, blackouts, extras, rooms] = await Promise.all([
-    getCategories(q), getSettings(q), getSlots(q, from - 7 * DAY, to + 7 * DAY, roomId), getAllBlocks(q, from, to, roomId), getExtras(q), getRooms(q),
+  const [categories, settings, slots, blackouts, extras, rooms, contacts] = await Promise.all([
+    getCategories(q), getSettings(q), getSlots(q, from - 7 * DAY, to + 7 * DAY, roomId), getAllBlocks(q, from, to, roomId), getExtras(q), getRooms(q), getContacts(q),
   ]);
   const days = await getDayInfos(from, to).catch(() => ({}));
   return {
     categories, settings: withRoom(settings, rooms, roomId), blackouts, slots: slots.map((s) => ({ ...s, id: s.id.slice(0, 8) })), rooms, roomId, days,
-    equipment: extras.equipment, feesExternal: extras.feesExternal, feesMemberParty: extras.feesMemberParty,
+    equipment: extras.equipment, feesExternal: extras.feesExternal, feesMemberParty: extras.feesMemberParty, contacts: publicContacts(contacts),
   };
 }
 

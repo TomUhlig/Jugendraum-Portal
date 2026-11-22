@@ -1,17 +1,19 @@
 import Link from 'next/link';
+import { ContactPhoto } from '@/components/ContactPhoto';
+import { initials } from '@/lib/contacts';
 import { imapConfig } from '@/lib/inbox-parse';
 import { db } from '@/lib/db';
 import { CopyText } from '@/components/CopyText';
 import { Flash, PageHead } from '@/components/Flash';
 import { requireAdmin } from '@/lib/auth';
-import { getCategories, getExtras, getHolidaySettings, getRooms, getSettings, operatorComplete } from '@/lib/data';
+import { getContacts, getCategories, getExtras, getHolidaySettings, getRooms, getSettings, operatorComplete } from '@/lib/data';
 import { DEFAULT_TEXTS, TEXT_LABELS, mailFrom, mailMode } from '@/lib/mail';
 import { formatIban } from '@/lib/payment';
 import { stripeEnabled } from '@/lib/stripe';
 import { appUrl } from '@/lib/url';
 import type { MailTextKey } from '@/lib/data';
 import { calendarId, googleConfigured, googleSettings, serviceEmail } from '@/lib/gcal';
-import { holidaysAction, roomsAction, templatesAction, inboxAction, googleResyncAction, googleSettingsAction, googleTestAction, offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
+import { contactsAction, holidaysAction, roomsAction, templatesAction, inboxAction, googleResyncAction, googleSettingsAction, googleTestAction, offerAction, operatorAction, paymentSettingsAction, settingsAction, testMailAction, textsAction } from '../../actions';
 
 export const metadata = { title: 'Einstellungen' };
 
@@ -23,7 +25,7 @@ const de = (n: number) => n.toString().replace('.', ',');
 export default async function Einstellungen({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin();
   const sp = await searchParams;
-  const [cats, s, x, gs, allRooms, hol] = await Promise.all([getCategories(), getSettings(), getExtras(), googleSettings(), getRooms(undefined, true), getHolidaySettings()]);
+  const [cats, s, x, gs, allRooms, hol, contacts] = await Promise.all([getCategories(), getSettings(), getExtras(), googleSettings(), getRooms(undefined, true), getHolidaySettings(), getContacts()]);
   const gOn = googleConfigured();
   const imap = imapConfig();
   const [inboxRow] = await db()`select value from settings where key = 'inbox'`;
@@ -126,6 +128,27 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
         <div className="card-foot inline"><button className="btn btn-primary" type="submit" disabled={ro}>Speichern und Ferien abrufen</button></div>
       </form>
 
+      <form action={contactsAction} className="card" id="ansprechpartner">
+        <div className="card-head"><div><h2>Ansprechpartner</h2><p>Mit diesen Personen sprechen Buchende vorher ab. Sie erscheinen im Anfrageformular, auf „Raum &amp; Regeln“, in Mails und im Pflicht-Haken „vorher abgesprochen“.</p></div></div>
+        <div className="card-body stack-sm">
+          {[...contacts, { name: '', role: '', phone: '', email: '', photo: '', showPhone: false }].map((c, i) => (
+            <fieldset key={c.name || 'neu'} className="contact-row" disabled={ro}>
+              <ContactPhoto name={`c_photo_${i}`} initial={c.photo} fallback={c.name ? initials(c.name) : ''} disabled={ro} />
+              <div className="contact-fields">
+                <input name={`c_name_${i}`} defaultValue={c.name} placeholder={c.name ? '' : 'Weitere Person, z. B. Eva Muster'} aria-label="Name" maxLength={80} />
+                <input name={`c_role_${i}`} defaultValue={c.role} placeholder="Aufgabe, z. B. Schlüssel und Absprache" aria-label="Aufgabe" maxLength={80} />
+                <input name={`c_phone_${i}`} type="tel" defaultValue={c.phone} placeholder="Telefon" aria-label="Telefon" maxLength={40} />
+                <input name={`c_email_${i}`} type="email" defaultValue={c.email} placeholder="E-Mail (nur intern)" aria-label="E-Mail" maxLength={120} />
+                <label className="check-inline small"><input type="checkbox" name={`c_show_${i}`} defaultChecked={c.showPhone} /> Telefon öffentlich zeigen</label>
+              </div>
+            </fieldset>
+          ))}
+          <input type="hidden" name="count" value={contacts.length + 1} />
+          <span className="muted small">Zum Entfernen den Namen leeren. Die Reihenfolge hier ist auch die Reihenfolge auf der Seite. Bestehende Buchungen behalten den Namen, mit dem abgesprochen wurde.</span>
+        </div>
+        <div className="card-foot"><button className="btn btn-primary" type="submit" disabled={ro}>Ansprechpartner speichern</button></div>
+      </form>
+
       <form action={roomsAction} className="card" id="raeume">
         <div className="card-head"><div><h2>Räume</h2><p>Mit mehr als einem aktiven Raum wählen Buchende zuerst den Raum. Belegung, Puffer und „eine Feier pro Wochenende“ gelten je Raum.</p></div></div>
         <div className="card-body stack-sm">
@@ -154,16 +177,18 @@ export default async function Einstellungen({ searchParams }: { searchParams: Pr
             <div className="field"><label htmlFor="s3">Buchbar im Voraus (Tage)</label><input id="s3" type="number" name="horizonDays" defaultValue={s.horizonDays} min={14} /></div>
             <div className="field"><label htmlFor="s4">Höchstzahl Personen</label><input id="s4" type="number" name="capacity" defaultValue={s.capacity} min={1} /></div>
             <div className="field"><label htmlFor="s5">Feiern enden spätestens</label><input id="s5" type="time" name="partyLatestEnd" defaultValue={s.partyLatestEnd} /></div>
+            <div className="field"><label htmlFor="s6">Mehrtägig höchstens (Tage)</label><input id="s6" type="number" name="multiDayMax" defaultValue={s.multiDayMax} min={0} max={14} /><span className="hint">0 = nur eintägig</span></div>
           </div>
           <p className="muted small">Vorlauf, Personenzahl und spätes Ende erzeugen Hinweise. Überschneidungen, Puffer, Sperrzeiten und die Feier-Regel verhindern eine Anfrage.</p>
           <div className="table-wrap"><table>
-            <thead><tr><th>Art</th><th>Puffer vorher (Min.)</th><th>Puffer nachher (Min.)</th><th>Freigabe auch für Mitglieder</th></tr></thead>
+            <thead><tr><th>Art</th><th>Puffer vorher (Min.)</th><th>Puffer nachher (Min.)</th><th>Freigabe auch für Mitglieder</th><th>Mehrtägig erlaubt</th></tr></thead>
             <tbody>{cats.map((c) => (
               <tr key={c.id}>
                 <td><span className="catdot" style={{ '--c': c.color } as React.CSSProperties}>{c.name}</span>{c.isParty && <span className="muted small"> · zählt als Feier</span>}</td>
                 <td><input type="number" name={`before_${c.id}`} defaultValue={c.bufferBefore} min={0} step={15} aria-label={`Puffer vorher, ${c.name}`} /></td>
                 <td><input type="number" name={`after_${c.id}`} defaultValue={c.bufferAfter} min={0} step={15} aria-label={`Puffer nachher, ${c.name}`} /></td>
                 <td><input type="checkbox" name={`approval_${c.id}`} defaultChecked={c.requiresApproval} aria-label={`Freigabe nötig, ${c.name}`} style={{ width: 18, height: 18, accentColor: 'var(--brand)' }} /></td>
+                <td>{c.isParty ? <span className="muted small">nie</span> : <input type="checkbox" name={`multi_${c.id}`} defaultChecked={s.multiDayCats.includes(c.id)} aria-label={`Mehrtägig erlaubt, ${c.name}`} style={{ width: 18, height: 18, accentColor: 'var(--brand)' }} />}</td>
               </tr>))}</tbody>
           </table></div>
           <p className="muted small">Anfragen von Personen außerhalb des Vereins brauchen immer eine Freigabe. Ohne Haken werden Mitglieder nach der E-Mail-Bestätigung direkt eingetragen.</p>

@@ -1,6 +1,9 @@
 import type { Lang } from './i18n';
 
-type V = { capacity: number; fromH: number; untilH: string; latest: string; lead: number; whole: boolean };
+type V = { people: string[]; capacity: number; fromH: number; untilH: string; latest: string; lead: number; whole: boolean };
+
+/** Namen fett, verbunden mit Komma und „oder“. */
+const who = (names: string[], or: string) => names.map((n, i) => <span key={n}>{i > 0 && (i === names.length - 1 ? ` ${or} ` : ', ')}<b>{n}</b></span>);
 
 /** Texte der Seite „Raum & Regeln“ in drei Sprachen. */
 export function raumText(lang: Lang, v: V) {
@@ -11,7 +14,7 @@ export function raumText(lang: Lang, v: V) {
     latest: `Parties until ${v.latest}`, latestSub: 'then clean-up', lead: `${v.lead} days’ notice`, leadSub: 'for parties',
     fixed: 'Fixed times when booking is not possible', onlyParties: ' (parties only)', equipment: 'Equipment:', equipmentTail: 'You can say what you need in your request.',
     steps: [
-      <>Agree the use in advance with <b>Michael Grieswelle</b> or <b>Sigrid Brodig</b>. Without this agreement a booking is invalid.</>,
+      <>Agree the use in advance with {who(v.people, 'or')}. Without this agreement a booking is invalid.</>,
       <>Make the request online and confirm your email address via the link in our email. Unconfirmed requests expire after 24 hours.</>,
       <>The organising team reviews the request and replies by email. Meetings and team meetings of club members are entered directly.</>,
       <>You receive a confirmation with a calendar entry and reminders three days and one day before.</>,
@@ -40,7 +43,7 @@ export function raumText(lang: Lang, v: V) {
     latest: `Kutlamalar en geç ${v.latest}`, latestSub: 'sonra toplama', lead: `${v.lead} gün önceden`, leadSub: 'kutlamalar için',
     fixed: 'Rezervasyon yapılamayan sabit zamanlar', onlyParties: ' (yalnızca kutlamalar)', equipment: 'Donanım:', equipmentTail: 'İhtiyacınız olanı talepte belirtebilirsiniz.',
     steps: [
-      <>Kullanımı önceden <b>Michael Grieswelle</b> veya <b>Sigrid Brodig</b> ile görüşün. Bu görüşme olmadan rezervasyon geçersizdir.</>,
+      <>Kullanımı önceden {who(v.people, 'veya')} ile görüşün. Bu görüşme olmadan rezervasyon geçersizdir.</>,
       <>Talebi çevrimiçi yapın ve e-postamızdaki bağlantıyla e-posta adresinizi onaylayın. Onaylanmayan talepler 24 saat sonra geçersiz olur.</>,
       <>Organizasyon ekibi talebi inceler ve e-posta ile dönüş yapar. Kulüp üyelerinin toplantıları doğrudan kaydedilir.</>,
       <>Takvim kaydıyla birlikte bir onay ve üç gün ile bir gün önce hatırlatmalar alırsınız.</>,
@@ -69,7 +72,7 @@ export function raumText(lang: Lang, v: V) {
     latest: `Feiern bis ${v.latest} Uhr`, latestSub: 'danach Aufräumen', lead: `${v.lead} Tage Vorlauf`, leadSub: 'für Feiern',
     fixed: 'Feste Zeiten, in denen nicht gebucht werden kann', onlyParties: ' (nur Feiern)', equipment: 'Ausstattung:', equipmentTail: 'Was du brauchst, kannst du bei der Anfrage angeben.',
     steps: [
-      <>Sprich die Nutzung vorher mit <b>Michael Grieswelle</b> oder <b>Sigrid Brodig</b> ab. Ohne diese Absprache ist eine Buchung ungültig.</>,
+      <>Sprich die Nutzung vorher mit {who(v.people, 'oder')} ab. Ohne diese Absprache ist eine Buchung ungültig.</>,
       <>Stell die Anfrage online und bestätige deine E-Mail-Adresse über den Link in unserer Mail. Unbestätigte Anfragen verfallen nach 24 Stunden.</>,
       <>Das Orga-Team prüft die Anfrage und meldet sich per Mail. Besprechungen und Mannschaftssitzungen von Mitgliedern werden direkt eingetragen.</>,
       <>Du bekommst eine Bestätigung mit Kalendereintrag sowie Erinnerungen drei Tage und einen Tag vorher.</>,

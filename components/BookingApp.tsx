@@ -4,22 +4,23 @@ import {
   AlertTriangle, ArrowLeft, ArrowRight, BellRing, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, Ellipsis, GraduationCap, Megaphone, PartyPopper, Plus, Share2, Shirt, Users, X, XCircle,
 } from 'lucide-react';
 import { Turnstile } from './Turnstile';
-import { Blackout, Category, CheckResult, Settings, Slot, blackoutWhen, checkBooking, partyWeekendOf } from '@/lib/rules';
+import { Blackout, Category, CheckResult, Settings, Slot, allowsMultiDay, blackoutWhen, checkBooking, partyWeekendOf } from '@/lib/rules';
 import { MIN, addDays, berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong, weekdayOf } from '@/lib/time';
 import { LOCALE, catLabel, t, type Lang } from '@/lib/i18n';
+import { DEFAULT_CONTACTS, fillWho, initials } from '@/lib/contacts';
 
 type Fees = { rent: number; deposit: number };
 export type Occupancy = {
   rooms?: { id: string; name: string; capacity: number }[]; roomId?: string;
   days?: Record<string, { name: string; kind: 'holiday' | 'school'; info?: boolean }[]>;
   categories: Category[]; settings: Settings; slots: Slot[]; blackouts: Blackout[];
+  contacts?: { name: string; role: string; phone: string; photo: string }[];
   equipment: string[]; feesExternal: Fees; feesMemberParty: Fees;
 };
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   meet: Users, team: Shirt, event: Megaphone, work: GraduationCap, party: PartyPopper, misc: Ellipsis,
 };
-const PEOPLE = ['Michael Grieswelle', 'Sigrid Brodig'];
 const eurL = (n: number, lang: Lang) => n.toLocaleString(LOCALE[lang], { style: 'currency', currency: 'EUR', maximumFractionDigits: n % 1 ? 2 : 0 });
 const monthStart = (k: string) => k.slice(0, 8) + '01';
 const shiftMonth = (k: string, n: number) => {
@@ -31,7 +32,6 @@ const dayLabelL = (k: string, lang: Lang) => new Date(k + 'T12:00:00Z').toLocale
 const toMin = (hm: string) => +hm.slice(0, 2) * 60 + +hm.slice(3);
 const toHm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 const START_OPTIONS = Array.from({ length: (23 - 7) * 4 + 4 }, (_, i) => toHm(7 * 60 + i * 15));
-const initials = (n: string) => n.split(' ').map((p) => p[0]).join('').slice(0, 2);
 
 type Done = { number: string; email: string; count?: number; skipped?: number };
 
@@ -106,19 +106,29 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF((s) => ({ ...s, [k]: e.target.value }));
+  const contacts = initial.contacts?.length ? initial.contacts : DEFAULT_CONTACTS;
+  const PEOPLE = contacts.map((c) => c.name);
   const cats = useMemo(() => new Map(data.categories.map((c) => [c.id, c])), [data.categories]);
   const cat = catId ? cats.get(catId) : undefined;
   const fees: Fees = bookerType === 'external' ? data.feesExternal : cat?.isParty ? data.feesMemberParty : { rent: 0, deposit: 0 };
 
+  // Mehrtägig (Turnier, Lehrgang, Freizeit): eigener letzter Tag statt "bis Folgetag"
+  const multiOk = allowsMultiDay(cat, data.settings);
+  const [multiOn, setMultiOn] = useState(false);
+  const [endDate, setEndDate] = useState('');
+  const multi = multiOk && multiOn && !!f.date;
+  const endDays = useMemo(() => (f.date ? Array.from({ length: Math.max(0, (data.settings.multiDayMax ?? 0) - 1) }, (_, i) => addDays(f.date, i + 1)) : []), [f.date, data.settings.multiDayMax]);
+  useEffect(() => { if (multi && !endDays.includes(endDate)) setEndDate(endDays[Math.min(1, endDays.length - 1)] ?? ''); }, [multi, endDays, endDate]);
   const draft = useMemo(() => {
     if (!f.date) return null;
     const start = berlinToUtc(f.date, f.start);
+    if (multi && endDate) return { start, end: berlinToUtc(endDate, f.end), guests: +f.guests || 0 };
     const end = toMin(f.end) > toMin(f.start) ? berlinToUtc(f.date, f.end) : berlinToUtc(addDays(f.date, 1), f.end);
     return { start, end, guests: +f.guests || 0 };
-  }, [f.date, f.start, f.end, f.guests]);
+  }, [f.date, f.start, f.end, f.guests, multi, endDate]);
   useEffect(() => { setWait({ open: false, state: 'idle', msg: '' }); }, [f.date, f.start, f.end, catId]);
   const [repeat, setRepeat] = useState<{ on: boolean; freq: 'weekly' | 'biweekly'; count: number }>({ on: false, freq: 'weekly', count: 6 });
-  const seriesOn = repeat.on && !!cat && !cat.isParty;
+  const seriesOn = repeat.on && !!cat && !cat.isParty && !multi;
   // Ausweichtermine: andere Tage zur gleichen Uhrzeit (höchstens zwei)
   const [alts, setAlts] = useState<string[]>([]);
   const altChecks = useMemo(() => alts.map((d) => {
@@ -142,9 +152,10 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
   const result: CheckResult | null = useMemo(() => (draft && catId ? checkBooking({ ...draft, categoryId: catId }, { ...data, now, lang }) : null), [draft, catId, data, now, lang]);
 
   const endOptions = useMemo(() => {
+    if (multi) return Array.from({ length: 96 }, (_, i) => ({ v: toHm(i * 15), next: false }));
     const s = toMin(f.start), max = (cat?.maxDurationMin ?? 16 * 60);
     return Array.from({ length: Math.floor(Math.min(max, 18 * 60) / 15) }, (_, i) => s + (i + 1) * 15).map((m) => ({ v: toHm(m), next: m >= 24 * 60 }));
-  }, [f.start, cat]);
+  }, [f.start, cat, multi]);
   useEffect(() => { if (!endOptions.some((o) => o.v === f.end)) setF((s) => ({ ...s, end: endOptions[Math.min(7, endOptions.length - 1)].v })); }, [endOptions, f.end]);
 
   // ---------- Validierung pro Schritt ----------
@@ -173,12 +184,12 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
       const res = await fetch('/api/buchungen', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          categoryId: catId, title: f.title.trim(), note: f.note.trim(), date: f.date, start: f.start, end: f.end, guests: +f.guests,
+          categoryId: catId, title: f.title.trim(), note: f.note.trim(), date: f.date, start: f.start, end: f.end, ...(multi && endDate ? { endDate } : {}), guests: +f.guests,
           equipment, bookerType, team: bookerType === 'member' ? f.team.trim() : '', name: f.name.trim(), email: f.email.trim(),
           phone: f.phone.trim(), agreedWith: who, agreed: agree, rulesAccepted: rules, lang, website: f.website, elapsed: Date.now() - loadedAt, turnstile: captcha,
           roomId,
           ...(seriesOn ? { repeat: { freq: repeat.freq, count: repeat.count } } : {}),
-          ...(!seriesOn && alts.filter(Boolean).length ? { alternatives: alts.filter((d) => d && d !== f.date).map((d) => ({ date: d, start: f.start, end: f.end })) } : {}),
+          ...(!seriesOn && !multi && alts.filter(Boolean).length ? { alternatives: alts.filter((d) => d && d !== f.date).map((d) => ({ date: d, start: f.start, end: f.end })) } : {}),
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -241,9 +252,9 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
             {rooms.length > 1 && <div className="item"><dt>{T.room}</dt><dd>{rooms.find((r) => r.id === roomId)?.name}</dd></div>}
             <div className="item"><dt>{T.occasion}</dt><dd className={f.title ? '' : 'tbd'}>{f.title || T.open}</dd></div>
             <div className="item"><dt>{T.kind}</dt><dd className={cat ? '' : 'tbd'}>{cat ? <span className="catdot" style={{ '--c': cat.color } as React.CSSProperties}>{cl(cat).name}</span> : T.open}</dd></div>
-            <div className="item"><dt>{T.date}</dt><dd className={f.date ? '' : 'tbd'}>{f.date ? dayLabel(f.date) : T.open}</dd></div>
-            <div className="item"><dt>{T.time}</dt><dd className={f.date ? 'num' : 'tbd'}>{f.date && draft ? `${f.start}–${f.end}${uhr}${berlinYmd(draft.end) !== f.date ? ' ' + T.nextDay : ''}` : T.open}</dd></div>
-            {cat && draft && <div className="item"><dt>{T.reserved}</dt><dd className="num" style={{ fontWeight: 400 }}>{berlinHm(draft.start - cat.bufferBefore * MIN)}–{berlinHm(draft.end + cat.bufferAfter * MIN)}{uhr}<br /><span className="muted small">{T.inclSetup}</span></dd></div>}
+            <div className="item"><dt>{T.date}</dt><dd className={f.date ? '' : 'tbd'}>{f.date ? (multi && endDate ? `${dayLabel(f.date)} – ${dayLabel(endDate)}` : dayLabel(f.date)) : T.open}</dd></div>
+            <div className="item"><dt>{T.time}</dt><dd className={f.date ? 'num' : 'tbd'}>{f.date && draft ? (multi ? `${T.multiFrom} ${f.start}${uhr} · ${T.multiTo} ${f.end}${uhr}` : `${f.start}–${f.end}${uhr}${berlinYmd(draft.end) !== f.date ? ' ' + T.nextDay : ''}`) : T.open}</dd></div>
+            {cat && draft && <div className="item"><dt>{T.reserved}</dt><dd className="num" style={{ fontWeight: 400 }}>{multi ? `${fmtDay(draft.start - cat.bufferBefore * MIN, lang)} ${berlinHm(draft.start - cat.bufferBefore * MIN)} – ${fmtDay(draft.end + cat.bufferAfter * MIN, lang)} ${berlinHm(draft.end + cat.bufferAfter * MIN)}` : `${berlinHm(draft.start - cat.bufferBefore * MIN)}–${berlinHm(draft.end + cat.bufferAfter * MIN)}`}{uhr}<br /><span className="muted small">{T.inclSetup}</span></dd></div>}
             <div className="item"><dt>{T.people}</dt><dd className="num">{f.guests || '–'}</dd></div>
             {!seriesOn && alts.some(Boolean) && <div className="item"><dt>{T.altTitle}</dt><dd style={{ fontWeight: 400 }}>{alts.filter(Boolean).map((d) => dayLabel(d)).join(', ')}</dd></div>}
             {equipment.length > 0 && <div className="item"><dt>{T.equipment}</dt><dd style={{ fontWeight: 400 }}>{equipment.join(', ')}</dd></div>}
@@ -259,7 +270,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
       </section>
       <section className="card card-body stack">
         <h2 className="section-title">{T.contacts}</h2>
-        {PEOPLE.map((p) => <div className="contact" key={p}><span className="avatar">{initials(p)}</span><div><b>{p}</b><br /><span className="muted small">{T.contactRole}</span></div></div>)}
+        {contacts.map((p) => <div className="contact" key={p.name}>{p.photo ? <img className="avatar" src={p.photo} alt="" /> : <span className="avatar">{initials(p.name)}</span>}<div><b>{p.name}</b><br /><span className="muted small">{(lang === 'de' && p.role) || T.contactRole}</span>{p.phone && <><br /><a className="small num" href={`tel:${p.phone.replace(/[^\d+]/g, '')}`}>{p.phone}</a></>}</div></div>)}
         {contactNote && lang === 'de' && <p className="muted small">{contactNote}</p>}
       </section>
       {!done && <section className="card card-body stack">
@@ -304,7 +315,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
           {T.steps.map((s, i) => (
             <li key={s}>
               <button type="button" disabled={i > reached} onClick={() => go(i)} aria-current={i === step ? 'step' : undefined} className={i < step ? 'done' : ''}>
-                <span className="n">{i < step ? <Check className="icon-sm" /> : i + 1}</span><span className="lbl">{s}</span>
+                <span className="n">{i < step ? <Check className="icon-sm" /> : String(i + 1).padStart(2, '0')}</span><span className="lbl">{s}</span>
               </button>
             </li>
           ))}
@@ -370,7 +381,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
                     const wd = weekdayOf(k), fri = wd === 5 ? k : wd === 6 ? addDays(k, -1) : wd === 0 ? addDays(k, -2) : null;
                     const info = data.days?.[k] ?? [];
                     const hol = info.find((x) => x.kind === 'holiday'), school = info.find((x) => x.kind === 'school');
-                    const cls = ['dcell', k.slice(0, 7) !== month.slice(0, 7) && 'out', k === todayKey && 'today', k === f.date && 'sel', blocked && 'blocked', hol && 'hol', school && 'school'].filter(Boolean).join(' ');
+                    const cls = ['dcell', k.slice(0, 7) !== month.slice(0, 7) && 'out', k === todayKey && 'today', k === f.date && 'sel', multi && endDate && k > f.date && k <= endDate && 'inrange', blocked && 'blocked', hol && 'hol', school && 'school'].filter(Boolean).join(' ');
                     return (
                       <button type="button" key={k} className={cls} disabled={k < todayKey || blocked} onClick={() => { setF((s) => ({ ...s, date: k })); if (monthStart(k) !== month) setMonth(monthStart(k)); }}
                         aria-label={`${dayLabel(k)}${hol ? ` (${hol.name})` : ''}: ${blocked ? T.blocked : list.length ? T.bookingsN(list.length) : T.free}`} aria-pressed={k === f.date} title={info.map((x) => x.name).join(' · ') || undefined}>
@@ -402,10 +413,18 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
                         <li key={s.id} style={{ '--c': cats.get(s.categoryId)?.color } as React.CSSProperties}><span className="t">{berlinHm(s.start)}–{berlinHm(s.end)}</span><span>{s.status === 'confirmed' ? T.booked : T.requested}</span></li>
                       ))}</ul>
                     ) : <p className="free-day"><CircleCheck className="icon-sm" />{T.noBookings}</p>}
+                    {multiOk && (
+                      <label className="check-inline multi-toggle"><input type="checkbox" checked={multiOn} onChange={(e) => setMultiOn(e.target.checked)} />
+                        <span><b>{T.multiLabel}</b><br /><span className="muted small">{T.multiHint(data.settings.multiDayMax)}</span></span></label>
+                    )}
+                    {multi && (
+                      <div className="field"><label htmlFor="f-enddate">{T.endDay}</label>
+                        <select id="f-enddate" value={endDate} onChange={(e) => setEndDate(e.target.value)}>{endDays.map((d, i) => <option key={d} value={d}>{dayLabel(d)} · {T.multiDays(i + 2)}</option>)}</select></div>
+                    )}
                     <div className="row" style={{ gridTemplateColumns: '1fr 1fr', marginTop: 6 }}>
-                      <div className="field"><label htmlFor="f-start">{T.from}</label>
+                      <div className="field"><label htmlFor="f-start">{multi ? `${T.multiFrom} (${T.startDay})` : T.from}</label>
                         <select id="f-start" value={f.start} onChange={set('start')}>{START_OPTIONS.map((t) => <option key={t}>{t}</option>)}</select></div>
-                      <div className="field"><label htmlFor="f-end">{T.to}</label>
+                      <div className="field"><label htmlFor="f-end">{multi ? `${T.multiTo} (${T.endDay})` : T.to}</label>
                         <select id="f-end" value={f.end} onChange={set('end')}>{endOptions.map((o) => <option key={o.v + o.next} value={o.v}>{o.v}{o.next ? ' (+1)' : ''}</option>)}</select></div>
                     </div>
                   </>
@@ -413,7 +432,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
               </div>
             </div>
 
-            {f.date && (
+            {f.date && !multi && (
               <div>
                 <div className="track" aria-hidden="true">
                   {data.slots.filter((s) => s.end + 4 * 3.6e6 > w0 && s.start - 3 * 3.6e6 < w0 + span).map((s) => {
@@ -445,7 +464,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
                 </div>
               </div>
             )}
-            {f.date && cat && !seriesOn && (
+            {f.date && cat && !seriesOn && !multi && (
               <div className={`alt-box${alts.length ? ' on' : ''}`}>
                 <div className="between"><span><b>{T.altTitle}</b> <span className="muted small">{T.altHint}</span></span>
                   {alts.length < 2 && <button type="button" className="btn btn-sm" onClick={() => setAlts((a) => [...a, ''])}><Plus className="icon-sm" />{T.altAdd}</button>}</div>
@@ -459,7 +478,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
                 ))}
               </div>
             )}
-            {f.date && cat && !cat.isParty && result?.level !== 'block' && (
+            {f.date && cat && !cat.isParty && !multi && result?.level !== 'block' && (
               <div className={`repeat-box${seriesOn ? ' on' : ''}`}>
                 <label className="check-inline"><input type="checkbox" checked={repeat.on} onChange={(e) => setRepeat((r) => ({ ...r, on: e.target.checked }))} />
                   <span><b>{T.repeatLabel}</b> <span className="muted small">{T.repeatHint}</span></span></label>
@@ -542,7 +561,7 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
               <div className={`choice important${err('agree') ? ' invalid' : ''}`}>
                 <input type="checkbox" id="f-agree" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
                 <div className="stack-sm">
-                  <label htmlFor="f-agree"><b>{T.agree}</b> {T.agreeNote}</label>
+                  <label htmlFor="f-agree"><b>{fillWho(T.agree, PEOPLE, lang)}</b> {T.agreeNote}</label>
                   <div className="chips" role="radiogroup" aria-label={T.agreedWith}>
                     {PEOPLE.map((p) => <label key={p} className="chip"><input type="radio" name="who" checked={who === p} onChange={() => { setWho(p); setAgree(true); }} />{p}</label>)}
                   </div>

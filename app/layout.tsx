@@ -11,7 +11,7 @@ import { dirOf, t } from '@/lib/i18n';
 import { NavLink } from '@/components/NavLinks';
 import './globals.css';
 
-const archivo = Archivo({ subsets: ['latin', 'latin-ext'], variable: '--font-archivo', display: 'swap' });
+const archivo = Archivo({ subsets: ['latin', 'latin-ext'], variable: '--font-archivo', display: 'swap', axes: ['wdth'] });
 const source = Source_Sans_3({ subsets: ['latin', 'latin-ext', 'cyrillic'], variable: '--font-source', display: 'swap' });
 const arabic = Noto_Sans_Arabic({ subsets: ['arabic'], variable: '--font-arabic', display: 'swap', preload: false, weight: ['400', '600', '700'] });
 

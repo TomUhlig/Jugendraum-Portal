@@ -2,7 +2,7 @@
 import type { Lang } from './i18n';
 
 const de = {
-  footer: 'Jugendraum des SV Heepen · Diese Nachricht wurde automatisch versendet. Bei Fragen antworte einfach auf diese Mail oder wende dich an Michael Grieswelle oder Sigrid Brodig.',
+  footer: 'Jugendraum des SV Heepen · Diese Nachricht wurde automatisch versendet. Bei Fragen antworte einfach auf diese Mail oder wende dich an {wer}.',
   footerText: 'Jugendraum des SV Heepen', room: 'Jugendraum',
   hello: (n: string) => `Hallo ${n},`,
   labels: { booking: 'Buchung', occasion: 'Anlass', date: 'Termin', kind: 'Art', people: 'Personen', equipment: 'Ausstattung', rent: 'Nutzungsentgelt', deposit: 'Kaution', contact: 'Ansprechperson', until: 'bis', uhr: ' Uhr' },
@@ -43,7 +43,7 @@ export type MailDict = typeof de;
 import { arMail, ukMail } from './mail-i18n-extra';
 
 const en: MailDict = {
-  footer: 'Youth room of SV Heepen · This message was sent automatically. If you have questions, simply reply to this email or contact Michael Grieswelle or Sigrid Brodig.',
+  footer: 'Youth room of SV Heepen · This message was sent automatically. If you have questions, simply reply to this email or contact {wer}.',
   footerText: 'Youth room of SV Heepen', room: 'Youth room',
   hello: (n) => `Hello ${n},`,
   labels: { booking: 'Booking', occasion: 'Occasion', date: 'Date', kind: 'Type', people: 'People', equipment: 'Equipment', rent: 'Usage fee', deposit: 'Deposit', contact: 'Contact person', until: 'until', uhr: '' },
@@ -82,7 +82,7 @@ const en: MailDict = {
 };
 
 const tr: MailDict = {
-  footer: 'SV Heepen gençlik salonu · Bu mesaj otomatik olarak gönderilmiştir. Sorularınız için bu e-postayı yanıtlayabilir veya Michael Grieswelle ya da Sigrid Brodig ile iletişime geçebilirsiniz.',
+  footer: 'SV Heepen gençlik salonu · Bu mesaj otomatik olarak gönderilmiştir. Sorularınız için bu e-postayı yanıtlayabilir veya {wer} ile iletişime geçebilirsiniz.',
   footerText: 'SV Heepen gençlik salonu', room: 'Gençlik salonu',
   hello: (n) => `Merhaba ${n},`,
   labels: { booking: 'Rezervasyon', occasion: 'Etkinlik', date: 'Tarih', kind: 'Tür', people: 'Kişi', equipment: 'Donanım', rent: 'Kullanım ücreti', deposit: 'Depozito', contact: 'İletişim kişisi', until: 'kadar', uhr: '' },

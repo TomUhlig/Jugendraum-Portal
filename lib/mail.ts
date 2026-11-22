@@ -7,9 +7,10 @@ import { decisionToken } from './auth';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { db } from './db';
 import { hausordnungPdf, protocolPdf } from './pdf';
-import { amountsDue, getCategories, getExtras, getSettings, getSignatures, type Booking, type MailTextKey } from './data';
+import { DEFAULT_CONTACTS, fillWho } from './contacts';
+import { amountsDue, getContacts, getCategories, getExtras, getSettings, getSignatures, type Booking, type MailTextKey } from './data';
 import { dueDate } from './payment';
-import type { Category } from './rules';
+import { calendarDays, type Category } from './rules';
 import { bookingIcs } from './ics';
 import { eur } from './labels';
 import { LOCALE, catLabel, type Lang } from './i18n';
@@ -56,6 +57,12 @@ export async function sendMail(m: Mail): Promise<boolean> {
   if (!to.length) return true;
   let ok = true; let error: string | null = null;
   const mode = mailMode();
+  // Ansprechpartner im Fußtext aus den Einstellungen einsetzen
+  if (/\{wer\}/.test(m.html + m.text)) {
+    const names = (await getContacts().catch(() => DEFAULT_CONTACTS)).map((c) => c.name);
+    const lang = (/<html lang="(\w\w)"/.exec(m.html)?.[1] ?? 'de') as Lang;
+    m = { ...m, html: fillWho(m.html, names.map(esc), lang), text: fillWho(m.text, names, lang) };
+  }
   // Antworten mit Buchungsnummer in der Adresse, damit sie im Nachrichtenverlauf landen (nur mit Postfach-Abruf)
   const plus = !m.replyTo && m.number && mode === 'smtp' && inboxEnabled() ? plusAddress(process.env.SMTP_USER ?? '', m.number) : null;
   const replyTo = m.replyTo || plus || process.env.MAIL_REPLY_TO || undefined;
@@ -96,22 +103,22 @@ function layout(o: Mailout) {
   const M = MAIL_TEXT[o.lang ?? 'de'];
   const rtl = o.lang === 'ar';
   return `<!doctype html><html lang="${o.lang ?? 'de'}" dir="${rtl ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${esc(o.heading)}</title></head>
-<body dir="${rtl ? 'rtl' : 'ltr'}" style="margin:0;padding:0;background:#F4F5F8;font-family:'Source Sans 3','Segoe UI',Tahoma,Helvetica,Arial,sans-serif;text-align:${rtl ? 'right' : 'left'}">
+<body dir="${rtl ? 'rtl' : 'ltr'}" style="margin:0;padding:0;background:#F2F0E9;font-family:'Source Sans 3','Segoe UI',Tahoma,Helvetica,Arial,sans-serif;text-align:${rtl ? 'right' : 'left'}">
 <span style="display:none;max-height:0;overflow:hidden">${esc(o.preheader)}</span>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F5F8;padding:28px 12px"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#FFFFFF;border:1px solid #E1E4EC;border-top:4px solid #FFD800;border-radius:8px">
-<tr><td style="padding:20px 28px;border-bottom:1px solid #E1E4EC">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2F0E9;padding:28px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#FFFFFF;border:1px solid #E2DFD5;border-radius:6px;overflow:hidden">
+<tr><td style="padding:18px 28px;background:#1B2160;border-top:4px solid #FFD500;border-bottom:3px solid #FFD500">
   <table role="presentation" cellpadding="0" cellspacing="0"><tr>
   <td><img src="${appUrl()}/logo.png" width="36" height="36" alt="SV Heepen" style="display:block"></td>
-  <td style="padding-${rtl ? 'right' : 'left'}:12px;font-size:16px;line-height:1.2;color:#2E367A;font-weight:700">${M.room}<br><span style="font-size:12px;color:#646A85;font-weight:400">SV Heepen</span></td>
+  <td style="padding-${rtl ? 'right' : 'left'}:12px;font-size:16px;line-height:1.15;color:#FFFFFF;font-weight:800;text-transform:uppercase;letter-spacing:.02em;font-family:'Arial Narrow','Archivo Narrow',Arial,sans-serif">${M.room}<br><span style="font-size:11px;color:#FFD500;font-weight:700;letter-spacing:.14em">SV HEEPEN</span></td>
   </tr></table></td></tr>
 <tr><td style="padding:28px 28px 8px">
-${o.progress ? progressBar(o.progress, o.lang ?? 'de') : ''}<h1 style="margin:0 0 16px;font-size:21px;line-height:1.3;color:#161A33;font-weight:700">${esc(o.heading)}</h1>
+${o.progress ? progressBar(o.progress, o.lang ?? 'de') : ''}<h1 style="margin:0 0 16px;font-size:24px;line-height:1.15;color:#12152B;font-weight:800;text-transform:uppercase;font-family:'Arial Narrow','Archivo Narrow',Arial,sans-serif;letter-spacing:.01em">${esc(o.heading)}</h1>
 ${o.blocks.join('\n')}
-${o.cta ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 22px"><tr><td style="background:#2E367A;border-radius:8px"><a href="${o.cta.href}" style="display:inline-block;padding:12px 22px;color:#FFFFFF;font-weight:600;font-size:15px;text-decoration:none">${esc(o.cta.label)}</a></td></tr></table>` : ''}
+${o.cta ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 22px"><tr><td style="background:#FFD500;border-radius:4px;border-bottom:3px solid #C9A400"><a href="${o.cta.href}" style="display:inline-block;padding:12px 22px;color:#12152B;font-weight:800;font-size:15px;text-decoration:none">${esc(o.cta.label)}</a></td></tr></table>` : ''}
 ${(o.after ?? []).join('\n')}
 </td></tr>
-<tr><td style="padding:16px 28px;border-top:1px solid #E1E4EC;font-size:12px;line-height:1.5;color:#646A85">${M.footer}</td></tr>
+<tr><td style="padding:16px 28px;border-top:1px solid #E2DFD5;background:#F7F5EF;font-size:12px;line-height:1.5;color:#62677F">${M.footer}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 const PROGRESS: Record<Lang, string[]> = {
@@ -182,7 +189,9 @@ function details(b: Booking, c?: Category, extra: [string, string][] = [], lang:
   const L = MAIL_TEXT[lang].labels;
   const eur = (n: number) => eurL(n, lang);
   const rows: [string, string][] = [
-    [L.booking, b.number], ...(roomLabel(b.roomId) ? [[ROOM_TX[lang], esc(roomLabel(b.roomId)!)] as [string, string]] : []), [L.occasion, esc(b.title)], [L.date, `${fmtLong(b.start, lang)}<br><span dir="ltr">${berlinHm(b.start)}–${berlinHm(b.end)}</span>${L.uhr}${berlinYmd(b.end) !== berlinYmd(b.start) ? ` (${L.until} ${fmtDay(b.end, lang)})` : ''}`],
+    [L.booking, b.number], ...(roomLabel(b.roomId) ? [[ROOM_TX[lang], esc(roomLabel(b.roomId)!)] as [string, string]] : []), [L.occasion, esc(b.title)], [L.date, b.end - b.start > 86_400_000 || calendarDays(b.start, b.end) > 2
+      ? `${fmtLong(b.start, lang)}, <span dir="ltr">${berlinHm(b.start)}</span>${L.uhr}<br>${L.until} ${fmtLong(b.end, lang)}, <span dir="ltr">${berlinHm(b.end)}</span>${L.uhr}`
+      : `${fmtLong(b.start, lang)}<br><span dir="ltr">${berlinHm(b.start)}–${berlinHm(b.end)}</span>${L.uhr}${berlinYmd(b.end) !== berlinYmd(b.start) ? ` (${L.until} ${fmtDay(b.end, lang)})` : ''}`],
     ...(c ? [[L.kind, esc(catLabel(lang, c).name)] as [string, string]] : []), [L.people, String(b.guests)],
     ...(b.equipment.length ? [[L.equipment, esc(b.equipment.join(', '))] as [string, string]] : []),
     ...(b.rent > 0 ? [[L.rent, eur(b.rent)] as [string, string]] : []), ...(b.deposit > 0 ? [[L.deposit, eur(b.deposit)] as [string, string]] : []),

@@ -23,7 +23,7 @@ const de = {
     text: 'Für Trainerbesprechungen, Mannschaftsabende, Vereinsveranstaltungen und private Feiern. Freie Zeiten siehst du direkt, das Orga-Team bestätigt deine Anfrage per E-Mail.',
     capacity: (n: number) => `bis ${n} Personen`, oneParty: 'eine Feier pro Wochenende', lead: (d: number) => `Feiern mind. ${d} Tage vorher anfragen`,
     nextFree: 'Nächste freie Abende', nextFreeHint: 'Antippen und direkt anfragen',
-    eyebrow: 'SV Heepen · Jugendraum', cta: 'Jetzt anfragen', more: 'Raum & Regeln', noneFree: 'In den nächsten Wochen sind die Abende ausgebucht. Wähle unten im Kalender einen anderen Zeitraum.', evening: 'Abend', otherDay: 'Anderen Tag wählen', share: 'Per WhatsApp teilen',
+    statPeople: 'Personen höchstens', statParty: 'Feier pro Wochenende', statLead: 'Tage Vorlauf für Feiern', boardLive: 'aktuell', eyebrow: 'SV Heepen · Jugendraum', cta: 'Jetzt anfragen', more: 'Raum & Regeln', noneFree: 'In den nächsten Wochen sind die Abende ausgebucht. Wähle unten im Kalender einen anderen Zeitraum.', evening: 'Abend', otherDay: 'Anderen Tag wählen', share: 'Per WhatsApp teilen',
   },
   cats: {
     meet: ['Besprechung', 'Trainer, Vorstand'], team: ['Mannschaftssitzung', 'Teamabend'], event: ['Vereinsveranstaltung', 'Elternabend, Ehrung'],
@@ -35,7 +35,7 @@ const de = {
     room: 'Raum', upTo: (n: number) => `bis ${n} Personen`,
     altTitle: 'Ausweichtermine', altHint: 'falls der Wunschtag nicht klappt, gleiche Uhrzeit', altAdd: 'Ausweichtag', altRemove: 'Entfernen', altTaken: 'belegt', altOk: 'frei', altUnknown: 'wird geprüft',
     draftShare: 'Entwurf teilen', draftCopied: 'Link kopiert', draftHint: 'zum Abstimmen, ohne deine Kontaktdaten', draftText: 'Kannst du mal draufschauen? Unsere Anfrage für den Jugendraum:',
-    repeatLabel: 'Regelmäßig wiederholen', repeatHint: 'z. B. Training oder Sitzungen, bis zu 12 Termine', weekly: 'jede Woche', biweekly: 'alle 2 Wochen', dates: 'Termine',
+    multiLabel: 'Über mehrere Tage', multiHint: (n: number) => `z. B. Turnier, Lehrgang oder Freizeit, bis zu ${n} Tage am Stück`, endDay: 'Letzter Tag', startDay: 'Erster Tag', multiFrom: 'Beginn', multiTo: 'Ende', multiDays: (n: number) => `${n} Tage`, repeatLabel: 'Regelmäßig wiederholen', repeatHint: 'z. B. Training oder Sitzungen, bis zu 12 Termine', weekly: 'jede Woche', biweekly: 'alle 2 Wochen', dates: 'Termine',
     repeatTaken: 'belegt, wird übersprungen', repeatCheck: 'wird beim Absenden geprüft', repeatNote: 'Serien prüft immer das Orga-Team.',
     doneSeries: (n: number, k: number) => `Angefragt: ${n} Termine${k ? `, ${k} belegte übersprungen` : ''}.`,
     steps: ['Anlass', 'Termin', 'Kontakt', 'Prüfen'],
@@ -71,13 +71,13 @@ const de = {
     feeInfo: (rent: string, dep: string) => `Für diese Nutzung fallen ${[rent && `ein Nutzungsentgelt von ${rent}`, dep && `eine Kaution von ${dep}`].filter(Boolean).join(' und ')} an. Die Kaution bekommst du nach der Abnahme zurück.`,
     checkTitle: 'Prüfen und absenden', checkLead: 'Kontrolliere deine Angaben in der Übersicht. Mit dem Absenden stellst du eine verbindliche Anfrage.',
     appointment: 'Termin', until: 'bis', contact: 'Kontakt', notMember: '(nicht im Verein)', message: 'Nachricht',
-    agree: 'Ich habe die Nutzung vorab mit Michael Grieswelle oder Sigrid Brodig abgesprochen.', agreeNote: 'Ohne vorherige Absprache ist die Buchung ungültig.', agreedWith: 'Abgesprochen mit',
+    agree: 'Ich habe die Nutzung vorab mit {wer} abgesprochen.', agreeNote: 'Ohne vorherige Absprache ist die Buchung ungültig.', agreedWith: 'Abgesprochen mit',
     rulesA: 'Ich habe die ', rulesLink: 'Hausordnung', rulesB: ' gelesen und akzeptiere sie. Die ', privacyLink: 'Datenschutzhinweise', rulesC: ' habe ich zur Kenntnis genommen.',
     back: 'Zurück', next: 'Weiter', sending: 'Wird gesendet …', submit: 'Anfrage verbindlich senden', memberOrExt: 'Mitglied oder extern',
   },
   rules: {
     category: 'Bitte wähle eine Kategorie.', range: 'Das Ende muss nach dem Beginn liegen.', past: 'Der Zeitpunkt liegt in der Vergangenheit.',
-    duration: (c: string, h: number) => `Für „${c}“ geht eine Buchung maximal ${h} Stunden.`, horizon: (m: number) => `Buchungen sind höchstens ${m} Monate im Voraus möglich.`,
+    multiDayMax: (n: number) => `Mehrtägige Veranstaltungen gehen höchstens über ${n} Tage.`, duration: (c: string, h: number) => `Für „${c}“ geht eine Buchung maximal ${h} Stunden.`, horizon: (m: number) => `Buchungen sind höchstens ${m} Monate im Voraus möglich.`,
     overlap: (when: string, confirmed: boolean) => `Belegt: ${when} (${confirmed ? 'gebucht' : 'angefragt'}).`,
     buffer: (when: string, min: number) => `Zu nah an einem Termin (${when}). Dazwischen braucht es ${min} Minuten für Auf- und Abbau.`,
     shiftTo: (t: string) => `Auf ${t} Uhr verschieben`,
@@ -132,7 +132,7 @@ const de = {
     waitInput: 'Bitte Name und eine gültige E-Mail-Adresse angeben.', past: 'Der Termin liegt in der Vergangenheit.' },
   error: { title: 'Hier ist etwas schiefgelaufen', text: 'Die Seite konnte gerade nicht geladen werden. Bitte versuch es in einem Moment noch einmal.', retry: 'Erneut versuchen', offline: 'Keine Verbindung: du siehst die zuletzt gespeicherte Ansicht.',
     install: { title: 'Als App aufs Handy', body: 'Speichere den Jugendraum auf deinem Startbildschirm. Deine Buchungen kannst du dann auch ohne Netz ansehen.', button: 'Jetzt speichern', ios: 'In Safari unten auf „Teilen“ tippen und dann „Zum Home-Bildschirm“ wählen.', close: 'Hinweis schließen' },
-    nfTitle: 'Diese Tür ist leider zu', nfText: 'Die Seite gibt es nicht (mehr). Vielleicht wurde der Link falsch kopiert oder die Buchung ist schon gelöscht.', home: 'Zur Startseite', maintTitle: 'Wir räumen kurz auf', maintText: 'Die Seite wird gerade gewartet und ist gleich wieder da. Dringende Fragen bitte direkt an Michael Grieswelle oder Sigrid Brodig.' },
+    nfTitle: 'Diese Tür ist leider zu', nfText: 'Die Seite gibt es nicht (mehr). Vielleicht wurde der Link falsch kopiert oder die Buchung ist schon gelöscht.', home: 'Zur Startseite', maintTitle: 'Wir räumen kurz auf', maintText: 'Die Seite wird gerade gewartet und ist gleich wieder da. Dringende Fragen bitte direkt an {wer}.' },
 };
 
 type Dict = typeof de;
@@ -146,7 +146,7 @@ const en: Dict = {
     text: 'For coaches’ meetings, team evenings, club events and private parties. You can see free times right away; the organising team confirms your request by email.',
     capacity: (n) => `up to ${n} people`, oneParty: 'one party per weekend', lead: (d) => `request parties at least ${d} days ahead`,
     nextFree: 'Next free evenings', nextFreeHint: 'Tap to request directly',
-    eyebrow: 'SV Heepen · Youth room', cta: 'Request now', more: 'Room & rules', noneFree: 'The evenings in the coming weeks are booked. Pick another time in the calendar below.', evening: 'evening', otherDay: 'Choose another day', share: 'Share via WhatsApp',
+    statPeople: 'people max.', statParty: 'party per weekend', statLead: 'days’ notice for parties', boardLive: 'live', eyebrow: 'SV Heepen · Youth room', cta: 'Request now', more: 'Room & rules', noneFree: 'The evenings in the coming weeks are booked. Pick another time in the calendar below.', evening: 'evening', otherDay: 'Choose another day', share: 'Share via WhatsApp',
   },
   cats: {
     meet: ['Meeting', 'Coaches, board'], team: ['Team meeting', 'Team evening'], event: ['Club event', 'Parents’ evening, awards'],
@@ -158,7 +158,7 @@ const en: Dict = {
     room: 'Room', upTo: (n: number) => `up to ${n} people`,
     altTitle: 'Alternative dates', altHint: 'in case your preferred day does not work, same time', altAdd: 'Alternative day', altRemove: 'Remove', altTaken: 'taken', altOk: 'free', altUnknown: 'checked on sending',
     draftShare: 'Share draft', draftCopied: 'Link copied', draftHint: 'to agree on it, without your contact details', draftText: 'Can you take a look? Our request for the youth room:',
-    repeatLabel: 'Repeat regularly', repeatHint: 'e.g. training or meetings, up to 12 dates', weekly: 'every week', biweekly: 'every 2 weeks', dates: 'dates',
+    multiLabel: 'Over several days', multiHint: (n) => `e.g. tournament, course or retreat, up to ${n} days in a row`, endDay: 'Last day', startDay: 'First day', multiFrom: 'Start', multiTo: 'End', multiDays: (n) => `${n} days`, repeatLabel: 'Repeat regularly', repeatHint: 'e.g. training or meetings, up to 12 dates', weekly: 'every week', biweekly: 'every 2 weeks', dates: 'dates',
     repeatTaken: 'taken, will be skipped', repeatCheck: 'checked when you send', repeatNote: 'The team always reviews series.',
     doneSeries: (n: number, k: number) => `Requested: ${n} dates${k ? `, ${k} taken dates skipped` : ''}.`,
     steps: ['Occasion', 'Date', 'Contact', 'Review'],
@@ -194,13 +194,13 @@ const en: Dict = {
     feeInfo: (rent, dep) => `This use costs ${[rent && `a usage fee of ${rent}`, dep && `a deposit of ${dep}`].filter(Boolean).join(' and ')}. You get the deposit back after the room has been inspected.`,
     checkTitle: 'Review and send', checkLead: 'Check your details in the summary. By sending, you make a binding request.',
     appointment: 'Date', until: 'until', contact: 'Contact', notMember: '(not a club member)', message: 'Message',
-    agree: 'I have agreed the use in advance with Michael Grieswelle or Sigrid Brodig.', agreeNote: 'Without prior agreement the booking is invalid.', agreedWith: 'Agreed with',
+    agree: 'I have agreed the use in advance with {wer}.', agreeNote: 'Without prior agreement the booking is invalid.', agreedWith: 'Agreed with',
     rulesA: 'I have read and accept the ', rulesLink: 'house rules', rulesB: '. I have taken note of the ', privacyLink: 'privacy notice', rulesC: '.',
     back: 'Back', next: 'Next', sending: 'Sending …', submit: 'Send binding request', memberOrExt: 'Member or external',
   },
   rules: {
     category: 'Please choose a category.', range: 'The end must be after the start.', past: 'This time is in the past.',
-    duration: (c, h) => `A “${c}” booking can last at most ${h} hours.`, horizon: (m) => `Bookings are possible at most ${m} months in advance.`,
+    multiDayMax: (n) => `Multi-day events can span at most ${n} days.`, duration: (c, h) => `A “${c}” booking can last at most ${h} hours.`, horizon: (m) => `Bookings are possible at most ${m} months in advance.`,
     overlap: (when, confirmed) => `Booked: ${when} (${confirmed ? 'confirmed' : 'requested'}).`,
     buffer: (when, min) => `Too close to another booking (${when}). ${min} minutes are needed in between for setup and clean-up.`,
     shiftTo: (t) => `Move to ${t}`,
@@ -255,7 +255,7 @@ const en: Dict = {
     waitInput: 'Please enter a name and a valid email address.', past: 'This date is in the past.' },
   error: { title: 'Something went wrong', text: 'The page could not be loaded just now. Please try again in a moment.', retry: 'Try again', offline: 'No connection: you are seeing the last saved version.',
     install: { title: 'Save as an app', body: 'Add the youth room to your home screen. You can then view your bookings even without a connection.', button: 'Save now', ios: 'In Safari tap “Share” and then “Add to Home Screen”.', close: 'Close hint' },
-    nfTitle: 'This door is closed', nfText: 'This page does not exist (any more). Maybe the link was copied incorrectly or the booking has been deleted.', home: 'Go to start page', maintTitle: 'We are tidying up', maintText: 'The site is under maintenance and will be back shortly. For urgent questions please contact Michael Grieswelle or Sigrid Brodig.' },
+    nfTitle: 'This door is closed', nfText: 'This page does not exist (any more). Maybe the link was copied incorrectly or the booking has been deleted.', home: 'Go to start page', maintTitle: 'We are tidying up', maintText: 'The site is under maintenance and will be back shortly. For urgent questions please contact {wer}.' },
 };
 
 const tr: Dict = {
@@ -265,7 +265,7 @@ const tr: Dict = {
     text: 'Antrenör toplantıları, takım akşamları, kulüp etkinlikleri ve özel kutlamalar için. Boş saatleri hemen görürsünüz; organizasyon ekibi talebinizi e-posta ile onaylar.',
     capacity: (n) => `en fazla ${n} kişi`, oneParty: 'hafta sonu başına bir kutlama', lead: (d) => `kutlamaları en az ${d} gün önceden talep edin`,
     nextFree: 'Sıradaki boş akşamlar', nextFreeHint: 'Dokunun ve hemen talep edin',
-    eyebrow: 'SV Heepen · Gençlik salonu', cta: 'Hemen talep et', more: 'Salon ve kurallar', noneFree: 'Önümüzdeki haftalarda akşamlar dolu. Aşağıdaki takvimden başka bir zaman seçin.', evening: 'akşam', otherDay: 'Başka bir gün seç', share: 'WhatsApp ile paylaş',
+    statPeople: 'kişi en fazla', statParty: 'hafta sonu başına kutlama', statLead: 'gün önceden (kutlama)', boardLive: 'güncel', eyebrow: 'SV Heepen · Gençlik salonu', cta: 'Hemen talep et', more: 'Salon ve kurallar', noneFree: 'Önümüzdeki haftalarda akşamlar dolu. Aşağıdaki takvimden başka bir zaman seçin.', evening: 'akşam', otherDay: 'Başka bir gün seç', share: 'WhatsApp ile paylaş',
   },
   cats: {
     meet: ['Toplantı', 'Antrenörler, yönetim'], team: ['Takım toplantısı', 'Takım akşamı'], event: ['Kulüp etkinliği', 'Veli toplantısı, ödül töreni'],
@@ -277,7 +277,7 @@ const tr: Dict = {
     room: 'Salon', upTo: (n: number) => `en fazla ${n} kişi`,
     altTitle: 'Alternatif tarihler', altHint: 'istediğin gün olmazsa, aynı saat', altAdd: 'Alternatif gün', altRemove: 'Kaldır', altTaken: 'dolu', altOk: 'boş', altUnknown: 'gönderirken kontrol edilecek',
     draftShare: 'Taslağı paylaş', draftCopied: 'Bağlantı kopyalandı', draftHint: 'birlikte karar vermek için, iletişim bilgilerin olmadan', draftText: 'Bakabilir misin? Gençlik salonu talebimiz:',
-    repeatLabel: 'Düzenli tekrarla', repeatHint: 'ör. antrenman veya toplantılar, en fazla 12 tarih', weekly: 'her hafta', biweekly: '2 haftada bir', dates: 'tarih',
+    multiLabel: 'Birkaç gün boyunca', multiHint: (n) => `ör. turnuva, kurs veya kamp, art arda en fazla ${n} gün`, endDay: 'Son gün', startDay: 'İlk gün', multiFrom: 'Başlangıç', multiTo: 'Bitiş', multiDays: (n) => `${n} gün`, repeatLabel: 'Düzenli tekrarla', repeatHint: 'ör. antrenman veya toplantılar, en fazla 12 tarih', weekly: 'her hafta', biweekly: '2 haftada bir', dates: 'tarih',
     repeatTaken: 'dolu, atlanacak', repeatCheck: 'gönderirken kontrol edilecek', repeatNote: 'Serileri her zaman ekip inceler.',
     doneSeries: (n: number, k: number) => `Talep edildi: ${n} tarih${k ? `, ${k} dolu tarih atlandı` : ''}.`,
     steps: ['Etkinlik', 'Tarih', 'İletişim', 'Kontrol'],
@@ -313,13 +313,13 @@ const tr: Dict = {
     feeInfo: (rent, dep) => `Bu kullanım için ${[rent && `${rent} kullanım ücreti`, dep && `${dep} depozito`].filter(Boolean).join(' ve ')} alınır. Depozito, salon kontrol edildikten sonra iade edilir.`,
     checkTitle: 'Kontrol et ve gönder', checkLead: 'Özetteki bilgileri kontrol edin. Göndererek bağlayıcı bir talepte bulunursunuz.',
     appointment: 'Tarih', until: 'kadar', contact: 'İletişim', notMember: '(kulüp üyesi değil)', message: 'Mesaj',
-    agree: 'Kullanımı önceden Michael Grieswelle veya Sigrid Brodig ile görüştüm.', agreeNote: 'Önceden görüşülmeden yapılan rezervasyon geçersizdir.', agreedWith: 'Görüşülen kişi',
+    agree: 'Kullanımı önceden {wer} ile görüştüm.', agreeNote: 'Önceden görüşülmeden yapılan rezervasyon geçersizdir.', agreedWith: 'Görüşülen kişi',
     rulesA: '', rulesLink: 'Kullanım kurallarını', rulesB: ' okudum ve kabul ediyorum. ', privacyLink: 'Gizlilik bilgilendirmesini', rulesC: ' okudum.',
     back: 'Geri', next: 'İleri', sending: 'Gönderiliyor …', submit: 'Bağlayıcı talebi gönder', memberOrExt: 'Üye veya harici',
   },
   rules: {
     category: 'Lütfen bir kategori seçin.', range: 'Bitiş, başlangıçtan sonra olmalıdır.', past: 'Bu zaman geçmişte kalıyor.',
-    duration: (c, h) => `„${c}“ için rezervasyon en fazla ${h} saat sürebilir.`, horizon: (m) => `Rezervasyonlar en fazla ${m} ay önceden yapılabilir.`,
+    multiDayMax: (n) => `Çok günlü etkinlikler en fazla ${n} gün sürebilir.`, duration: (c, h) => `„${c}“ için rezervasyon en fazla ${h} saat sürebilir.`, horizon: (m) => `Rezervasyonlar en fazla ${m} ay önceden yapılabilir.`,
     overlap: (when, confirmed) => `Dolu: ${when} (${confirmed ? 'onaylandı' : 'talep edildi'}).`,
     buffer: (when, min) => `Başka bir rezervasyona çok yakın (${when}). Arada hazırlık ve toplama için ${min} dakika gerekir.`,
     shiftTo: (t) => `${t} saatine kaydır`,
@@ -374,7 +374,7 @@ const tr: Dict = {
     waitInput: 'Lütfen bir ad ve geçerli bir e-posta adresi girin.', past: 'Bu tarih geçmişte kalıyor.' },
   error: { title: 'Bir şeyler ters gitti', text: 'Sayfa şu anda yüklenemedi. Lütfen birazdan tekrar deneyin.', retry: 'Tekrar dene', offline: 'Bağlantı yok: en son kaydedilen görünümü görüyorsun.',
     install: { title: 'Uygulama olarak kaydet', body: 'Gençlik salonunu ana ekranına ekle. Rezervasyonlarını internet olmadan da görebilirsin.', button: 'Şimdi kaydet', ios: 'Safari’de “Paylaş”a dokun ve “Ana Ekrana Ekle”yi seç.', close: 'İpucunu kapat' },
-    nfTitle: 'Bu kapı kapalı', nfText: 'Bu sayfa yok (artık). Bağlantı yanlış kopyalanmış ya da rezervasyon silinmiş olabilir.', home: 'Ana sayfaya git', maintTitle: 'Kısa bir bakım', maintText: 'Site şu anda bakımda ve birazdan geri dönecek. Acil sorular için Michael Grieswelle veya Sigrid Brodig ile iletişime geçin.' },
+    nfTitle: 'Bu kapı kapalı', nfText: 'Bu sayfa yok (artık). Bağlantı yanlış kopyalanmış ya da rezervasyon silinmiş olabilir.', home: 'Ana sayfaya git', maintTitle: 'Kısa bir bakım', maintText: 'Site şu anda bakımda ve birazdan geri dönecek. Acil sorular için {wer} ile iletişime geçin.' },
 };
 
 export const DICT: Record<Lang, Dict> = { de, en, tr, uk, ar };
