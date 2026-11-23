@@ -1,9 +1,10 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, BellRing, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, Ellipsis, GraduationCap, Megaphone, PartyPopper, Plus, Share2, Shirt, Users, X, XCircle,
+  AlertTriangle, ArrowLeft, ArrowRight, BellRing, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, PartyPopper, Plus, Share2, X, XCircle,
 } from 'lucide-react';
 import { Turnstile } from './Turnstile';
+import { CatIcon } from './ClubIcons';
 import { Blackout, Category, CheckResult, Settings, Slot, allowsMultiDay, blackoutWhen, checkBooking, partyWeekendOf } from '@/lib/rules';
 import { MIN, addDays, berlinHm, berlinToUtc, berlinYmd, fmtDay, fmtLong, weekdayOf } from '@/lib/time';
 import { LOCALE, catLabel, t, type Lang } from '@/lib/i18n';
@@ -18,9 +19,6 @@ export type Occupancy = {
   equipment: string[]; feesExternal: Fees; feesMemberParty: Fees;
 };
 
-const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  meet: Users, team: Shirt, event: Megaphone, work: GraduationCap, party: PartyPopper, misc: Ellipsis,
-};
 const eurL = (n: number, lang: Lang) => n.toLocaleString(LOCALE[lang], { style: 'currency', currency: 'EUR', maximumFractionDigits: n % 1 ? 2 : 0 });
 const monthStart = (k: string) => k.slice(0, 8) + '01';
 const shiftMonth = (k: string, n: number) => {
@@ -331,10 +329,9 @@ export default function BookingApp({ initial, initialMonth, contactNote, prefill
             )}
             <div className="options" role="group" aria-label={T.kindOfUse}>
               {data.categories.map((c) => {
-                const I = ICONS[c.id] ?? Ellipsis;
                 return (
                   <button type="button" key={c.id} className="option" aria-pressed={c.id === catId} onClick={() => setCatId(c.id)} style={{ '--c': c.color } as React.CSSProperties}>
-                    <span className="ico"><I className="icon" /></span><b>{cl(c).name}</b><small>{cl(c).hint}</small>
+                    <span className="ico"><CatIcon id={c.id} className="icon" /></span><b>{cl(c).name}</b><small>{cl(c).hint}</small>
                   </button>
                 );
               })}

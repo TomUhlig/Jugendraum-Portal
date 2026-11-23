@@ -7,6 +7,8 @@ import { getLang } from '@/lib/lang';
 import { LOCALE, t } from '@/lib/i18n';
 import { getExtras, getPublicOccupancy, getRooms, listPhotos, nextFreeEvenings } from '@/lib/data';
 import { Gallery } from '@/components/Gallery';
+import { WeekStrip } from '@/components/WeekStrip';
+import { Flap } from '@/components/Flap';
 import { addDays, berlinParts, berlinToUtc, berlinYmd, fmtLong, hmRange } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
@@ -72,11 +74,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
             </div>
             {free.length > 0 ? (
               <ol className="board-rows">
-                {free.map((f) => (
+                {free.map((f, i) => (
                   <li key={f.date}>
                     <a href={`/?${allRooms.length > 1 ? `raum=${roomParam}&` : ''}datum=${f.date}&von=18:00&bis=22:00#anfrage`}>
                       <span className="b-wd">{wd.format(f.start).replace('.', '')}</span>
-                      <span className="b-day">{String(berlinParts(f.start).day).padStart(2, '0')}</span>
+                      <Flap className="b-day" value={String(berlinParts(f.start).day).padStart(2, '0')} delay={150 + i * 110} />
                       <span className="b-mo">{mo.format(f.start).replace('.', '')}</span>
                       <span className="b-time">{hmRange(f.start, f.end, lang)}</span>
                       <ArrowRight className="icon b-go" aria-hidden />
@@ -93,12 +95,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         </div>
         <div className="wrap">
           <ul className="stats">
-            <li><Users className="icon" aria-hidden /><b>{initial.settings.capacity}</b><span>{I.statPeople}</span></li>
+            <li><Users className="icon" aria-hidden /><b><Flap value={String(initial.settings.capacity)} delay={200} /></b><span>{I.statPeople}</span></li>
             <li><PartyPopper className="icon" aria-hidden /><b>1</b><span>{I.statParty}</span></li>
-            <li><CalendarClock className="icon" aria-hidden /><b>{initial.settings.partyMinLeadDays}</b><span>{I.statLead}</span></li>
+            <li><CalendarClock className="icon" aria-hidden /><b><Flap value={String(initial.settings.partyMinLeadDays)} delay={400} /></b><span>{I.statLead}</span></li>
           </ul>
         </div>
       </section>
+      <WeekStrip today={berlinYmd(Date.now())} slots={initial.slots} blackouts={initial.blackouts} categories={initial.categories} days={initial.days} T={I} locale={LOC} roomParam={allRooms.length > 1 ? roomParam : undefined} />
       {photos.length > 0 && <section className="wrap photos-band" aria-label="Fotos"><Gallery photos={photos} variant="strip" /></section>}
       <div id="anfrage" className="anchor" />
       <BookingApp serverNow={Date.now()} initial={initial} initialMonth={month} contactNote={extras.contactNote} prefill={prefill} turnstileKey={turnstileEnabled() ? turnstileSiteKey() : ''} lang={lang} />

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
-import { CalendarCheck, Clock, PartyPopper, Shirt, Star, Users } from 'lucide-react';
+import { CalendarCheck, Clock, Star, Users } from 'lucide-react';
+import { IcGirlande, IcTrikot } from '@/components/ClubIcons';
 import { bookingsForYear, getCategories, getContacts, getYearReport } from '@/lib/data';
 import { berlinParts, fmtLong } from '@/lib/time';
 import { appUrl } from '@/lib/url';
@@ -31,7 +32,7 @@ export default async function Rueckblick({ params }: { params: Promise<{ jahr: s
   const cat = new Map(cats.map((c) => [c.id, c]));
   const topCat = [...r.byCat].sort((a, b) => (b.n as number) - (a.n as number))[0];
   const url = `${appUrl()}/rueckblick/${year}`;
-  const stat = (Icon: typeof Users, v: string | number, l: string) => <div className="rb-stat"><Icon className="icon" /><b>{typeof v === 'number' ? v.toLocaleString('de-DE') : v}</b><span>{l}</span></div>;
+  const stat = (Icon: React.ComponentType<{ className?: string }>, v: string | number, l: string) => <div className="rb-stat"><Icon className="icon" /><b>{typeof v === 'number' ? v.toLocaleString('de-DE') : v}</b><span>{l}</span></div>;
   return (
     <main className="rb">
       <header className="rb-hero">
@@ -46,8 +47,8 @@ export default async function Rueckblick({ params }: { params: Promise<{ jahr: s
           {stat(CalendarCheck, r.totals.n, 'Termine')}
           {stat(Clock, r.totals.hours, 'Stunden genutzt')}
           {stat(Users, guests, 'Gäste insgesamt')}
-          {stat(PartyPopper, r.totals.parties, 'Feiern')}
-          {stat(Shirt, r.totals.teams, 'Mannschaften und Gruppen')}
+          {stat(IcGirlande, r.totals.parties, 'Feiern')}
+          {stat(IcTrikot, r.totals.teams, 'Mannschaften und Gruppen')}
           {r.feedback.n > 0 && stat(Star, (r.feedback.avg as number).toLocaleString('de-DE', { maximumFractionDigits: 1 }), 'von 5 Sternen')}
         </section>
 

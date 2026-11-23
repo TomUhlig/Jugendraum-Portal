@@ -1100,7 +1100,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--brand-ink); box-
 .stats li + li { padding-inline-start: 24px; border-inline-start: 1px solid rgba(255,255,255,.14) }
 .stats .icon { display: none }
 .stats b { grid-row: span 2; font: 800 3.4rem/.85 var(--f-display); font-stretch: 68%; color: var(--gelb) }
-.stats span { grid-row: span 2; align-self: end; font: 700 .95rem/1.15 var(--f-display); font-stretch: 85%; text-transform: uppercase; letter-spacing: .04em; color: rgba(255,255,255,.85); max-width: 14ch; padding-bottom: 2px }
+.stats li > span { grid-row: span 2; align-self: end; font: 700 .95rem/1.15 var(--f-display); font-stretch: 85%; text-transform: uppercase; letter-spacing: .04em; color: rgba(255,255,255,.85); max-width: 14ch; padding-bottom: 2px }
 @media (max-width: 900px) {
   .hero-grid { grid-template-columns: 1fr; padding-block: 40px 28px; gap: 32px }
   .hero:not(.has-photo)::before { display: none }
@@ -1235,3 +1235,70 @@ th { font: 700 .72rem/1.2 var(--f-display); font-stretch: 85%; text-transform: u
 @media (max-width: 860px) { .facts-grid { grid-template-columns: 1fr 1fr } .fact:nth-child(even) { border-inline-start: 1px solid var(--line) } .fact:nth-child(-n+2) { border-top: 0 } }
 .steps .n { color: var(--muted) }
 .summary dd.tbd { color: var(--muted); font-weight: 600 }
+
+/* ---------- Wappen als Wasserzeichen (Kopf ohne Foto) ---------- */
+.hero:not(.has-photo)::after { content: ""; position: absolute; z-index: -1; width: min(560px, 48vw); aspect-ratio: 1; right: -4vw; top: 50%; transform: translateY(-46%) rotate(-8deg);
+  background: url(/logo.png) center / contain no-repeat; filter: grayscale(1) brightness(1.8); opacity: .07; pointer-events: none }
+[dir="rtl"] .hero:not(.has-photo)::after { right: auto; left: -4vw; transform: translateY(-46%) rotate(8deg) }
+@media (max-width: 900px) { .hero:not(.has-photo)::after { width: 120vw; right: -40vw; top: 4%; transform: rotate(-8deg); opacity: .05 } }
+
+/* ---------- Eigene Symbole ---------- */
+.icon-xs { width: 13px; height: 13px; flex: none }
+.option .ico svg { width: 22px; height: 22px }
+
+/* ---------- Fallblatt ---------- */
+.flap { display: inline-block; perspective: 300px }
+.flap-ch { display: inline-block; transform-origin: 50% 50%; animation: flapIn .11s cubic-bezier(.3, .7, .4, 1) }
+@keyframes flapIn { from { transform: rotateX(80deg); opacity: .4 } }
+.b-day { position: relative; overflow: hidden }
+.b-day::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(0, 0, 0, .55); box-shadow: 0 1px 0 rgba(255,255,255,.05) }
+@media (prefers-reduced-motion: reduce) { .flap-ch { animation: none } }
+
+/* ---------- Wochenstreifen ---------- */
+.weekstrip { margin-top: 36px }
+.ws-head { display: flex; justify-content: space-between; align-items: end; gap: 6px 20px; flex-wrap: wrap; margin-bottom: 12px }
+.ws-head h2 { font-size: clamp(1.6rem, 3vw, 2.1rem); font-weight: 800; font-stretch: 72%; text-transform: uppercase; line-height: 1 }
+.ws-head p { color: var(--muted); font-size: .9rem }
+.ws-days { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden }
+.ws-days li + li { border-inline-start: 1px solid var(--line) }
+.ws-days a { display: grid; grid-template-rows: auto 150px auto; gap: 10px; padding: 12px 10px 12px; color: var(--ink); text-decoration: none; height: 100%; position: relative; transition: background .12s }
+.ws-days a:hover { background: var(--brand-tint) }
+.ws-days .is-today a { box-shadow: inset 0 4px 0 var(--gelb) }
+.ws-date { display: flex; align-items: baseline; justify-content: space-between; gap: 6px }
+.ws-date small { font: 700 .74rem/1 var(--f-display); font-stretch: 85%; text-transform: uppercase; letter-spacing: .08em; color: var(--muted) }
+.ws-date b { font: 800 2rem/.9 var(--f-display); font-stretch: 68%; font-variant-numeric: tabular-nums }
+.is-today .ws-date small { color: var(--brand-ink) }
+.is-hol .ws-date b { color: var(--bad) }
+.ws-track { position: relative; background: var(--surface-2); border-radius: 3px; overflow: hidden }
+.ws-tick { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--line); font-style: normal }
+.ws-tick em { position: absolute; top: 1px; inset-inline-end: 3px; font: 600 .62rem/1 var(--f-body); color: var(--ink-2); font-style: normal }
+.ws-eve { position: absolute; left: 0; right: 0; background: color-mix(in srgb, var(--gelb) 16%, transparent); border-block: 1px solid color-mix(in srgb, var(--gelb) 45%, transparent) }
+.ws-blk { position: absolute; left: 4px; right: 4px; background: var(--c); border-radius: 2px; display: grid; place-items: start center; padding-top: 3px; color: #fff; box-shadow: 0 0 0 1.5px var(--surface-2) }
+.ws-blk.open { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--c) 55%, transparent) 0 4px, color-mix(in srgb, var(--c) 30%, transparent) 4px 8px); border: 1.5px solid var(--c); color: var(--c) }
+.is-closed .ws-track { background: repeating-linear-gradient(135deg, var(--surface-2) 0 6px, var(--bad-bg) 6px 9px) }
+.ws-state { font: 700 .78rem/1.1 var(--f-display); font-stretch: 85%; text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: 6px }
+.ws-state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none }
+.ws-state.free { color: var(--ok) }
+.ws-state.busy { color: var(--muted) }
+.ws-hol { position: absolute; top: 34px; inset-inline: 10px; font-size: .66rem; color: var(--bad); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+@media (max-width: 760px) {
+  .ws-days { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none }
+  .ws-days::-webkit-scrollbar { display: none }
+  .ws-days li { flex: 0 0 31%; scroll-snap-align: start }
+  .ws-days a { grid-template-rows: auto 120px auto }
+}
+
+/* ---------- Wischen zum Entscheiden (Verwaltung, Touch) ---------- */
+.swipe-hint { display: none; font-size: .78rem; color: var(--muted) }
+@media (hover: none) and (pointer: coarse) { .swipe-hint { display: inline } }
+.req-item.swipe { position: relative; overflow: hidden; padding: 0 !important }
+.swipe-card { position: relative; z-index: 1; background: var(--surface); padding: 14px 20px; display: grid; gap: 8px; transition: transform .22s cubic-bezier(.2, .8, .3, 1); touch-action: pan-y }
+.swipe-bg { position: absolute; inset: 0; display: flex; align-items: center; gap: 10px; padding: 0 22px; font: 800 1rem/1 var(--f-display); font-stretch: 80%; text-transform: uppercase; letter-spacing: .05em; color: #fff; opacity: 0 }
+.swipe-bg.ok { background: var(--ok); justify-content: flex-start }
+.swipe-bg.no { background: var(--bad); justify-content: flex-end }
+.swipe.to-ok .swipe-bg.ok, .swipe.to-no .swipe-bg.no { opacity: calc(.35 + var(--p) * .65) }
+.swipe-bg .icon { transform: scale(calc(.8 + var(--p) * .5)); transition: transform .1s }
+.swipe.armed .swipe-bg .icon { transform: scale(1.35) }
+:root[data-theme="dark"] .swipe-bg { color: #0B0D1A }
+.options { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) }
+.option b { hyphens: manual }

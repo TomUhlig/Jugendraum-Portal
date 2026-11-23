@@ -23,7 +23,7 @@ const de = {
     text: 'Für Trainerbesprechungen, Mannschaftsabende, Vereinsveranstaltungen und private Feiern. Freie Zeiten siehst du direkt, das Orga-Team bestätigt deine Anfrage per E-Mail.',
     capacity: (n: number) => `bis ${n} Personen`, oneParty: 'eine Feier pro Wochenende', lead: (d: number) => `Feiern mind. ${d} Tage vorher anfragen`,
     nextFree: 'Nächste freie Abende', nextFreeHint: 'Antippen und direkt anfragen',
-    statPeople: 'Personen höchstens', statParty: 'Feier pro Wochenende', statLead: 'Tage Vorlauf für Feiern', boardLive: 'aktuell', eyebrow: 'SV Heepen · Jugendraum', cta: 'Jetzt anfragen', more: 'Raum & Regeln', noneFree: 'In den nächsten Wochen sind die Abende ausgebucht. Wähle unten im Kalender einen anderen Zeitraum.', evening: 'Abend', otherDay: 'Anderen Tag wählen', share: 'Per WhatsApp teilen',
+    weekTitle: 'Die nächsten sieben Tage', weekHint: 'Belegung von 8 bis 24 Uhr. Tag antippen und direkt anfragen.', eveningFree: 'Abend frei', eveningBusy: 'Abend belegt', dayClosed: 'gesperrt', today: 'Heute', statPeople: 'Personen höchstens', statParty: 'Feier pro Wochenende', statLead: 'Tage Vorlauf für Feiern', boardLive: 'aktuell', eyebrow: 'SV Heepen · Jugendraum', cta: 'Jetzt anfragen', more: 'Raum & Regeln', noneFree: 'In den nächsten Wochen sind die Abende ausgebucht. Wähle unten im Kalender einen anderen Zeitraum.', evening: 'Abend', otherDay: 'Anderen Tag wählen', share: 'Per WhatsApp teilen',
   },
   cats: {
     meet: ['Besprechung', 'Trainer, Vorstand'], team: ['Mannschaftssitzung', 'Teamabend'], event: ['Vereinsveranstaltung', 'Elternabend, Ehrung'],
@@ -146,7 +146,7 @@ const en: Dict = {
     text: 'For coaches’ meetings, team evenings, club events and private parties. You can see free times right away; the organising team confirms your request by email.',
     capacity: (n) => `up to ${n} people`, oneParty: 'one party per weekend', lead: (d) => `request parties at least ${d} days ahead`,
     nextFree: 'Next free evenings', nextFreeHint: 'Tap to request directly',
-    statPeople: 'people max.', statParty: 'party per weekend', statLead: 'days’ notice for parties', boardLive: 'live', eyebrow: 'SV Heepen · Youth room', cta: 'Request now', more: 'Room & rules', noneFree: 'The evenings in the coming weeks are booked. Pick another time in the calendar below.', evening: 'evening', otherDay: 'Choose another day', share: 'Share via WhatsApp',
+    weekTitle: 'The next seven days', weekHint: 'Bookings from 8 am to midnight. Tap a day to request it.', eveningFree: 'Evening free', eveningBusy: 'Evening booked', dayClosed: 'closed', today: 'Today', statPeople: 'people max.', statParty: 'party per weekend', statLead: 'days’ notice for parties', boardLive: 'live', eyebrow: 'SV Heepen · Youth room', cta: 'Request now', more: 'Room & rules', noneFree: 'The evenings in the coming weeks are booked. Pick another time in the calendar below.', evening: 'evening', otherDay: 'Choose another day', share: 'Share via WhatsApp',
   },
   cats: {
     meet: ['Meeting', 'Coaches, board'], team: ['Team meeting', 'Team evening'], event: ['Club event', 'Parents’ evening, awards'],
@@ -265,7 +265,7 @@ const tr: Dict = {
     text: 'Antrenör toplantıları, takım akşamları, kulüp etkinlikleri ve özel kutlamalar için. Boş saatleri hemen görürsünüz; organizasyon ekibi talebinizi e-posta ile onaylar.',
     capacity: (n) => `en fazla ${n} kişi`, oneParty: 'hafta sonu başına bir kutlama', lead: (d) => `kutlamaları en az ${d} gün önceden talep edin`,
     nextFree: 'Sıradaki boş akşamlar', nextFreeHint: 'Dokunun ve hemen talep edin',
-    statPeople: 'kişi en fazla', statParty: 'hafta sonu başına kutlama', statLead: 'gün önceden (kutlama)', boardLive: 'güncel', eyebrow: 'SV Heepen · Gençlik salonu', cta: 'Hemen talep et', more: 'Salon ve kurallar', noneFree: 'Önümüzdeki haftalarda akşamlar dolu. Aşağıdaki takvimden başka bir zaman seçin.', evening: 'akşam', otherDay: 'Başka bir gün seç', share: 'WhatsApp ile paylaş',
+    weekTitle: 'Önümüzdeki yedi gün', weekHint: '08:00–24:00 arası doluluk. Bir güne dokun ve talep et.', eveningFree: 'Akşam boş', eveningBusy: 'Akşam dolu', dayClosed: 'kapalı', today: 'Bugün', statPeople: 'kişi en fazla', statParty: 'hafta sonu başına kutlama', statLead: 'gün önceden (kutlama)', boardLive: 'güncel', eyebrow: 'SV Heepen · Gençlik salonu', cta: 'Hemen talep et', more: 'Salon ve kurallar', noneFree: 'Önümüzdeki haftalarda akşamlar dolu. Aşağıdaki takvimden başka bir zaman seçin.', evening: 'akşam', otherDay: 'Başka bir gün seç', share: 'WhatsApp ile paylaş',
   },
   cats: {
     meet: ['Toplantı', 'Antrenörler, yönetim'], team: ['Takım toplantısı', 'Takım akşamı'], event: ['Kulüp etkinliği', 'Veli toplantısı, ödül töreni'],

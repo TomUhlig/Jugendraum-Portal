@@ -162,7 +162,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
                 <form action={decideAction} className="stack-sm">
                   {hidden(b.status === 'confirmed' ? 'cancel' : 'reject')}
                   <div className="field"><label htmlFor="reason">{b.status === 'confirmed' ? 'Stornieren' : 'Ablehnen'}: Begründung für {b.name}</label>
-                    <textarea id="reason" name="reason" required minLength={3} style={{ minHeight: 70 }} placeholder="z. B. An diesem Wochenende findet das Vereinsfest statt." />
+                    <textarea id="reason" name="reason" required minLength={3} autoFocus={sp.ablehnen === '1'} style={{ minHeight: 70 }} placeholder="z. B. An diesem Wochenende findet das Vereinsfest statt." />
                     <TemplatePicker target="reason" items={tpl('reject')} /></div>
                   <button className="btn btn-danger" type="submit" style={{ justifySelf: 'start' }}>{b.status === 'confirmed' ? 'Buchung stornieren' : 'Anfrage ablehnen'}</button>
                 </form>

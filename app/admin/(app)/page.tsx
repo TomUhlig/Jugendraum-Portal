@@ -1,3 +1,4 @@
+import { SwipeDecide } from '@/components/SwipeDecide';
 import { AlertTriangle, ArrowRight, Check, KeyRound, Lock, MailWarning, MessageSquareText, Plus, Settings2, Wallet, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { Flash, PageHead } from '@/components/Flash';
@@ -64,12 +65,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
       <div className="grid-2">
         <section className="card" id="anfragen">
-          <div className="card-head"><h2>Offene Anfragen</h2><Link href="/admin/buchungen?status=requested" className="small">Alle anzeigen</Link></div>
+          <div className="card-head"><h2>Offene Anfragen</h2>{open.length > 0 && canDecide && <span className="swipe-hint">Wischen: → bestätigen · ← ablehnen</span>}<Link href="/admin/buchungen?status=requested" className="small">Alle anzeigen</Link></div>
           {open.length === 0 ? <div className="empty">Keine offenen Anfragen. Neue Anfragen erscheinen hier und kommen per Mail an alle mit aktivierter Benachrichtigung.</div> : (
             <ul className="list">{open.map((b, i) => {
               const c = cat.get(b.categoryId); const r = checks[i];
               return (
-                <li key={b.id} className="req-item">
+                <SwipeDecide key={b.id} id={b.id} canDecide={canDecide}>
                   <div className="between"><Link className="t" href={`/admin/buchung/${b.id}`}>{b.title}</Link><span className="catdot small" style={{ '--c': c?.color } as React.CSSProperties}>{c?.name}</span></div>
                   <div className="meta"><span className="num">{fmtRange(b.start, b.end)}</span><span>{b.name}{b.team ? `, ${b.team}` : ''}</span><span>{b.bookerType === 'external' ? 'nicht im Verein' : 'Mitglied'} · {b.guests} Pers.</span><span>abgesprochen mit {b.agreedWith}</span></div>
                   {b.note && <div className="note">{b.note}</div>}
@@ -77,10 +78,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                     <span className={`badge b-${r.level === 'ok' ? 'ok' : r.level === 'warn' ? 'warn' : 'bad'}`}>{r.level === 'ok' ? 'Keine Konflikte' : r.messages[0].text}</span>
                     <div className="inline">
                       <Link className="btn btn-sm" href={`/admin/buchung/${b.id}`}>Details</Link>
-                      {canDecide && <form action={decideAction}><input type="hidden" name="id" value={b.id} /><input type="hidden" name="action" value="confirm" /><input type="hidden" name="back" value="/admin" /><button className="btn btn-sm btn-ok" type="submit"><Check className="icon-sm" />Bestätigen</button></form>}
+                      {canDecide && <form action={decideAction} data-swipe-confirm><input type="hidden" name="id" value={b.id} /><input type="hidden" name="action" value="confirm" /><input type="hidden" name="back" value="/admin" /><button className="btn btn-sm btn-ok" type="submit"><Check className="icon-sm" />Bestätigen</button></form>}
                     </div>
                   </div>
-                </li>
+                </SwipeDecide>
               );
             })}</ul>
           )}
